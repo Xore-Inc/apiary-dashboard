@@ -4,9 +4,9 @@
 #
 # Runs beside the old honeypot-dashboard project, not instead of it: this
 # project binds only the staging port 19092, the old one keeps 19090, so
-# production cutover and rollback are a Traefik route edit each. The two
-# share nothing but the `honeynet` network and the BFF log directory —
-# sessions live in this project's own Valkey and do not carry over.
+# production cutover and rollback are a Traefik route edit each. Sessions
+# live in this project's own Valkey and do not carry over. Use
+# compose.honeynet.yml while the backend is still on the local honeynet.
 #
 # Every required value fails closed at interpolation (`:?`), so a sync
 # without the host-local .env deploys nothing.
@@ -66,17 +66,14 @@ services:
         condition: service_healthy
     environment:
       - PORT=3000
-      - BACKEND_URL=http://backend-service:8081
-      - BACKEND_MOUNTED_URL=http://backend-service-mounted:8082
+      - BACKEND_URL=${BACKEND_URL:?set BACKEND_URL}
+      - BACKEND_MOUNTED_URL=${BACKEND_MOUNTED_URL:?set BACKEND_MOUNTED_URL}
       - SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}
       - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:?set OIDC_ISSUER_URL}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID}
       - OIDC_CLIENT_SECRET_FILE=/run/dashboard-secrets/oidc-client-secret
       - OIDC_SESSION_REDIS_URL=redis://oidc-sessions:6379/0
       - EXTERNAL_URL=${EXTERNAL_URL:?set EXTERNAL_URL}
-      # rewrite.jsonl, not app.jsonl: the old dashboard still writes and
-      # rotates app.jsonl in the same directory during the overlap.
-      - DASHBOARD_BFF_LOG_FILE=/logs/dashboard-bff/rewrite.jsonl
       - HONEYPOT_DOMAIN=${HONEYPOT_DOMAIN:-}
       - KIBANA_PUBLIC_URL=${KIBANA_PUBLIC_URL:-}
       - EVEBOX_PUBLIC_URL=${EVEBOX_PUBLIC_URL:-}
@@ -96,15 +93,12 @@ services:
       - '${HP_BIND:-127.0.0.1}:19092:3000'
     volumes:
       - ${DASHBOARD_SECRETS_DIR:-/var/dockge/stacks/apiary-dashboard/secrets}:/run/dashboard-secrets:ro
-      # Read-write: the image runs as bun (uid 1000), the owner
-      # honeypot-init's log-init step already gives this directory.
-      - /opt/stacks/apiary/logs/dashboard-bff:/logs/dashboard-bff
     # The secret is readable by deploy-runner's group only. Its GID differs
     # per host build, so it comes from the host-local .env, never a default.
     group_add:
       - '${DEPLOY_RUNNER_GID:?set DEPLOY_RUNNER_GID}'
     networks:
-      - honeynet
+      - backend-access
       - oidc-session
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
@@ -118,8 +112,6 @@ services:
 networks:
   oidc-session:
     internal: true
-  # Shared with the backend stacks: explicit fixed name, non-external, the
-  # same declaration every APIARY stack uses.
-  honeynet:
-    name: honeynet
+  # Portable egress network; the dashboard host needs no APIARY network.
+  backend-access:
     driver: bridge
