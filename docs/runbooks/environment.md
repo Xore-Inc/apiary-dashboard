@@ -14,7 +14,7 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 | `OIDC_CLIENT_SECRET_FILE` | Preferred client-secret input. `OIDC_CLIENT_SECRET` is supported when file secrets are unavailable. |
 | `OIDC_SESSION_REDIS_URL` | Dedicated Redis URL for sessions and one-time PKCE state. |
 | `EXTERNAL_URL` | Exact public origin for this deployment. It controls redirects and same-origin checks. |
-| `DASHBOARD_BFF_LOG_FILE` | Durable JSONL path collected by Filebeat. |
+| `DASHBOARD_BFF_LOG_FILE` | Optional JSONL file sink; unset emits named events to stdout for the container log collector. |
 | `PORT` | Container port; image default `3000`. |
 
 Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`, `BACKEND_MAX_QUEUE=50`, `LIVE_MAX_STREAMS=500`, and `BFF_EVENT_LOOP_SHED_MS=250`. Change them only from measured load evidence.
@@ -27,7 +27,7 @@ Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC
 2. Create the Keycloak client with authorization-code flow and PKCE. Register both the soak and main callback URLs: `https://next.dashboard.example.test/auth/callback` and `https://dashboard.example.test/auth/callback`.
 3. Map the client `admin` role. Authenticated users without it are viewers.
 4. Grant backend network access only from the rewrite deployment and install the same `SERVICE_TOKEN` at both ends.
-5. Mount the log path and client-secret file read-only where applicable.
+5. Mount the client-secret directory read-only. Mount a writable log directory only when using `DASHBOARD_BFF_LOG_FILE`; otherwise collect structured container stdout.
 6. Render the final environment, confirm every required value is non-empty, and confirm every development-only variable is absent. Do not print secret values into the change record.
 
 ## Validation

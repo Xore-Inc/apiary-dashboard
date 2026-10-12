@@ -119,14 +119,14 @@ compose file should contain:
    session data.
 4. Dashboard runtime configuration:
    - `PORT=3000`
-   - `BACKEND_URL=http://backend-service:8081`
-   - `BACKEND_MOUNTED_URL=http://backend-service-mounted:8082`
+   - `BACKEND_URL=${BACKEND_URL:?set BACKEND_URL}` (set to `http://backend-service:8081` for this co-located stage)
+   - `BACKEND_MOUNTED_URL=${BACKEND_MOUNTED_URL:?set BACKEND_MOUNTED_URL}` (set to `http://backend-service-mounted:8082` for this stage)
    - `SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}`
    - `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, and
      `OIDC_CLIENT_SECRET_FILE=/run/dashboard-secrets/oidc-client-secret`
    - `OIDC_SESSION_REDIS_URL=redis://oidc-sessions:6379/0`
    - `EXTERNAL_URL=${EXTERNAL_URL:?set EXTERNAL_URL}`
-   - `DASHBOARD_BFF_LOG_FILE=/logs/dashboard-bff/rewrite.jsonl`
+   - `DASHBOARD_BFF_LOG_FILE=/logs/dashboard-bff/rewrite.jsonl` from `compose.honeynet.yml` during this co-located stage
    - Optional tool-link variables already supported by the application.
 5. The staging binding `${HP_BIND:-127.0.0.1}:19092:3000`. Do not bind
    `19090`; keeping the old project on `19090` is what makes rollback a
@@ -134,19 +134,20 @@ compose file should contain:
    `:?`: Arcane validates the compose file before the host-local `.env` exists
    and substitutes a placeholder for unset required values, which is not an
    IP address. Unset therefore leaves the port unreachable from the VPS.
-6. The existing host log directory mounted read-write at
-   `/logs/dashboard-bff`, and the new project's secret directory mounted
-   read-only at `/run/dashboard-secrets`.
+6. The new project's secret directory mounted read-only at
+   `/run/dashboard-secrets`. The co-located override mounts the existing host
+   log directory read-write at `/logs/dashboard-bff`; standalone deployment
+   ships structured container stdout instead.
 7. The host's real deploy-runner GID supplied through `group_add`, matching the
    existing secret-permission pattern. Do not hard-code a system GID.
-8. `honeynet` declared with `name: honeynet` and `driver: bridge`, plus a
-   project-local internal network for Valkey.
+8. A project-local outbound network and internal network for Valkey. The
+   co-located override joins the existing external `honeynet` bridge.
 9. The image health check, `restart: unless-stopped`, `autoheal=true`,
    `no-new-privileges`, dropped capabilities, and explicit CPU/memory limits.
 
 The standalone frontend needs no Docker named volumes from
-`honeypot-dashboard`. Its only shared resources are `honeynet` and the BFF log
-bind mount.
+`honeypot-dashboard`. Its co-located override shares `honeynet` and the BFF
+log bind mount; the base Compose file does not.
 
 ### 1.2 Make provisioning reproducible
 
@@ -294,6 +295,8 @@ APIARY_DASHBOARD_VERSION=vX.Y.Z
 APIARY_DASHBOARD_DIGEST=sha256:<manifest-digest>
 HP_BIND=<homeserver-wireguard-address>
 SERVICE_TOKEN=<backend-shared-secret>
+BACKEND_URL=http://backend-service:8081
+BACKEND_MOUNTED_URL=http://backend-service-mounted:8082
 OIDC_ISSUER_URL=https://auth.example.test/realms/apiary
 OIDC_CLIENT_ID=apiary-dashboard-rewrite
 EXTERNAL_URL=https://next.dashboard.example.test
@@ -317,7 +320,7 @@ values:
 
 ```bash
 ssh homeserver \
-  'cd /var/dockge/stacks/apiary-dashboard && sudo docker compose config --quiet'
+  'cd /var/dockge/stacks/apiary-dashboard && sudo docker compose -f compose.yml -f compose.honeynet.yml config --quiet'
 ```
 
 Redeploy with `POST /api/environments/0/projects/<project-id>/up`. Arcane calls

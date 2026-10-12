@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { admissionGate } from './admission'
 import { flushNamedEvents, recordNamedEvent, recordRequest, renderMetrics } from './obs'
 
@@ -47,5 +47,16 @@ describe('metrics', () => {
     await flushNamedEvents()
     expect((await stat(`${file}.1`)).size).toBe(25 * 1024 * 1024)
     expect(JSON.parse(await readFile(file, 'utf8'))).toMatchObject({ 'event.action': 'auth_callback_completed', level: 'info' })
+  })
+
+  it('writes structured events to stdout without a host log mount', async () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      recordNamedEvent('auth_callback_completed', { reason: 'ok' })
+      await flushNamedEvents()
+      expect(JSON.parse(log.mock.lastCall?.[0] as string)).toMatchObject({ 'event.action': 'auth_callback_completed', reason: 'ok' })
+    } finally {
+      log.mockRestore()
+    }
   })
 })
