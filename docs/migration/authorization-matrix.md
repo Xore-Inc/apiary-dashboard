@@ -2,13 +2,14 @@
 
 Effective access for every generated HTTP route and every server query. “Viewer” is the canonical user role. A page redirect is navigation behavior; a direct handler or server query returns an HTTP refusal.
 
-## HTTP routes (187)
+## HTTP routes (188)
 
 | Route | Anonymous | Viewer | Admin | Enforcement owner |
 |---|---|---|---|---|
 | `/` | 307 sign-in | allow | allow | `_layout` navigation guard |
 | `/healthz` | allow | allow | allow | public route handler |
 | `/metrics` | token | token | token | `x-service-token`; roles do not grant access |
+| `/readyz` | allow | allow | allow | public route handler |
 | `/admin` | 307 sign-in | redirect `/` | allow | `_layout` then route `beforeLoad` |
 | `/attackers` | 307 sign-in | allow | allow | `_layout` navigation guard |
 | `/commands` | 307 sign-in | allow | allow | `_layout` navigation guard |

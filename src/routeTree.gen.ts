@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as HealthzRouteImport } from './routes/healthz'
 import { Route as MetricsRouteImport } from './routes/metrics'
+import { Route as ReadyzRouteImport } from './routes/readyz'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutAdminRouteImport } from './routes/_layout/admin'
 import { Route as LayoutAttackersRouteImport } from './routes/_layout/attackers'
@@ -210,6 +211,11 @@ const HealthzRoute = HealthzRouteImport.update({
 const MetricsRoute = MetricsRouteImport.update({
   id: '/metrics',
   path: '/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReadyzRoute = ReadyzRouteImport.update({
+  id: '/readyz',
+  path: '/readyz',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
@@ -1217,6 +1223,7 @@ export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/healthz': typeof HealthzRoute
   '/metrics': typeof MetricsRoute
+  '/readyz': typeof ReadyzRoute
   '/admin': typeof LayoutAdminRoute
   '/attackers': typeof LayoutAttackersRoute
   '/commands': typeof LayoutCommandsRoute
@@ -1405,6 +1412,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/healthz': typeof HealthzRoute
   '/metrics': typeof MetricsRoute
+  '/readyz': typeof ReadyzRoute
   '/admin': typeof LayoutAdminRoute
   '/attackers': typeof LayoutAttackersRoute
   '/commands': typeof LayoutCommandsRoute
@@ -1580,6 +1588,7 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/healthz': typeof HealthzRoute
   '/metrics': typeof MetricsRoute
+  '/readyz': typeof ReadyzRoute
   '/_layout/admin': typeof LayoutAdminRoute
   '/_layout/attackers': typeof LayoutAttackersRoute
   '/_layout/commands': typeof LayoutCommandsRoute
@@ -1772,6 +1781,7 @@ export interface FileRouteTypes {
     | '/'
     | '/healthz'
     | '/metrics'
+    | '/readyz'
     | '/admin'
     | '/attackers'
     | '/commands'
@@ -1960,6 +1970,7 @@ export interface FileRouteTypes {
   to:
     | '/healthz'
     | '/metrics'
+    | '/readyz'
     | '/admin'
     | '/attackers'
     | '/commands'
@@ -2134,6 +2145,7 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/healthz'
     | '/metrics'
+    | '/readyz'
     | '/_layout/admin'
     | '/_layout/attackers'
     | '/_layout/commands'
@@ -2325,6 +2337,7 @@ export interface RootRouteChildren {
   LayoutRoute: typeof LayoutRouteWithChildren
   HealthzRoute: typeof HealthzRoute
   MetricsRoute: typeof MetricsRoute
+  ReadyzRoute: typeof ReadyzRoute
   ApiLiveRoute: typeof ApiLiveRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   AuthLoginRoute: typeof AuthLoginRoute
@@ -2362,6 +2375,13 @@ declare module '@tanstack/react-router' {
       path: '/metrics'
       fullPath: '/metrics'
       preLoaderRoute: typeof MetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/readyz': {
+      id: '/readyz'
+      path: '/readyz'
+      fullPath: '/readyz'
+      preLoaderRoute: typeof ReadyzRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_layout/': {
@@ -4175,6 +4195,7 @@ const rootRouteChildren: RootRouteChildren = {
   LayoutRoute: LayoutRouteWithChildren,
   HealthzRoute: HealthzRoute,
   MetricsRoute: MetricsRoute,
+  ReadyzRoute: ReadyzRoute,
   ApiLiveRoute: ApiLiveRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   AuthLoginRoute: AuthLoginRoute,
@@ -4194,13 +4215,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
