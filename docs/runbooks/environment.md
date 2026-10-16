@@ -7,6 +7,7 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 | Variable | Requirement |
 |---|---|
 | `SERVICE_TOKEN` | Required shared secret for backend-service and `/metrics`. Load from a secret, never source control. |
+| `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key that signs the operator identity on backend calls (`ACTOR_ASSERTION_PRIVATE_KEY` is the inline form; set one, not both). Required before the backend runs `ACTOR_ASSERTION_MODE=enforce`; unset signs nothing. A bad key refuses to boot with `E-ACTOR-ASSERTION-KEY`. |
 | `BACKEND_URL` | backend-service base URL. Required for production data. |
 | `BACKEND_MOUNTED_URL` | Mounted backend instance for spool-backed operations; omit only when `BACKEND_URL` reaches the same mounts. |
 | `OIDC_ISSUER_URL` | Keycloak realm URL. Required outside development. |
@@ -19,7 +20,7 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 
 Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`, `BACKEND_MAX_QUEUE=50`, `LIVE_MAX_STREAMS=500`, and `BFF_EVENT_LOOP_SHED_MS=250`. Change them only from measured load evidence.
 
-Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset. The server refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, or `E-DEV-HTTP-COOKIE`.
+Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset. The server refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, `E-DEV-HTTP-COOKIE`, or `E-ACTOR-ASSERTION-KEY`.
 
 ## Provisioning
 

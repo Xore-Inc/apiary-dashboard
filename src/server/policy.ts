@@ -2,6 +2,7 @@
 // Both are checked before the server listens (server.ts) and when the
 // server code first loads (dev), so a misconfigured process dies instead of
 // serving one open request. The canonical codes and override, unchanged.
+import { readActorKey } from './actorAssertion'
 
 /** `SERVICE_TOKEN` unset and this exactly "1" is the only way an instance
  * without the shared secret may boot. */
@@ -63,9 +64,18 @@ export function identityProviderPolicy(env: Env = process.env): Policy<'oidc' | 
   }
 }
 
+/** The key the BFF signs actor assertions with (#249): unset signs nothing
+ * (the backend in `off`/`log` mode is fine with that); both forms set, or a
+ * key that is not a parsable Ed25519 private key, refuses to boot. */
+export function actorAssertionPolicy(env: Env = process.env): Policy<'sign' | 'unsigned'> {
+  const result = readActorKey(env)
+  if (result.kind === 'refuse') return result
+  return { kind: result.kind === 'key' ? 'sign' : 'unsigned' }
+}
+
 /** Throws the first refusal; silent when the environment is sound. */
 export function assertBootPolicies(env: Env = process.env): void {
-  for (const policy of [serviceTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env)]) {
+  for (const policy of [serviceTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env), actorAssertionPolicy(env)]) {
     if (policy.kind === 'refuse') throw new Error(policy.message)
   }
 }

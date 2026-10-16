@@ -20,7 +20,7 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production && rm -rf /root/.bun/install/cache
 COPY --from=build /app/dist ./dist
 COPY server.ts ./
-COPY src/server/policy.ts ./src/server/policy.ts
+COPY src/server/policy.ts src/server/actorAssertion.ts ./src/server/
 USER bun
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s CMD ["bun", "-e", "const r = await fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/healthz'); process.exit(r.ok ? 0 : 1)"]

@@ -69,6 +69,10 @@ services:
       - BACKEND_URL=http://backend-service:8081
       - BACKEND_MOUNTED_URL=http://backend-service-mounted:8082
       - SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}
+      # Signs the operator behind each backend call (x-actor-assertion). Set
+      # to the key file under the secrets mount, e.g.
+      # /run/dashboard-secrets/actor-assertion.key; empty signs nothing.
+      - ACTOR_ASSERTION_PRIVATE_KEY_FILE=${ACTOR_ASSERTION_PRIVATE_KEY_FILE:-}
       - OIDC_ISSUER_URL=${OIDC_ISSUER_URL:?set OIDC_ISSUER_URL}
       - OIDC_CLIENT_ID=${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID}
       - OIDC_CLIENT_SECRET_FILE=/run/dashboard-secrets/oidc-client-secret

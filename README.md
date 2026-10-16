@@ -83,11 +83,20 @@ On the server:
 
 The VPS job sends the header from its `DASHBOARD_SERVICE_TOKEN`, which must hold the same value as `SERVICE_TOKEN`.
 
+#### Machine access: the backend
+
+Calls to the backend carry `x-service-token`. When a signing key is configured they also carry `x-actor-assertion`: a short-lived (60 s) Ed25519-signed JWS naming the signed-in operator (`sub`, `username`, `role`) and bound to one request (`htm`, `htu`). The backend verifies it with the public key only, so the bearer token cannot mint an identity; see `docs/BACKEND-TRUST-BOUNDARY.md` in the APIARY repository for the claims, the `off`/`log`/`enforce` modes and the rollout order.
+
+- The `username` claim, and the plain `x-actor-username` header, are the OIDC username, not the display name. Workbench run and recipe ownership is keyed on it.
+- No assertion is sent for a call with no signed-in operator (machine reads), or when no key is configured.
+- Roll back to a build that does not sign only after the backend is in `log` or `off`.
+
 The server refuses to boot in an environment that would open it:
 
 | Variable | |
 |---|---|
 | `SERVICE_TOKEN` | Shared secret with the backend. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
+| `ACTOR_ASSERTION_PRIVATE_KEY` / `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key (PEM; `\n` for newlines inline) that signs operator identities for the backend. Both set, or a key that is unparsable or not Ed25519, refuses to boot (`E-ACTOR-ASSERTION-KEY`). Unset signs nothing. |
 | `BACKEND_URL` | Base URL of the backend tier. Unset — the development default — leaves queries answering from the mock. Production requires it. |
 | `APIARY_ALLOW_UNAUTH_DEV` | Exactly `1`: a local development instance. `bun run dev` sets it. |
 | `OIDC_DISABLED` | `1` skips sign-in: everyone is a fixture admin. Only with `NODE_ENV=development` or `APIARY_ALLOW_UNAUTH_DEV=1` (`E-OIDC-DISABLED`). |
