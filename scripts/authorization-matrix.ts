@@ -36,7 +36,7 @@ const trimIndexSlash = (path: string) =>
 
 export function routePolicy(path: string, type = generatedTypes.get(path)): RoutePolicy {
   const route = trimIndexSlash(path)
-  if (['/auth/login', '/auth/callback', '/healthz'].includes(route))
+  if (['/auth/login', '/auth/callback', '/healthz', '/readyz'].includes(route))
     return 'public'
   if (route === '/auth/logout') return 'same-origin'
   if (route === '/metrics') return 'service-token'

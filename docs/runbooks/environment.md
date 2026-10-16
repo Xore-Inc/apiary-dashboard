@@ -33,3 +33,12 @@ Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC
 ## Validation
 
 Start one instance off-traffic and verify `/healthz` is 200, `/` redirects to sign-in, `/metrics` is 401 without the service token and 200 with it, Keycloak sign-in completes, and a signed-in live query reaches backend-service. Record only image digest, configuration revision, timestamps, status codes, and reviewer names.
+
+## Backend compatibility (`/readyz`)
+
+The dashboard and backend-service are released independently, so compatibility is the backend's published contract version, not a git revision. The backend serves `api_version` on its public `/healthz` and `info.x-api-version` in its `openapi.json`; this build accepts the versions in `SUPPORTED_API_VERSIONS` (`src/server/backendContract.ts`).
+
+- `GET /readyz` probes `BACKEND_URL` and, when it names a different instance, `BACKEND_MOUNTED_URL`. It answers 200, or 503 with `unsupported backend API: ...` or `backend unreachable` per listener. With no `BACKEND_URL` it is ready. Use it as a deploy gate, not a restart policy.
+- `GET /healthz` stays pure liveness and never calls the backend.
+- `contracts/backend/openapi.json` is the pinned backend artifact and `contracts/backend/SOURCE.json` records its APIARY commit. Refresh with `bun run contract:sync [ref]`, then `bun run test`: `src/data/contract.test.ts` fails on a dashboard call the artifact does not declare, and on a backend-emitted UI path with no dashboard route.
+- Backend breaking change: bump `API_VERSION` there, sync the pin, then add the version here once the contracts follow it. Keep the old version listed while a backend serving it is deployed.
