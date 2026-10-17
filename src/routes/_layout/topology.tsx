@@ -25,7 +25,9 @@ export const Route = createFileRoute('/_layout/topology')({
   pendingComponent: TopologyPage,
 })
 
-const INGRESS_COLOR = { portbridge: 'blue', traefik: 'purple', direct: 'gray', proxy: 'teal' } as const
+const INGRESS_COLOR = { portbridge: 'blue', traefik: 'purple', 'tunnel-only': 'orange', direct: 'gray', proxy: 'teal' } as const
+/** Labels for the ingress kinds whose wire name reads badly as a badge. */
+const INGRESS_LABEL: Partial<Record<TopologySensor['ingress'][number], string>> = { proxy: '+PROXY', 'tunnel-only': 'tunnel only' }
 
 const exposureColumns: TableColumn<TopologySensor>[] = [
   { key: 'sensor', header: 'Sensor', width: pixel(160), renderCell: (row) => <EntityLink kind="sensor" id={row.sensor} /> },
@@ -37,7 +39,7 @@ const exposureColumns: TableColumn<TopologySensor>[] = [
       <VStack gap={1}>
         <HStack gap={1}>
           {row.ingress.map((kind) => (
-            <Token key={kind} size="sm" color={INGRESS_COLOR[kind]} label={kind === 'proxy' ? '+PROXY' : kind} />
+            <Token key={kind} size="sm" color={INGRESS_COLOR[kind]} label={INGRESS_LABEL[kind] ?? kind} />
           ))}
         </HStack>
         {row.hostnames.length > 0 && <Text type="supporting">{row.hostnames.join(' · ')}</Text>}

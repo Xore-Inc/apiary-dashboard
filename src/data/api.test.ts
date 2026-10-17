@@ -1353,18 +1353,17 @@ describe('the fleet topology', () => {
     // live elsewhere").
     expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/services', '/api/v1/source-health', '/api/v1/topology'])
     expect(topo.sensors).toEqual([
-      { sensor: 'cowrie', ingress: ['portbridge'], hostnames: [], ports: [{ proto: 'tcp', public: 22, host: 19022 }], rawIndex: 'honeypot-v2', feed: 'fresh' },
+      { sensor: 'cowrie', ingress: ['portbridge', 'tunnel-only'], hostnames: [], ports: [{ proto: 'tcp', public: 22, host: 19022 }], rawIndex: 'honeypot-v2', feed: 'fresh' },
       { sensor: 'dionaea', ingress: ['traefik'], hostnames: ['smtp.example.test'], ports: [], rawIndex: 'unmapped', feed: 'silent' },
     ])
     expect(topo.stacks).toEqual([{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', state: 'running' }] }])
   })
 
-  it('drops an ingress the page cannot colour, and names the survivors it can', async () => {
-    // Gap #6: the wire's vocabulary is traefik / portbridge / tunnel-only,
-    // and the page's adds "direct" / "+PROXY" which the wire never emits.
-    // "tunnel-only" is dropped; the other two stay.
+  it('keeps every ingress the wire emits, tunnel-only included (#261)', async () => {
+    // The wire's vocabulary is traefik / portbridge / tunnel-only; all three
+    // are rendered, so a management-only sensor is not shown with no ingress.
     stub(operationsFixtures())
-    expect((await live('getTopology')()).sensors[0].ingress).toEqual(['portbridge'])
+    expect((await live('getTopology')()).sensors[0].ingress).toEqual(['portbridge', 'tunnel-only'])
   })
 
   it('turns flow node names into the indices the sankey wants', async () => {

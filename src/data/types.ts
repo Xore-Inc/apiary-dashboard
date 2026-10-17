@@ -584,7 +584,7 @@ export interface SourceHealth {
 
 export interface TopologySensor extends Record<string, unknown> {
   sensor: string
-  ingress: Array<'portbridge' | 'traefik' | 'direct' | 'proxy'>
+  ingress: Array<'portbridge' | 'traefik' | 'tunnel-only' | 'direct' | 'proxy'>
   hostnames: string[]
   ports: Array<{ proto: 'tcp' | 'udp'; public: number; host: number }>
   rawIndex: string
@@ -1451,8 +1451,8 @@ export interface CapeRun extends Record<string, unknown> {
   log: string
   /** CAPE's own task number, and its raw task status (`reported`,
    * `failed_analysis`, …). */
-  taskId: number
-  capeStatus: string
+  taskId: number | null
+  capeStatus: string | null
   /** CAPE's verdict word for the score (Malicious, Suspicious, Clean). */
   malstatus: string
   /** API calls the behavior log recorded. */

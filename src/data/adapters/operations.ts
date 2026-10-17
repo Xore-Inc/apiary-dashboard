@@ -243,7 +243,7 @@ const exitCode = (services: ServicesWire, name: string): number | undefined => {
 
 /** The topology's own ingress vocabulary is traefik / portbridge / tunnel-only;
  * the page adds "direct" and "+PROXY", neither of which the wire emits. */
-const isIngress = (kind: string): kind is TopologySensor['ingress'][number] => kind === 'traefik' || kind === 'portbridge' || kind === 'direct' || kind === 'proxy'
+const isIngress = (kind: string): kind is TopologySensor['ingress'][number] => kind === 'traefik' || kind === 'portbridge' || kind === 'tunnel-only' || kind === 'direct' || kind === 'proxy'
 
 // ---- Dead letters ----------------------------------------------------------
 
