@@ -227,10 +227,12 @@ export const DEFAULT_PREFERENCES_WIRE: PreferencesDocWire = {
  * `{revision: 0, payload: {}}`, so every block here is a read with a
  * default — that is also what makes an operator's first visit render.
  *
- * `payload.brand_prefix` (validated, max 20 chars) is dropped: no page
- * field. `presentation.title_format` and `behavior.default_landing` are
- * stored but not validated by the Rust tier (only Go's typed tier pinned
- * them), so they pass through as written. */
+ * `presentation.brand_prefix` (validated, max 20 chars) has no page control,
+ * but it is carried as `brandPrefix` when stored, so the presentation save
+ * can send it back (put_config_field replaces the whole block). Absent or
+ * empty stays absent. `presentation.title_format` and
+ * `behavior.default_landing` are stored but not validated by the Rust tier
+ * (only Go's typed tier pinned them), so they pass through as written. */
 export function dashboardConfig(wire: ConfigWire): DashboardConfig {
   const p = wire.payload.presentation ?? {}
   const b = wire.payload.behavior ?? {}
@@ -253,6 +255,7 @@ export function dashboardConfig(wire: ConfigWire): DashboardConfig {
       footerText: text(p.footer_text),
       aiDisclaimer: text(p.ai_disclaimer),
       privacyNotice: text(p.privacy_notice),
+      ...(p.brand_prefix ? { brandPrefix: p.brand_prefix } : {}),
     },
     behavior: {
       defaultLanding: text(b.default_landing),
@@ -331,6 +334,8 @@ export function configSectionBody(section: ConfigSection, value: DashboardConfig
       footer_text: p.footerText,
       ai_disclaimer: p.aiDisclaimer,
       privacy_notice: p.privacyNotice,
+      // Round-trip only a stored value: an absent or empty brand_prefix stays absent.
+      ...(p.brandPrefix ? { brand_prefix: p.brandPrefix } : {}),
     }
   }
   if (section === 'behavior') {

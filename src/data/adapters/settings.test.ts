@@ -222,6 +222,23 @@ describe('config adapters', () => {
     })
   })
 
+  it('keeps a stored brand_prefix through a presentation save', () => {
+    const loaded = dashboardConfig(config)
+    expect(loaded.presentation.brandPrefix).toBe('APIARY')
+    expect(configSectionBody('presentation', loaded.presentation)).toMatchObject({ brand_prefix: 'APIARY' })
+    // The page never edits it, so a save of an edited page still carries the loaded value.
+    expect(configSectionBody('presentation', { ...loaded.presentation, appName: 'Renamed' })).toMatchObject({ app_name: 'Renamed', brand_prefix: 'APIARY' })
+  })
+
+  it('leaves an absent or empty brand_prefix absent from the presentation save', () => {
+    const absent = dashboardConfig({ revision: 3, payload: { presentation: { app_name: 'APIARY' } } })
+    expect(absent.presentation.brandPrefix).toBeUndefined()
+    expect(configSectionBody('presentation', absent.presentation)).not.toHaveProperty('brand_prefix')
+    const empty = dashboardConfig({ revision: 3, payload: { presentation: { app_name: 'APIARY', brand_prefix: '' } } })
+    expect(empty.presentation.brandPrefix).toBeUndefined()
+    expect(configSectionBody('presentation', empty.presentation)).not.toHaveProperty('brand_prefix')
+  })
+
   it('routes each section to the path the backend accepts', () => {
     expect([configSectionPath('presentation'), configSectionPath('behavior'), configSectionPath('honeypot'), configSectionPath('reportPresets')]).toEqual([
       'presentation',
