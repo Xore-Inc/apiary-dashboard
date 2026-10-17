@@ -1,0 +1,418 @@
+{
+  "_source": "backend-service sensors.rs (MailoneySession, HttpRequest, TannerRequest, SensorDetail, SensorCatalog, SensorEvent(s), SensorOverview), stores.rs acknowledge + the alert-state document worker.rs observe writes, health.rs SourceHealth, webhook_delivery.rs DeliveryHealth, topology.rs TopologyResponse (SensorRow/ExposedPort camelCase; ContainerRef has no rename), stores.rs dead-letters purge, problem_reports.rs submit (stored document, dom_snapshot excluded by the store page).",
+  "curatedSensors": {
+    "mailoney": [
+      {
+        "session_id": "s-1",
+        "when": "2026-10-14T09:00:00Z",
+        "ip": "203.0.113.9",
+        "port": 25,
+        "logged_in": true,
+        "user": "admin",
+        "pass": "hunter2",
+        "mail_from": [
+          "a@example.test"
+        ],
+        "rcpt_to": [
+          "b@example.test"
+        ],
+        "body_size": 120,
+        "truncated": false,
+        "body_path": "/mail/s-1.eml",
+        "body_preview": "Subject: hi"
+      }
+    ],
+    "http_requests": [
+      {
+        "id": "h-1",
+        "when": "2026-10-14T09:00:00Z",
+        "ip": "203.0.113.9",
+        "method": "POST",
+        "host": "decoy.example.test",
+        "path": "/login",
+        "query": "",
+        "user_agent": "curl/8.5.0",
+        "headers": {
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        "body": "[redacted]",
+        "username": "admin",
+        "credential_status": "present",
+        "credential_present": null,
+        "credential_indicator_match": false,
+        "auth_outcome": "failure",
+        "auth_type": "form",
+        "status": 401,
+        "category": "login",
+        "tarpitted": false,
+        "tarpit_bytes": 0,
+        "tarpit_ms": 0
+      }
+    ],
+    "tanner": [
+      {
+        "id": "t-1",
+        "when": "2026-10-14T09:00:00Z",
+        "ip": "203.0.113.9",
+        "method": "GET",
+        "path": "/etc/passwd",
+        "user_agent": "curl/8.5.0",
+        "headers": {},
+        "username": "",
+        "password": "",
+        "tarpitted": false,
+        "tarpit_bytes": 0,
+        "tarpit_ms": 0,
+        "post_data": {},
+        "cookies": {},
+        "detection_name": "lfi",
+        "detection_payload": "../../etc/passwd"
+      }
+    ]
+  },
+  "sensorCatalog": {
+    "window": "now-14d",
+    "sensors": [
+      {
+        "sensor": "cowrie",
+        "events": 3100,
+        "last_seen": "2026-10-14T10:02:11.000Z"
+      }
+    ]
+  },
+  "sensorEvents": {
+    "sensor": "cowrie",
+    "total": 1,
+    "rows": [
+      {
+        "id": "wtE0IaEBXGgnD02F2rjA",
+        "when": "2026-10-14T10:02:11.000Z",
+        "src_ip": "203.0.113.4",
+        "src_port": 51310,
+        "dst_port": 22,
+        "fields": {
+          "eventid": "cowrie.login.failed",
+          "username": "root"
+        }
+      }
+    ]
+  },
+  "sensorOverview": {
+    "sensor": "cowrie",
+    "window": "48h",
+    "events": 3100,
+    "unique_sources": 41,
+    "first_seen": "2026-10-12T10:00:00Z",
+    "last_seen": "2026-10-14T10:02:11Z",
+    "hourly": [
+      1,
+      2,
+      3
+    ],
+    "top_sources": [
+      {
+        "key": "203.0.113.4",
+        "count": 410
+      }
+    ],
+    "top_countries": [
+      {
+        "key": "NL",
+        "count": 1200
+      }
+    ],
+    "top_lists": [
+      {
+        "label": "Usernames",
+        "rows": [
+          {
+            "key": "root",
+            "count": 900
+          }
+        ]
+      }
+    ],
+    "measures": [
+      {
+        "label": "Held",
+        "total": 120.5,
+        "max": 30,
+        "unit": "s"
+      }
+    ]
+  },
+  "alertsPage": {
+    "total": 2,
+    "rows": [
+      {
+        "Key": "k1",
+        "Message": "ML anomaly burst",
+        "Link": "/ml",
+        "FirstSeen": "2026-10-14T08:00:00+00:00",
+        "LastSeen": "2026-10-14T09:00:00+00:00",
+        "LastNotified": "2026-10-14T08:00:00+00:00",
+        "Count": 4,
+        "Acknowledged": false,
+        "_doc_id": "k1"
+      },
+      {
+        "Key": "k2",
+        "Message": "New campaign",
+        "Link": "/campaigns",
+        "FirstSeen": "2026-10-14T08:30:00+00:00",
+        "LastSeen": "2026-10-14T08:30:00+00:00",
+        "LastNotified": null,
+        "Count": 1,
+        "Acknowledged": true,
+        "_doc_id": "k2"
+      }
+    ]
+  },
+  "alertAck": {
+    "ok": true,
+    "key": "k1",
+    "ack": true
+  },
+  "sourceHealth": {
+    "cluster_status": "green",
+    "total_documents": 895516,
+    "sensors": [
+      {
+        "sensor": "cowrie",
+        "documents": 3100,
+        "last_seen": "2026-10-14T10:02:11.000Z",
+        "state": "active"
+      }
+    ],
+    "yara": {
+      "enabled": true,
+      "last_scan": "2026-10-14T06:00:00Z",
+      "rules_sha256": "ab12",
+      "samples": 40,
+      "matched": 3,
+      "errors": 0
+    },
+    "runtime": {
+      "uptime_seconds": 86400,
+      "rss_bytes": 104857600,
+      "vm_bytes": 524288000
+    },
+    "ingest": {
+      "state": "fresh",
+      "last_ingest": "2026-10-14T10:02:00Z",
+      "age_seconds": 12,
+      "recent_dead_letters": 0
+    },
+    "dead_letters": 2,
+    "pipeline": {
+      "state": "ok",
+      "acked": 1000,
+      "failed": 0,
+      "dropped": 0,
+      "active": 4,
+      "decode_failures": 0
+    },
+    "webhook": {
+      "available": true,
+      "reason": "",
+      "state": "healthy",
+      "target": "discord",
+      "messages": 12,
+      "consecutive_failures": 0,
+      "failure_threshold": 5,
+      "last_success": {
+        "at": "2026-10-14T09:00:00Z",
+        "status": "delivered",
+        "http_code": 204,
+        "latency_ms": 88,
+        "tries": 1,
+        "error": null
+      },
+      "last_failure": {
+        "at": "2026-10-14T08:00:00Z",
+        "status": "failed",
+        "http_code": null,
+        "latency_ms": 0,
+        "tries": 3,
+        "error": "connection refused"
+      },
+      "updated_at": "2026-10-14T09:00:01Z"
+    },
+    "unattributed_24h": 0
+  },
+  "sourceHealthNoWebhook": {
+    "cluster_status": "green",
+    "total_documents": 895516,
+    "sensors": [
+      {
+        "sensor": "cowrie",
+        "documents": 3100,
+        "last_seen": "2026-10-14T10:02:11.000Z",
+        "state": "active"
+      }
+    ],
+    "yara": {
+      "enabled": true,
+      "last_scan": "2026-10-14T06:00:00Z",
+      "rules_sha256": "ab12",
+      "samples": 40,
+      "matched": 3,
+      "errors": 0
+    },
+    "runtime": {
+      "uptime_seconds": 86400,
+      "rss_bytes": 104857600,
+      "vm_bytes": 524288000
+    },
+    "ingest": {
+      "state": "fresh",
+      "last_ingest": "2026-10-14T10:02:00Z",
+      "age_seconds": 12,
+      "recent_dead_letters": 0
+    },
+    "dead_letters": 2,
+    "pipeline": {
+      "state": "ok",
+      "acked": 1000,
+      "failed": 0,
+      "dropped": 0,
+      "active": 4,
+      "decode_failures": 0
+    },
+    "webhook": {
+      "available": false,
+      "reason": "no delivery record yet",
+      "state": "unknown",
+      "target": "",
+      "messages": 0,
+      "consecutive_failures": 0,
+      "failure_threshold": 5,
+      "last_success": null,
+      "last_failure": null,
+      "updated_at": ""
+    },
+    "unattributed_24h": 0
+  },
+  "topology": {
+    "generated_at": "2026-10-14T10:00:00+00:00",
+    "sensors": [
+      {
+        "sensor": "cowrie",
+        "stack": "honeypot-cowrie",
+        "containers": [
+          "hp-cowrie"
+        ],
+        "ingress": [
+          "portbridge"
+        ],
+        "hostnames": [],
+        "ports": [
+          {
+            "proto": "tcp",
+            "public": 22,
+            "host": 2222,
+            "proxy": true
+          }
+        ],
+        "rawIndex": "honeypot-v2-*"
+      },
+      {
+        "sensor": "canarytokens",
+        "stack": "honeypot-canarytokens",
+        "containers": [
+          "hp-canarytokens"
+        ],
+        "ingress": [
+          "tunnel-only"
+        ],
+        "hostnames": [],
+        "ports": [],
+        "rawIndex": "unmapped"
+      }
+    ],
+    "flow": {
+      "nodes": [
+        {
+          "name": "VPS portbridge (raw ports)",
+          "layer": 0
+        },
+        {
+          "name": "cowrie",
+          "layer": 1
+        }
+      ],
+      "links": [
+        {
+          "source": "VPS portbridge (raw ports)",
+          "target": "cowrie"
+        }
+      ]
+    },
+    "stacks": [
+      {
+        "stack": "honeypot-cowrie",
+        "containers": [
+          {
+            "name": "hp-cowrie",
+            "adapter_visible": true
+          }
+        ]
+      }
+    ]
+  },
+  "deadLettersPage": {
+    "total": 1,
+    "rows": [
+      {
+        "@timestamp": "2026-10-14T09:00:00Z",
+        "reason": "mapper_parsing_exception",
+        "logset": "zeek",
+        "pipeline": "honeypot",
+        "message": "{...}",
+        "_doc_id": "dl-1"
+      }
+    ]
+  },
+  "deadLettersPurged": {
+    "deleted": 2
+  },
+  "problemReportsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "id": "pr-0123456789abcdef",
+        "submitted_at": "2026-10-14T09:00:00+00:00",
+        "submitted_by": "sub-1",
+        "submitted_by_name": "analyst",
+        "page": "/events",
+        "expected": "rows",
+        "actual": "empty",
+        "action_trail": [
+          {
+            "at": "2026-10-14T08:59:00Z",
+            "kind": "click",
+            "detail": "filters"
+          }
+        ],
+        "console_errors": [],
+        "network_failures": [],
+        "api_calls": [
+          {
+            "at": "2026-10-14T08:59:01Z",
+            "method": "GET",
+            "url": "/api/events",
+            "status": 500,
+            "request_body": "",
+            "response_body": "boom"
+          }
+        ],
+        "user_agent": "Mozilla/5.0",
+        "status": "open",
+        "_doc_id": "pr-0123456789abcdef"
+      }
+    ]
+  },
+  "problemReportCreated": {
+    "id": "pr-0123456789abcdef"
+  }
+}

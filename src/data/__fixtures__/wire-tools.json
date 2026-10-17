@@ -1,0 +1,125 @@
+{
+  "_source": "backend-service canarytokens.rs (TYPES -> bare array, CreatedToken, redact_record'd list, create's stored record), credentials.rs (list envelope, stored record, rotate / link-token), stores.rs (canarytokens store page, auth_token excluded), events.rs EventRow (sensor=canarytokens).",
+  "types": [
+    {
+      "token_type": "adobe_pdf",
+      "label": "PDF document",
+      "description": "A decoy PDF that fires when opened.",
+      "requires_upload": false,
+      "supports_snippet": false
+    },
+    {
+      "token_type": "web_image",
+      "label": "Custom web image",
+      "description": "A web bug behind your own image; fires on load.",
+      "requires_upload": true,
+      "supports_snippet": false
+    }
+  ],
+  "created": {
+    "id": "a1b2c3d4e5f6a7b8c9d0e1f2a",
+    "token_type": "ms_word",
+    "memo": "finance share bait",
+    "token_url": "https://decoys.example.test/a1b2",
+    "hostname": "quiet-river-4211.decoys.example.test",
+    "created_by": "analyst",
+    "created_at": "2026-10-14T09:00:00+00:00"
+  },
+  "list": {
+    "tokens": [
+      {
+        "id": "a1b2c3d4e5f6a7b8c9d0e1f2a",
+        "token_type": "ms_word",
+        "memo": "finance share bait",
+        "token_url": "https://decoys.example.test/a1b2",
+        "hostname": "quiet-river-4211.decoys.example.test",
+        "created_by": "analyst",
+        "created_at": "2026-10-14T09:00:00+00:00",
+        "filename_hint": "quarterly-report.docx"
+      },
+      {
+        "id": "b2",
+        "token_type": "web_image",
+        "memo": "finance share bait",
+        "token_url": "https://decoys.example.test/a1b2",
+        "hostname": "quiet-river-4211.decoys.example.test",
+        "created_by": "analyst",
+        "created_at": "2026-10-14T09:00:00+00:00",
+        "filename_hint": ""
+      }
+    ]
+  },
+  "storePage": {
+    "total": 1,
+    "rows": [
+      {
+        "id": "a1b2c3d4e5f6a7b8c9d0e1f2a",
+        "token_type": "ms_word",
+        "memo": "finance share bait",
+        "token_url": "https://decoys.example.test/a1b2",
+        "hostname": "quiet-river-4211.decoys.example.test",
+        "created_by": "analyst",
+        "created_at": "2026-10-14T09:00:00+00:00",
+        "filename_hint": "quarterly-report.docx",
+        "_doc_id": "a1b2c3d4e5f6a7b8c9d0e1f2a"
+      }
+    ]
+  },
+  "fired": {
+    "total": 1,
+    "offset": 0,
+    "rows": [
+      {
+        "id": "ev1",
+        "time": "2026-10-14T10:00:00.000Z",
+        "sensor": "canarytokens",
+        "src_ip": "203.0.113.77",
+        "country": "NL",
+        "detail": "opened",
+        "record": {
+          "honeypot": {
+            "token_type": "ms_word",
+            "channel": "HTTP",
+            "manage_url": "https://decoys.example.test/manage?token=a1b2",
+            "memo": "finance share bait"
+          }
+        }
+      }
+    ]
+  },
+  "credentials": {
+    "available": true,
+    "credentials": [
+      {
+        "id": "cred_0011223344556677",
+        "target": "cowrie_honeyfs",
+        "path": "home/deploy/.aws/credentials",
+        "username": "deploy",
+        "password": "pw-example",
+        "content_template": "username={{username}}\npassword={{password}}\n",
+        "memo": "aws bait",
+        "created_by": "analyst",
+        "created_at": "2026-10-14T09:00:00+00:00"
+      },
+      {
+        "id": "cred_8899aabbccddeeff",
+        "target": "cowrie_honeyfs",
+        "path": "home/x",
+        "username": "x",
+        "password": "y",
+        "content_template": "username={{username}}\npassword={{password}}\n",
+        "memo": "",
+        "created_by": "sub-1",
+        "created_at": "2026-10-13T09:00:00+00:00",
+        "rotated_by": "analyst",
+        "rotated_at": "2026-10-14T09:00:00+00:00",
+        "linked_token_id": "a1b2c3d4e5f6a7b8c9d0e1f2a"
+      }
+    ]
+  },
+  "credentialsUnavailable": {
+    "available": false,
+    "error": "elasticsearch unreachable",
+    "credentials": []
+  }
+}

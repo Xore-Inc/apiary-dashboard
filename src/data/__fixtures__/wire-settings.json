@@ -1,0 +1,371 @@
+{
+  "_source": "backend-service preferences.rs (default_preferences, get/put/reset), config.rs (get_config, history, validate, users), config_history.rs HistoryEntry, audit.rs AuditEvent, services_control.rs (list, logs, action) with the row shape services-adapter.py container_status builds, reporter_stats.rs, health.rs Storage, problem_reports.rs submit (store page, dom_snapshot excluded), mail.rs Mail, detail.rs attack vectors.",
+  "preferences": {
+    "preferences": {
+      "theme": "system",
+      "palette": "claude",
+      "density": "comfortable",
+      "reduced_motion": "system",
+      "collapsed_sidebar": false,
+      "landing_page": "/",
+      "remember_filters": false,
+      "rows_per_page": 50,
+      "wrap_long_values": false,
+      "timezone": "browser",
+      "clock": "h24",
+      "timestamps": "relative",
+      "auto_refresh": true,
+      "refresh_interval_seconds": 30,
+      "live_toasts": true,
+      "live_toast_interval_seconds": 60,
+      "map_basemap": "osm",
+      "map_clustering": true,
+      "map_animation": true,
+      "high_contrast": false,
+      "large_evidence_text": false,
+      "notify_severity": "high",
+      "notify_sound": false,
+      "notify_desktop": false,
+      "default_event_window": "24h",
+      "preserve_filters": false,
+      "open_details_new_tab": false
+    },
+    "revision": 3
+  },
+  "preferencesNeverSaved": {
+    "preferences": {
+      "theme": "system",
+      "palette": "claude",
+      "density": "comfortable",
+      "reduced_motion": "system",
+      "collapsed_sidebar": false,
+      "landing_page": "/",
+      "remember_filters": false,
+      "rows_per_page": 50,
+      "wrap_long_values": false,
+      "timezone": "Europe/Amsterdam",
+      "clock": "h24",
+      "timestamps": "relative",
+      "auto_refresh": true,
+      "refresh_interval_seconds": 30,
+      "live_toasts": true,
+      "live_toast_interval_seconds": 60,
+      "map_basemap": "osm",
+      "map_clustering": true,
+      "map_animation": true,
+      "high_contrast": false,
+      "large_evidence_text": false,
+      "notify_severity": "high",
+      "notify_sound": false,
+      "notify_desktop": false,
+      "default_event_window": "24h",
+      "preserve_filters": false,
+      "open_details_new_tab": false
+    },
+    "revision": 0
+  },
+  "config": {
+    "schema_version": 4,
+    "revision": 7,
+    "updated": "2026-10-14T09:00:00+00:00",
+    "payload": {
+      "presentation": {
+        "app_name": "APIARY",
+        "title_format": "{page} - {app}",
+        "product_label": "Honeypot",
+        "dashboard_title": "APIARY",
+        "dashboard_subtitle": "",
+        "org_name": "Example Org",
+        "overview_intro": "",
+        "help_link_label": "",
+        "help_link_url": "https://example.test/help",
+        "banner_text": "",
+        "banner_severity": "",
+        "banner_expires": "",
+        "footer_text": "",
+        "ai_disclaimer": "",
+        "privacy_notice": "",
+        "brand_prefix": ""
+      },
+      "behavior": {
+        "default_landing": "/",
+        "default_time_window": "24h",
+        "rows_per_page_options": [
+          10,
+          25,
+          50,
+          100
+        ],
+        "max_export_rows": 10000,
+        "refresh_interval_seconds_options": [
+          10,
+          30,
+          60
+        ],
+        "source_stale_minutes": 30,
+        "map_provider": "osm",
+        "default_timezone": "browser",
+        "show_ml_panels": true,
+        "maintenance_mode": false,
+        "read_only": false,
+        "show_problem_report_button": true
+      },
+      "honeypot": {
+        "alert_cooldown": "1h",
+        "alert_campaign_score": 60,
+        "sandbox_alert_risk_score": 70,
+        "ml_alert_threshold": 0.8,
+        "yara_scan_interval_seconds": 3600,
+        "yara_max_bytes": 10485760,
+        "payload_dedupe_interval_seconds": 3600
+      },
+      "report_presets": {
+        "attacker-dossier": {
+          "name": "Dossier",
+          "description": "Per-attacker"
+        }
+      }
+    }
+  },
+  "configNeverWritten": {
+    "revision": 0,
+    "payload": {}
+  },
+  "configValidate": {
+    "ok": false,
+    "problems": [
+      "presentation.app_name must not be empty"
+    ]
+  },
+  "configValidateOk": {
+    "ok": true,
+    "problems": []
+  },
+  "configHistory": {
+    "entries": [
+      {
+        "revision": 7,
+        "time": "2026-10-14T09:00:00+00:00",
+        "actor_subject": "sub-1",
+        "actor_username": "analyst",
+        "action": "update",
+        "fields": [
+          "presentation"
+        ]
+      },
+      {
+        "revision": 8,
+        "time": "2026-10-14T09:30:00+00:00",
+        "actor_subject": "sub-1",
+        "actor_username": "analyst",
+        "action": "rollback",
+        "fields": [
+          "*"
+        ]
+      }
+    ]
+  },
+  "audit": {
+    "events": [
+      {
+        "time": "2026-10-14T09:00:00+00:00",
+        "actor_subject": "sub-1",
+        "actor_username": "analyst",
+        "request_id": "req-1",
+        "client_ip": "203.0.113.9",
+        "action": "config.update",
+        "fields": [
+          "presentation"
+        ],
+        "revision": 7,
+        "result": "success"
+      },
+      {
+        "actor_subject": "",
+        "actor_username": "",
+        "action": "config.update",
+        "revision": 0,
+        "result": "conflict"
+      }
+    ]
+  },
+  "users": {
+    "users": [
+      {
+        "subject": "sub-1",
+        "username": "analyst",
+        "role": "admin",
+        "first_seen_at": "2026-10-01T08:00:00+00:00",
+        "last_seen_at": "2026-10-14T09:00:00+00:00"
+      }
+    ]
+  },
+  "services": {
+    "available": true,
+    "services": [
+      {
+        "name": "hp-cowrie",
+        "state": "running",
+        "exit_code": 0,
+        "started_at": "2026-10-10T08:00:00.123456789Z",
+        "restart_count": 0,
+        "health": "healthy"
+      },
+      {
+        "name": "hp-dionaea",
+        "state": "exited",
+        "exit_code": 137,
+        "started_at": "2026-10-10T08:00:00Z",
+        "restart_count": 2
+      },
+      {
+        "name": "hp-missing",
+        "state": "not_found"
+      },
+      {
+        "name": "hp-opaque",
+        "state": "unknown"
+      }
+    ]
+  },
+  "servicesUnavailable": {
+    "available": false,
+    "reason": "services adapter is not configured",
+    "services": []
+  },
+  "serviceLogs": {
+    "name": "hp-cowrie",
+    "lines": 200,
+    "log": "cowrie started\n"
+  },
+  "serviceActionOk": {
+    "ok": true,
+    "name": "hp-cowrie",
+    "action": "restart"
+  },
+  "serviceActionRefused": {
+    "ok": false,
+    "error": "unsupported action"
+  },
+  "reporterStats": {
+    "available": true,
+    "stats": {
+      "attempted": 10,
+      "sent": 8,
+      "suppressed_cooldown": 1,
+      "dry_run": 0,
+      "failed": 1,
+      "updated_at": "2026-10-14T09:00:00Z"
+    }
+  },
+  "reporterStatsNone": {
+    "available": false,
+    "reason": "no reporter metrics indexed yet"
+  },
+  "storage": {
+    "cluster_status": "green",
+    "index_count": 120,
+    "doc_count": 895516,
+    "store_bytes": 2147483648
+  },
+  "problemReportsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "id": "pr-0123456789abcdef",
+        "submitted_at": "2026-10-14T09:00:00+00:00",
+        "submitted_by": "sub-1",
+        "submitted_by_name": "analyst",
+        "page": "/events",
+        "expected": "rows",
+        "actual": "empty",
+        "action_trail": [
+          {
+            "at": "2026-10-14T08:59:00Z",
+            "kind": "click",
+            "detail": "filters"
+          }
+        ],
+        "console_errors": [
+          "TypeError: x"
+        ],
+        "network_failures": [
+          "GET /api/events 500"
+        ],
+        "api_calls": [
+          {
+            "at": "2026-10-14T08:59:01Z",
+            "method": "GET",
+            "url": "/api/events",
+            "status": 500,
+            "request_body": "",
+            "response_body": "boom"
+          }
+        ],
+        "user_agent": "Mozilla/5.0",
+        "status": "open",
+        "_doc_id": "pr-0123456789abcdef"
+      }
+    ]
+  },
+  "mail": {
+    "session_id": "s-1",
+    "body_path": "/mail/s-1.eml",
+    "size_bytes": 412,
+    "imported_at": "2026-10-14T09:00:00Z",
+    "from": {
+      "name": "Attacker",
+      "address": "attacker@evil.example"
+    },
+    "to": [
+      {
+        "name": "",
+        "address": "victim@example.org"
+      }
+    ],
+    "subject": "test payload",
+    "date": "2026-08-18T10:00:00+00:00",
+    "message_id": "<abc123@evil.example>",
+    "body_text": "hello from mailoney",
+    "attachments": [
+      {
+        "filename": "payload.bin",
+        "content_type": "application/octet-stream",
+        "size_bytes": 5,
+        "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+      }
+    ],
+    "eml_base64": "RnJvbTogQXR0YWNrZXI="
+  },
+  "mailNoFrom": {
+    "session_id": "s-2",
+    "body_path": "/mail/s-2.eml",
+    "size_bytes": 10,
+    "imported_at": "",
+    "from": null,
+    "to": [],
+    "subject": "",
+    "date": "",
+    "message_id": "",
+    "body_text": "",
+    "attachments": [],
+    "eml_base64": ""
+  },
+  "attackVectors": {
+    "sensor": "cowrie",
+    "ports": [
+      {
+        "key": "22",
+        "count": 3100,
+        "link": "/events?sensor=cowrie&port=22"
+      }
+    ],
+    "protocols": [
+      {
+        "key": "ssh",
+        "count": 3100,
+        "link": "/events?sensor=cowrie&proto=ssh"
+      }
+    ]
+  }
+}
