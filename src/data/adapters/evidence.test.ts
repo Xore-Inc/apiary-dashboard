@@ -242,6 +242,12 @@ describe('evidence adapters', () => {
     expect(runs[0].processes).toEqual([{ pid: 1200, name: 'powershell.exe', commandLine: 'C:\\tmp\\p.exe' }])
   })
 
+  it('keeps a null task and status for a failed submission instead of printing task 0', () => {
+    const failed = { sha256: '5'.repeat(64), requested_at: '2026-10-01T11:50:00Z', started_at: '2026-10-01T11:50:01Z', completed_at: '2026-10-01T11:50:02Z', exit_status: 'error', task_id: null, cape_status: null, error: 'cape submit refused', signatures: [] } satisfies CapeRunWire
+    const [run] = capeRuns({ total: 1, rows: [{ _doc_id: 'f', cape: failed }] })
+    expect(run).toMatchObject({ sha: '5'.repeat(64), status: 'failed_analysis', taskId: null, capeStatus: null })
+  })
+
   it('maps report_summary.package onto the run, and leaves it off when the report has none', () => {
     const base = { sha256: '3'.repeat(64), requested_at: '2026-10-01T11:50:00Z', started_at: '2026-10-01T11:50:01Z', completed_at: '2026-10-01T12:00:00Z', exit_status: 'ok', cape_status: 'reported', task_id: 8812, signatures: [] }
     const [withPackage, withoutPackage] = capeRuns({

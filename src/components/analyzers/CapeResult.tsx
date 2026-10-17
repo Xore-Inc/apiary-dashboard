@@ -25,7 +25,11 @@ export function CapeResult({ run }: { run: CapeRun }) {
       <VStack gap={5}>
         <HStack gap={3} wrap="wrap">
           <EntityLink kind="payload" id={run.sha}><Text type="code">{`${run.sha.slice(0, 24)}…`}</Text></EntityLink>
-          <Text type="supporting">{`task ${run.taskId} · ${formatDateTime(run.at)} · CAPE status ${run.capeStatus}`}</Text>
+          <Text type="supporting">
+            {run.taskId === null
+              ? `not submitted to CAPE · ${formatDateTime(run.at)}`
+              : `task ${run.taskId} · ${formatDateTime(run.at)} · CAPE status ${run.capeStatus ?? 'unknown'}`}
+          </Text>
         </HStack>
         {run.package && (
           <MetadataList label={{ position: 'start', width: 80 }}>
