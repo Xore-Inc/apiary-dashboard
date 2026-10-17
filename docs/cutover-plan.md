@@ -122,6 +122,8 @@ compose file should contain:
    - `BACKEND_URL=http://backend-service:8081`
    - `BACKEND_MOUNTED_URL=http://backend-service-mounted:8082`
    - `SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}`
+   - `EXPORT_TOKEN=${EXPORT_TOKEN:-}`, the export-only credential for the VPS
+     blocklist job (must differ from `SERVICE_TOKEN`)
    - `OIDC_ISSUER_URL`, `OIDC_CLIENT_ID`, and
      `OIDC_CLIENT_SECRET_FILE=/run/dashboard-secrets/oidc-client-secret`
    - `OIDC_SESSION_REDIS_URL=redis://oidc-sessions:6379/0`
@@ -294,6 +296,7 @@ APIARY_DASHBOARD_VERSION=vX.Y.Z
 APIARY_DASHBOARD_DIGEST=sha256:<manifest-digest>
 HP_BIND=<homeserver-wireguard-address>
 SERVICE_TOKEN=<backend-shared-secret>
+EXPORT_TOKEN=<export-only-secret>
 OIDC_ISSUER_URL=https://auth.example.test/realms/apiary
 OIDC_CLIENT_ID=apiary-dashboard-rewrite
 EXTERNAL_URL=https://next.dashboard.example.test

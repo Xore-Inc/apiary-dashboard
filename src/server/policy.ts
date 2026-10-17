@@ -9,6 +9,7 @@ import { readActorKey } from './actorAssertion'
 export const DEV_UNAUTH_OVERRIDE_ENV = 'APIARY_ALLOW_UNAUTH_DEV'
 export const SERVICE_TOKEN_GATE_CODE = 'E-SERVICE-TOKEN'
 export const OIDC_DISABLED_GATE_CODE = 'E-OIDC-DISABLED'
+export const EXPORT_TOKEN_GATE_CODE = 'E-EXPORT-TOKEN'
 export const DEV_HTTP_COOKIE_GATE_CODE = 'E-DEV-HTTP-COOKIE'
 export const OIDC_ISSUER_GATE_CODE = 'E-OIDC-ISSUER'
 /** "1": the session cookie works over plain HTTP (a dev server reached by
@@ -28,6 +29,20 @@ export function serviceTokenPolicy(env: Env = process.env): Policy<'token' | 'de
     kind: 'refuse',
     message: `[${SERVICE_TOKEN_GATE_CODE}] refusing to start: SERVICE_TOKEN is unset or empty, which would leave the backend tier open to unauthenticated requests. Set SERVICE_TOKEN to the secret the backend also carries, or for local development only set ${DEV_UNAUTH_OVERRIDE_ENV}=1 explicitly.`,
   }
+}
+
+/** `EXPORT_TOKEN` opens the blocklist export only. Unset leaves machine
+ * access to it off; equal to `SERVICE_TOKEN` it would be the backend-wide
+ * secret under another name, so that refuses to boot. */
+export function exportTokenPolicy(env: Env = process.env): Policy<'export-token' | 'disabled'> {
+  if (!env.EXPORT_TOKEN) return { kind: 'disabled' }
+  if (env.EXPORT_TOKEN === env.SERVICE_TOKEN) {
+    return {
+      kind: 'refuse',
+      message: `[${EXPORT_TOKEN_GATE_CODE}] refusing to start: EXPORT_TOKEN equals SERVICE_TOKEN, so the export-only credential would also be the backend-wide secret. Generate a separate value for EXPORT_TOKEN, or unset it to turn machine access to the export off.`,
+    }
+  }
+  return { kind: 'export-token' }
 }
 
 /** OIDC_DISABLED=1 lets every request in as a fixture admin: only in
@@ -75,7 +90,7 @@ export function actorAssertionPolicy(env: Env = process.env): Policy<'sign' | 'u
 
 /** Throws the first refusal; silent when the environment is sound. */
 export function assertBootPolicies(env: Env = process.env): void {
-  for (const policy of [serviceTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env), actorAssertionPolicy(env)]) {
+  for (const policy of [serviceTokenPolicy(env), exportTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env), actorAssertionPolicy(env)]) {
     if (policy.kind === 'refuse') throw new Error(policy.message)
   }
 }

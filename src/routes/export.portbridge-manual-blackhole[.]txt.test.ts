@@ -1,6 +1,6 @@
 // GET /export/portbridge-manual-blackhole.txt: the firewall puller's list.
-// Who may read it: a machine client with X-Service-Token equal to
-// SERVICE_TOKEN, or a signed-in session whose role the query policy allows.
+// Who may read it: a machine client with X-Export-Token equal to
+// EXPORT_TOKEN (SERVICE_TOKEN is refused here), or a signed-in session whose role the query policy allows.
 // Nothing else, and the token is never taken from the URL.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route } from './export.portbridge-manual-blackhole[.]txt'
@@ -18,7 +18,8 @@ const get = (Route as unknown as { options: { server: { handlers: { GET: Handler
 
 const URL_PATH = 'http://dashboard.example.test/export/portbridge-manual-blackhole.txt'
 const LIST = '198.51.100.7\n203.0.113.4\n'
-const SECRET = 'test-service-token'
+const SECRET = 'test-export-token'
+const SERVICE_SECRET = 'test-service-token'
 
 /** The backend's answer for the list, and the calls it received. */
 function backend(body = LIST) {
@@ -41,7 +42,8 @@ const request = (headers: Record<string, string> = {}, url = URL_PATH) => new Re
 const signedIn = (headers: Record<string, string> = {}) => request({ ...headers, cookie: `${SESSION_COOKIE}=${sid}` })
 
 beforeEach(async () => {
-  process.env.SERVICE_TOKEN = SECRET
+  process.env.SERVICE_TOKEN = SERVICE_SECRET
+  process.env.EXPORT_TOKEN = SECRET
   process.env.BACKEND_URL = 'http://backend.test'
   process.env.APIARY_ALLOW_UNAUTH_DEV = '1'
   sid = await sessions.create(viewer)
@@ -52,6 +54,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   delete process.env.BACKEND_URL
   delete process.env.SERVICE_TOKEN
+  delete process.env.EXPORT_TOKEN
   process.env.APIARY_ALLOW_UNAUTH_DEV = '1'
 })
 
@@ -64,28 +67,28 @@ describe('/export/portbridge-manual-blackhole.txt', () => {
     expect(calls).toEqual([])
   })
 
-  it('refuses a wrong service token with 401', async () => {
+  it('refuses a wrong export token with 401', async () => {
     const calls = backend()
-    const response = await get({ request: request({ 'x-service-token': 'not-the-token' }) })
+    const response = await get({ request: request({ 'x-export-token': 'not-the-token' }) })
     expect(response.status).toBe(401)
     expect(calls).toEqual([])
   })
 
-  it('refuses an empty service token header with 401', async () => {
-    const response = await get({ request: request({ 'x-service-token': '' }) })
+  it('refuses an empty export token header with 401', async () => {
+    const response = await get({ request: request({ 'x-export-token': '' }) })
     expect(response.status).toBe(401)
   })
 
   it('does not accept the token in the URL', async () => {
     const calls = backend()
-    const response = await get({ request: request({}, `${URL_PATH}?service_token=${SECRET}&token=${SECRET}`) })
+    const response = await get({ request: request({}, `${URL_PATH}?export_token=${SECRET}&token=${SECRET}`) })
     expect(response.status).toBe(401)
     expect(calls).toEqual([])
   })
 
-  it('serves the list unchanged to a machine client with the correct token', async () => {
+  it('serves the list unchanged to a machine client with the correct export token', async () => {
     const calls = backend()
-    const response = await get({ request: request({ 'x-service-token': SECRET }) })
+    const response = await get({ request: request({ 'x-export-token': SECRET }) })
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8')
     expect(response.headers.get('cache-control')).toBe('no-store')
@@ -95,7 +98,7 @@ describe('/export/portbridge-manual-blackhole.txt', () => {
 
   it('never echoes the token in the response', async () => {
     backend()
-    const response = await get({ request: request({ 'x-service-token': SECRET }) })
+    const response = await get({ request: request({ 'x-export-token': SECRET }) })
     expect(JSON.stringify([...response.headers.entries()])).not.toContain(SECRET)
     expect(await response.text()).not.toContain(SECRET)
   })
@@ -117,13 +120,35 @@ describe('/export/portbridge-manual-blackhole.txt', () => {
     expect(calls).toEqual([])
   })
 
-  it('refuses every caller when SERVICE_TOKEN is unset, even with a token', async () => {
-    delete process.env.SERVICE_TOKEN
+  it('refuses SERVICE_TOKEN on this route, in either header', async () => {
     const calls = backend()
-    const response = await get({ request: request({ 'x-service-token': '' }) })
-    expect(response.status).toBe(401)
-    const withSome = await get({ request: request({ 'x-service-token': SECRET }) })
-    expect(withSome.status).toBe(401)
+    for (const headers of [{ 'x-service-token': SERVICE_SECRET }, { 'x-export-token': SERVICE_SECRET }] as Record<string, string>[]) {
+      const response = await get({ request: request(headers) })
+      expect(response.status).toBe(401)
+    }
     expect(calls).toEqual([])
+  })
+
+  it('does not take the export token in the service-token header', async () => {
+    const calls = backend()
+    const response = await get({ request: request({ 'x-service-token': SECRET }) })
+    expect(response.status).toBe(401)
+    expect(calls).toEqual([])
+  })
+
+  it('refuses every machine caller when EXPORT_TOKEN is unset', async () => {
+    delete process.env.EXPORT_TOKEN
+    const calls = backend()
+    for (const headers of [{ 'x-export-token': '' }, { 'x-export-token': SECRET }, { 'x-service-token': SERVICE_SECRET }] as Record<string, string>[]) {
+      expect((await get({ request: request(headers) })).status).toBe(401)
+    }
+    expect(calls).toEqual([])
+  })
+
+  it('still serves a signed-in session when EXPORT_TOKEN is unset', async () => {
+    delete process.env.EXPORT_TOKEN
+    backend()
+    const response = await get({ request: signedIn() })
+    expect(response.status).toBe(200)
   })
 })

@@ -69,6 +69,9 @@ services:
       - BACKEND_URL=http://backend-service:8081
       - BACKEND_MOUNTED_URL=http://backend-service-mounted:8082
       - SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}
+      # Export-only credential for the VPS blocklist job; empty leaves machine
+      # access to /export/portbridge-manual-blackhole.txt off.
+      - EXPORT_TOKEN=${EXPORT_TOKEN:-}
       # Signs the operator behind each backend call (x-actor-assertion). Set
       # to the key file under the secrets mount, e.g.
       # /run/dashboard-secrets/actor-assertion.key; empty signs nothing.
