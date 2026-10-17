@@ -68,6 +68,8 @@ services:
       - PORT=3000
       - BACKEND_URL=http://backend-service:8081
       - BACKEND_MOUNTED_URL=http://backend-service-mounted:8082
+      # The dashboard also reads SERVICE_TOKEN_FILE / EXPORT_TOKEN_FILE (a
+      # secret file, exactly one of file or value); this stack uses the value.
       - SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}
       # Export-only credential for the VPS blocklist job; empty leaves machine
       # access to /export/portbridge-manual-blackhole.txt off.

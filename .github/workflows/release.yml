@@ -35,7 +35,7 @@ jobs:
       - name: Package the build
         run: |
           name="apiary-dashboard-${GITHUB_REF_NAME}"
-          tar -czf "$name.tar.gz" dist server.ts src/server/policy.ts package.json bun.lock
+          tar -czf "$name.tar.gz" dist server.ts src/server/policy.ts src/server/actorAssertion.ts src/server/secret.ts package.json bun.lock
           sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
       - uses: actions/attest-build-provenance@v4
         with:

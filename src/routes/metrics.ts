@@ -5,6 +5,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { createFileRoute } from '@tanstack/react-router'
 import { serviceTokenPolicy } from '#/server/policy'
+import { secretValue } from '#/server/secret'
 
 const sameSecret = (given: string, expected: string) => {
   const a = Buffer.from(given)
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/metrics')({
     handlers: {
       GET: async ({ request }) => {
         const open = serviceTokenPolicy().kind === 'dev-override'
-        const expected = process.env.SERVICE_TOKEN ?? ''
+        const expected = secretValue('SERVICE_TOKEN')
         if (!open && !(expected && sameSecret(request.headers.get('x-service-token') ?? '', expected))) return new Response('unauthorized', { status: 401 })
         const { renderMetrics } = await import('#/server/obs')
         return new Response(renderMetrics(), { headers: { 'content-type': 'text/plain; version=0.0.4', 'cache-control': 'no-store' } })

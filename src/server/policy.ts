@@ -3,6 +3,7 @@
 // server code first loads (dev), so a misconfigured process dies instead of
 // serving one open request. The canonical codes and override, unchanged.
 import { readActorKey } from './actorAssertion'
+import { readSecret } from './secret'
 
 /** `SERVICE_TOKEN` unset and this exactly "1" is the only way an instance
  * without the shared secret may boot. */
@@ -23,11 +24,13 @@ type Policy<T extends string> = { kind: T } | { kind: 'refuse'; message: string 
 export const mockScenariosAllowed = (env: Env = process.env): boolean => !env.BACKEND_URL?.trim() || env[DEV_UNAUTH_OVERRIDE_ENV] === '1'
 
 export function serviceTokenPolicy(env: Env = process.env): Policy<'token' | 'dev-override'> {
-  if (env.SERVICE_TOKEN) return { kind: 'token' }
+  const token = readSecret('SERVICE_TOKEN', env, SERVICE_TOKEN_GATE_CODE)
+  if (token.kind === 'refuse') return token
+  if (token.kind === 'value') return { kind: 'token' }
   if (env[DEV_UNAUTH_OVERRIDE_ENV] === '1') return { kind: 'dev-override' }
   return {
     kind: 'refuse',
-    message: `[${SERVICE_TOKEN_GATE_CODE}] refusing to start: SERVICE_TOKEN is unset or empty, which would leave the backend tier open to unauthenticated requests. Set SERVICE_TOKEN to the secret the backend also carries, or for local development only set ${DEV_UNAUTH_OVERRIDE_ENV}=1 explicitly.`,
+    message: `[${SERVICE_TOKEN_GATE_CODE}] refusing to start: SERVICE_TOKEN (or SERVICE_TOKEN_FILE) is unset or empty, which would leave the backend tier open to unauthenticated requests. Set SERVICE_TOKEN, or SERVICE_TOKEN_FILE to a file holding it, to the secret the backend also carries, or for local development only set ${DEV_UNAUTH_OVERRIDE_ENV}=1 explicitly.`,
   }
 }
 
@@ -35,11 +38,14 @@ export function serviceTokenPolicy(env: Env = process.env): Policy<'token' | 'de
  * access to it off; equal to `SERVICE_TOKEN` it would be the backend-wide
  * secret under another name, so that refuses to boot. */
 export function exportTokenPolicy(env: Env = process.env): Policy<'export-token' | 'disabled'> {
-  if (!env.EXPORT_TOKEN) return { kind: 'disabled' }
-  if (env.EXPORT_TOKEN === env.SERVICE_TOKEN) {
+  const exportToken = readSecret('EXPORT_TOKEN', env, EXPORT_TOKEN_GATE_CODE)
+  if (exportToken.kind === 'refuse') return exportToken
+  if (exportToken.kind === 'unset') return { kind: 'disabled' }
+  const serviceToken = readSecret('SERVICE_TOKEN', env)
+  if (serviceToken.kind === 'value' && exportToken.value === serviceToken.value) {
     return {
       kind: 'refuse',
-      message: `[${EXPORT_TOKEN_GATE_CODE}] refusing to start: EXPORT_TOKEN equals SERVICE_TOKEN, so the export-only credential would also be the backend-wide secret. Generate a separate value for EXPORT_TOKEN, or unset it to turn machine access to the export off.`,
+      message: `[${EXPORT_TOKEN_GATE_CODE}] refusing to start: EXPORT_TOKEN equals SERVICE_TOKEN, so the export-only credential would also be the backend-wide secret. Generate a separate value for EXPORT_TOKEN (or EXPORT_TOKEN_FILE), or unset it to turn machine access to the export off.`,
     }
   }
   return { kind: 'export-token' }
