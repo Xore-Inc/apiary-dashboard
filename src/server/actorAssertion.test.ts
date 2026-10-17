@@ -81,12 +81,15 @@ describe('the signing key', () => {
 
   it('refuses to boot when both forms are set, or the key is unparsable, public or not Ed25519', () => {
     const rsa = generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey
+    const emptyKeyFile = join(mkdtempSync(join(tmpdir(), 'actor-key-')), 'empty')
+    writeFileSync(emptyKeyFile, '\n')
     const bad = [
       { ACTOR_ASSERTION_PRIVATE_KEY: pem(privateKey), ACTOR_ASSERTION_PRIVATE_KEY_FILE: '/run/secrets/k' },
       { ACTOR_ASSERTION_PRIVATE_KEY: 'not a key' },
       { ACTOR_ASSERTION_PRIVATE_KEY: publicKey.export({ type: 'spki', format: 'pem' }).toString() },
       { ACTOR_ASSERTION_PRIVATE_KEY: pem(rsa) },
       { ACTOR_ASSERTION_PRIVATE_KEY_FILE: '/nonexistent/actor.key' },
+      { ACTOR_ASSERTION_PRIVATE_KEY_FILE: emptyKeyFile },
     ]
     for (const e of bad) {
       const policy = actorAssertionPolicy(e)

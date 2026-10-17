@@ -6,8 +6,8 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 
 | Variable | Requirement |
 |---|---|
-| `SERVICE_TOKEN` | Required shared secret for backend-service and `/metrics`. Load from a secret, never source control. |
-| `EXPORT_TOKEN` | Optional export-only secret for `/export/portbridge-manual-blackhole.txt` (`X-Export-Token`). Must differ from `SERVICE_TOKEN`. Unset disables machine access to the export. |
+| `SERVICE_TOKEN` / `SERVICE_TOKEN_FILE` | Required shared secret for backend-service and `/metrics`. Give it inline, or as a path to a file holding it (a swarm secret under `/run/secrets`); exactly one. A trailing newline is dropped. Both set, or a file that is missing, unreadable or empty, refuses to boot with `E-SERVICE-TOKEN`. Load from a secret, never source control. |
+| `EXPORT_TOKEN` / `EXPORT_TOKEN_FILE` | Optional export-only secret for `/export/portbridge-manual-blackhole.txt` (`X-Export-Token`). Must differ from `SERVICE_TOKEN`. Same inline-or-file rule as `SERVICE_TOKEN`; a bad `EXPORT_TOKEN_FILE` refuses to boot with `E-EXPORT-TOKEN`. Unset disables machine access to the export. |
 | `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key that signs the operator identity on backend calls (`ACTOR_ASSERTION_PRIVATE_KEY` is the inline form; set one, not both). Required before the backend runs `ACTOR_ASSERTION_MODE=enforce`; unset signs nothing. A bad key refuses to boot with `E-ACTOR-ASSERTION-KEY`. |
 | `BACKEND_URL` | backend-service base URL. Required for production data. |
 | `BACKEND_MOUNTED_URL` | Mounted backend instance for spool-backed operations; omit only when `BACKEND_URL` reaches the same mounts. |

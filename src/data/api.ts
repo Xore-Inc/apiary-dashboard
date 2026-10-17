@@ -109,6 +109,7 @@ import type { DashboardViews } from './adapters/monitor'
 import { readingOf } from '#/lib/sensorSpecs'
 import { authorize } from '#/server/authorize'
 import { envInt } from '#/server/admission'
+import { secretValue } from '#/server/secret'
 import { recordShed } from '#/server/obs'
 import { isRead, READ_ONLY_EXEMPT } from './readOnly'
 import {
@@ -331,7 +332,7 @@ async function raw(path: string, opts: { mounted?: boolean; user?: Caller; searc
   const query = queryOf(opts.search)
   let response: Response
   try {
-    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '', ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
+    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('unavailable', endpoint)
@@ -427,7 +428,7 @@ async function request<T>(endpoint: string, path: string, opts: { method: 'GET' 
       // Only a request that carries a body declares a content type: a
       // bodyless PUT/PATCH declares none, so the tier is not invited to
       // reject an empty body against a header that promised JSON.
-      headers: { ...(opts.body === undefined ? {} : { 'content-type': 'application/json' }), 'x-service-token': process.env.SERVICE_TOKEN ?? '', ...hopHeaders(opts.user, opts.method, path) },
+      headers: { ...(opts.body === undefined ? {} : { 'content-type': 'application/json' }), 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, opts.method, path) },
       ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     }))
@@ -485,7 +486,7 @@ async function stream(endpoint: string, path: string, signal: AbortSignal): Prom
   const url = `${baseURL()}${path}`
   let response: Response
   try {
-    response = await fetch(url, { headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '', ...assertionHeaders(undefined, 'GET', path) }, signal })
+    response = await fetch(url, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...assertionHeaders(undefined, 'GET', path) }, signal })
   } catch {
     // Unreachable or refused. The upstream sent no status, so there is none
     // to pass through — same ApiError the JSON path raises, which the route

@@ -54,6 +54,8 @@ To release: `git tag v0.1.0 && git push origin v0.1.0`.
 ```bash
 docker build -t apiary-dashboard .
 docker run -p 3000:3000 -e SERVICE_TOKEN=… apiary-dashboard
+# or from a mounted secret file:
+# docker run -p 3000:3000 -v ./service-token:/run/secrets/service-token:ro -e SERVICE_TOKEN_FILE=/run/secrets/service-token apiary-dashboard
 ```
 
 `bun run test` covers the authorization matrix, the boot policies, sessions, nav roll-ups, formatters, and invariants over the mock backend: numbers shown on different pages must agree, and every id one page links to must resolve on its target page.
@@ -95,8 +97,8 @@ The server refuses to boot in an environment that would open it:
 
 | Variable | |
 |---|---|
-| `SERVICE_TOKEN` | Shared secret with the backend. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
-| `EXPORT_TOKEN` | Optional export-only secret for the blocklist export (`X-Export-Token`). Unset turns machine access to the export off. Equal to `SERVICE_TOKEN` refuses to boot (`E-EXPORT-TOKEN`). |
+| `SERVICE_TOKEN` / `SERVICE_TOKEN_FILE` | Shared secret with the backend, inline or as a path to a file holding it (a swarm secret); exactly one, and a file that is missing or empty refuses to boot. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
+| `EXPORT_TOKEN` / `EXPORT_TOKEN_FILE` | Optional export-only secret (inline or file, as above) for the blocklist export (`X-Export-Token`). Unset turns machine access to the export off. Equal to `SERVICE_TOKEN` refuses to boot (`E-EXPORT-TOKEN`). |
 | `ACTOR_ASSERTION_PRIVATE_KEY` / `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key (PEM; `\n` for newlines inline) that signs operator identities for the backend. Both set, or a key that is unparsable or not Ed25519, refuses to boot (`E-ACTOR-ASSERTION-KEY`). Unset signs nothing. |
 | `BACKEND_URL` | Base URL of the backend tier. Unset — the development default — leaves queries answering from the mock. Production requires it. |
 | `APIARY_ALLOW_UNAUTH_DEV` | Exactly `1`: a local development instance. `bun run dev` sets it. |

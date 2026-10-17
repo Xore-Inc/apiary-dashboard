@@ -13,7 +13,7 @@
 // set signs nothing, which the backend in `off`/`log` mode accepts.
 import { createPrivateKey, sign } from 'node:crypto'
 import type { KeyObject } from 'node:crypto'
-import { readFileSync } from 'node:fs'
+import { readSecret } from './secret'
 import type { SessionUser } from '#/data/types'
 
 export const ACTOR_ASSERTION_HEADER = 'x-actor-assertion'
@@ -31,19 +31,10 @@ const refuse = (detail: string): KeyResult => ({ kind: 'refuse', message: `[${AC
 
 /** Parses the configured key. Never echoes key material in a message. */
 export function readActorKey(env: Env = process.env): KeyResult {
-  const inline = env.ACTOR_ASSERTION_PRIVATE_KEY?.trim()
-  const file = env.ACTOR_ASSERTION_PRIVATE_KEY_FILE?.trim()
-  if (inline && file) return refuse('both ACTOR_ASSERTION_PRIVATE_KEY and ACTOR_ASSERTION_PRIVATE_KEY_FILE are set. Set exactly one.')
-  if (!inline && !file) return { kind: 'unset' }
-  let pem: string
-  if (file) {
-    try {
-      pem = readFileSync(file, 'utf8')
-    } catch {
-      return refuse(`ACTOR_ASSERTION_PRIVATE_KEY_FILE (${file}) cannot be read.`)
-    }
-  } else pem = inline!.replace(/\\n/g, '\n')
-  const source = file ? 'ACTOR_ASSERTION_PRIVATE_KEY_FILE' : 'ACTOR_ASSERTION_PRIVATE_KEY'
+  const secret = readSecret('ACTOR_ASSERTION_PRIVATE_KEY', env, ACTOR_ASSERTION_KEY_GATE_CODE)
+  if (secret.kind !== 'value') return secret
+  const pem = secret.source.endsWith('_FILE') ? secret.value : secret.value.trim().replace(/\\n/g, '\n')
+  const source = secret.source
   try {
     const key = createPrivateKey(pem)
     if (key.asymmetricKeyType !== 'ed25519') return refuse(`${source} is a ${key.asymmetricKeyType ?? 'unknown'} key; the backend verifies Ed25519 only.`)
