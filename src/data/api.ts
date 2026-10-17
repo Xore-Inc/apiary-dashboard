@@ -618,8 +618,10 @@ const getCanarytokens: Backend['getCanarytokens'] = async () => {
 
 /** POST /api/v1/canarytokens (canarytokens.rs `create`, L154).
  *
- * `created_by` is the signed-in operator's name, read off `callerOf()` exactly as
- * the mounted mutations below take their actor: the Rust tier has no session
+ * `created_by` is the signed-in operator's OIDC username (#256), the same value
+ * `x-actor-username` and the signed assertion carry, read off `callerOf()` the
+ * way `actorHeaders` reads it, so `log` mode sees no mismatch. A caller with
+ * no known username sends a blank value, as before. The Rust tier has no session
  * concept, so `canarytokens.rs CreateBody.created_by` is a field this tier
  * fills from the session it already resolved — never from client input.
  *
@@ -638,7 +640,7 @@ const createCanarytoken: Backend['createCanarytoken'] = async (input) => {
   const wire = await post<CreatedCanarytokenWire>('createCanarytoken', '/api/v1/canarytokens', {
     token_type: input.type,
     memo: input.memo,
-    created_by: callerOf()?.name ?? '',
+    created_by: sessionIdentityOf(callerOf())?.username ?? '',
     ...(input.snippet ? { include_text_snippet: true, text_snippet: input.snippet } : {}),
     ...(input.image ? { file_base64: input.image.base64, file_name: input.image.name, file_content_type: input.image.contentType } : {}),
   })

@@ -15,6 +15,7 @@ import type { EventPageWire, FilterValuesWire, RecordingsPageWire, ReplayWire, S
 import type { EventRow } from './contracts/events'
 import type { CorrelationWire, IpProfileWire, SourcesPageWire } from './contracts/sources'
 import type { Backend } from './backend'
+import { rememberActor } from '#/server/actorAssertion'
 
 /** One wire row, as events.rs's `row_from_hit` builds it. */
 /** Reports writes run the read-only guard first, so `calls` is offset by the
@@ -620,8 +621,8 @@ describe('the actor the Rust tier trusts', () => {
   // operator. The gate below is what makes the interleave real: the config
   // read answers only once BOTH requests have reached it, so the swap happens
   // inside the await rather than between two of this test's own ticks.
-  const alice = { id: 'u1', name: 'alice', email: 'a@example.test', roles: ['admin' as const] }
-  const bob = { id: 'u2', name: 'bob', email: 'b@example.test', roles: ['admin' as const] }
+  const alice = rememberActor({ name: 'alice', email: 'a@example.test', roles: ['admin' as const] }, { sub: 'oidc|alice', username: 'alice' })
+  const bob = rememberActor({ name: 'bob', email: 'b@example.test', roles: ['admin' as const] }, { sub: 'oidc|bob', username: 'bob' })
 
   /** A stub whose config read holds every request until two of them have
    * reached it, so the read-after-await is a real interleave rather than an
@@ -1604,17 +1605,25 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
   it('mints a token through POST /api/v1/canarytokens, with the actor as created_by', async () => {
     stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
     process.env.BACKEND_URL = 'http://backend.test'
-    const analyst = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
+    // The OIDC username, not the display name (#256): `created_by` must match
+    // the `x-actor-username` and the signed assertion's username claim.
+    const analyst = rememberActor({ name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }, { sub: 'oidc|7', username: 'ada.analyst' })
     // A freshly minted token carries no filename_hint — the backend stamps
     // the file name onto the STORED record, not the created one (canarytokens.rs:246).
     const token = await (liveQuery('createCanarytoken', analyst) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll', snippet: 'Q3 adjustments' })
-    expect(bodiesOf()).toEqual([{ path: '/api/v1/canarytokens', body: { token_type: 'ms_word', memo: 'payroll', created_by: 'A', include_text_snippet: true, text_snippet: 'Q3 adjustments' } }])
+    expect(bodiesOf()).toEqual([{ path: '/api/v1/canarytokens', body: { token_type: 'ms_word', memo: 'payroll', created_by: 'ada.analyst', include_text_snippet: true, text_snippet: 'Q3 adjustments' } }])
     expect(token).toMatchObject({ id: 'a1b2c3d4e5f6a7b8c9d0e1f2a', type: 'ms_word', memo: 'finance share bait' })
   })
 
   it('sends no snippet and no file fields the dialog left blank', async () => {
     stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
     await live('createCanarytoken')({ type: 'ms_word', memo: 'payroll' })
+    expect(bodiesOf()[0].body).toEqual({ token_type: 'ms_word', memo: 'payroll', created_by: '' })
+  })
+
+  it('leaves created_by blank for a caller with no known username, never the display name', async () => {
+    stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
+    await (liveQuery('createCanarytoken', { name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll' })
     expect(bodiesOf()[0].body).toEqual({ token_type: 'ms_word', memo: 'payroll', created_by: '' })
   })
 
