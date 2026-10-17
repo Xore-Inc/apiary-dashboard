@@ -1134,6 +1134,8 @@ export interface DashboardConfig {
     footerText: string
     aiDisclaimer: string
     privacyNotice: string
+    /** The stored `brand_prefix` (max 20 chars). No page control edits it: it is carried so a presentation save does not erase it. Absent when the document has none. */
+    brandPrefix?: string
   }
   behavior: {
     defaultLanding: string

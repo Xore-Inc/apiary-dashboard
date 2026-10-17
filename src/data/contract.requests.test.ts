@@ -21,7 +21,7 @@ import { alertAckBody } from './adapters/operations'
 import { mlAckBody, mlDispositionBody } from './adapters/monitor'
 import { reportDefinitionBody } from './adapters/reports'
 import { createWorkbenchRunBody, saveWorkbenchRecipeBody } from './adapters/evidence'
-import { configRollbackBody, configSectionBody, configValidateBody, preferences, preferencesPatch, preferencesResetBody, preferencesWriteBody, problemReportBody, problemStatusPatch } from './adapters/settings'
+import { configRollbackBody, configSectionBody, configValidateBody, dashboardConfig, preferences, preferencesPatch, preferencesResetBody, preferencesWriteBody, problemReportBody, problemStatusPatch } from './adapters/settings'
 import { setIpBlockBody } from './adapters/sources'
 import { CONFIG } from './mock/details'
 import type { AnalyzerOptions, ProblemStatus, ReportDefinition, WorkbenchRecipe } from './types'
@@ -185,15 +185,17 @@ describe('the bodies the adapters build match the structs the backend decodes', 
       honeypot: Object.keys(stored.honeypot),
       reportPresets: [],
     }
+    // The page saves what it loaded. Load the stored document with a brand_prefix so the presentation save is built from it.
+    const loaded = dashboardConfig({ ...wireSettings.config, payload: { ...stored, presentation: { ...stored.presentation, brand_prefix: 'APIARY' } } })
+    const page = { ...CONFIG, presentation: loaded.presentation }
     for (const section of sections) {
-      const body = configSectionBody(section, CONFIG[section])
+      const body = configSectionBody(section, page[section])
       expect(body).toBeTypeOf('object')
       // put_config_field replaces the whole block, so the dashboard sends it whole: every key the stored block carries.
       if (section !== 'reportPresets') {
         const unsent = known[section].filter((key) => !(key in body))
-        // KNOWN GAP: config.rs validates presentation.brand_prefix and the stored block carries it, but the page has
-        // no field for it, so every presentation save replaces the block without it. Update this when the page does.
-        expect(unsent, `${section} keys the stored block has and the save drops`).toEqual(section === 'presentation' ? ['brand_prefix'] : [])
+        // brand_prefix has no page control but is carried from the load, so a stored value is sent back, not erased.
+        expect(unsent, `${section} keys the stored block has and the save drops`).toEqual([])
         expect(Object.keys(body).filter((key) => !known[section].includes(key)), `${section} keys the stored block does not have`).toEqual([])
       }
       // /config/validate takes an object of sections named as the backend's match arms spell them.
