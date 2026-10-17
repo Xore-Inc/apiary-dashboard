@@ -1,0 +1,988 @@
+{
+  "_source": "Backend-built shapes from backend-service payload_inventory.rs CapturedFile, payload_detail.rs PayloadDetail, stores.rs payloads page, reports_api.rs payload report, workbench_domain.rs (WorkbenchRun/Child/Recipe/Analyzer), workbench_api.rs envelopes, payload_kind.rs PayloadClassification, gpu_queue.rs GpuJob, artifacts.rs list, sandbox_submit.rs / ghidra_submit.rs / github_analysis_submit.rs, detail.rs (ghidra_run ioc_correlation, ghidra_callgraph, revdeck_run), ioc_correlation.rs. Raw analysis documents are the writers' payloads wrapped by es_importer.rs build_document: sandbox/export-result.py, analysis/ghidra/worker/ghidra-worker.py (success and failure_result), sandbox/cape/worker/cape-worker.py (success and failure_result), analysis/github/collect-results.py, arcane/home/honeypot-payload-analysis/analysis/yara/scanner.py.",
+  "payloadsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "Hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Size": 4096,
+        "SizeH": "4.0 KiB",
+        "Mtime": "2026-10-13T08:00:00Z",
+        "MtimeUTC": "2026-10-13T08:00:00Z",
+        "MIME": "application/x-executable",
+        "Kind": "ELF executable",
+        "KindCode": "elf",
+        "Platform": "linux",
+        "AnalysisPath": "sandbox",
+        "Dynamic": true,
+        "Sources": [
+          "cowrie"
+        ],
+        "Copies": 2,
+        "Preview": "7f454c46",
+        "PreviewTruncated": false,
+        "_doc_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "source_buckets": [
+      {
+        "key": "cowrie",
+        "doc_count": 2
+      }
+    ],
+    "source_other": 0
+  },
+  "payloadDetail": {
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory": {
+      "Hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "Size": 4096,
+      "SizeH": "4.0 KiB",
+      "Mtime": "2026-10-13T08:00:00Z",
+      "MtimeUTC": "2026-10-13T08:00:00Z",
+      "MIME": "application/x-executable",
+      "Kind": "ELF executable",
+      "KindCode": "elf",
+      "Platform": "linux",
+      "AnalysisPath": "sandbox",
+      "Dynamic": true,
+      "Sources": [
+        "cowrie"
+      ],
+      "Copies": 2,
+      "Preview": "7f454c46",
+      "PreviewTruncated": false
+    },
+    "analysis": null,
+    "yara": [
+      {
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "yara": {
+          "size": 4096,
+          "mtime_ns": 1791000000000000000,
+          "scanned_at": "2026-10-14T06:00:00+00:00",
+          "matches": [
+            "Mirai_Generic"
+          ],
+          "source": "cowrie"
+        }
+      }
+    ],
+    "size_bytes": 4096,
+    "hex_preview": [
+      "00000000  7f 45 4c 46 02 01 01 00  |.ELF....|"
+    ]
+  },
+  "payloadDetailBytesOnly": {
+    "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "inventory": null,
+    "analysis": null,
+    "yara": [],
+    "size_bytes": 0,
+    "hex_preview": []
+  },
+  "payloadReport": {
+    "id": "rep-1",
+    "generated": {
+      "id": "rep-1",
+      "name": "Payload report",
+      "template": "payload",
+      "theme": "dark",
+      "title": "Payload e3b0c442",
+      "size_bytes": 20480,
+      "created_at": "2026-10-14T09:00:00+00:00",
+      "origin": "manual"
+    }
+  },
+  "sandboxRunPage": {
+    "total": 1,
+    "rows": [
+      {
+        "sandbox": {
+          "version": 2,
+          "job": "job1",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "capture_name": "x86",
+          "source": "cowrie",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:05Z",
+          "completed_at": "2026-10-14T09:02:00Z",
+          "duration_seconds": 115,
+          "exit_status": "ok",
+          "run_status": "completed",
+          "guest_started": true,
+          "failure_reason": "",
+          "timeout_reason": "",
+          "risk_score": 12,
+          "risk_level": "low",
+          "network": "isolated",
+          "file_type": "ELF 64-bit",
+          "platform": "linux",
+          "analysis_path": "sandbox",
+          "execution_mode": "qemu",
+          "classification": {
+            "code": "elf",
+            "label": "ELF executable",
+            "platform": "linux",
+            "category": "executable",
+            "analysis_path": "sandbox",
+            "dynamic": true
+          },
+          "hashes": {
+            "md5": "d41d8cd98f00b204e9800998ecf8427e",
+            "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          "stdout": "",
+          "stderr": "",
+          "runner_log": "",
+          "changed_files": [],
+          "sockets_before": [],
+          "sockets_after": [],
+          "top_syscalls": [
+            {
+              "name": "read",
+              "count": 14
+            }
+          ],
+          "network_summary": {},
+          "iocs": [],
+          "windows_forensics": null,
+          "artifacts": {
+            "kernel": "6.1",
+            "processes_before": [
+              "init"
+            ],
+            "host_phase": "done"
+          }
+        },
+        "event": {
+          "category": "sandbox"
+        },
+        "@timestamp": "2026-10-14T09:02:00Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "ok",
+        "risk_level": "low",
+        "risk_score": 12,
+        "platform": "linux",
+        "_doc_id": "sandbox:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "goldenImageStatus": {
+    "configured": true,
+    "BuiltAt": "2026-10-01T00:00:00Z",
+    "Checksum": "ab12"
+  },
+  "goldenImageUnconfigured": {
+    "configured": false
+  },
+  "sandboxVnc": {
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bridge_ws": "/vnc/ws"
+  },
+  "sandboxSubmit": {
+    "target": "linux",
+    "queued": true
+  },
+  "ghidraSubmit": {
+    "queued": true
+  },
+  "githubAnalysisSubmit": {
+    "queued": true
+  },
+  "ghidraRunPage": {
+    "total": 2,
+    "rows": [
+      {
+        "ghidra": {
+          "version": 3,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:10Z",
+          "completed_at": "2026-10-14T09:10:00Z",
+          "exit_status": "ok",
+          "analyzer_version": "1.2.0",
+          "artifact_schema_version": "2",
+          "service_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "functions": [
+            {
+              "name": "main",
+              "address": "00401000",
+              "size": 128,
+              "callers": [],
+              "callees": [
+                {
+                  "addr": "00401100",
+                  "name": "helper"
+                }
+              ],
+              "signature": "int main(void)",
+              "decompiled": "int main(void){return 0;}"
+            }
+          ],
+          "functions_truncated": false,
+          "functions_deepened": 1,
+          "functions_deepened_truncated": false,
+          "strings": [
+            "/bin/sh"
+          ],
+          "imports": [
+            {
+              "name": "connect",
+              "count": 2
+            }
+          ],
+          "findcrypt": [],
+          "call_graph_svg": "<svg/>",
+          "types": [],
+          "globals": [],
+          "annotations": {
+            "revision": 1,
+            "entries": []
+          },
+          "memory_map": [],
+          "ai_triage": {
+            "summary": "dropper",
+            "model": "qwen3:14b",
+            "confidence": "medium",
+            "family_guess": "mirai",
+            "behaviors": [
+              "scanning"
+            ],
+            "risk_level": "high",
+            "workflow": "triage"
+          },
+          "fuzzy_hashes": {
+            "ssdeep": "3:a:b",
+            "tlsh": "T1",
+            "imphash": ""
+          },
+          "lief": {
+            "format": "ELF",
+            "architecture": "x86_64",
+            "entrypoint": "0x401000",
+            "is_pie": false,
+            "stripped": true,
+            "is_dll": null,
+            "compile_timestamp": null,
+            "section_count": 18,
+            "libraries": [
+              "libc.so.6"
+            ]
+          },
+          "capa": {
+            "capabilities": [],
+            "attack": [],
+            "mbc": []
+          },
+          "floss": {
+            "strings": {
+              "static": [
+                "a"
+              ]
+            },
+            "total": 1,
+            "truncated": false
+          },
+          "revdeck": null,
+          "revdeck_chat_threads": null,
+          "revdeck_recovery": null,
+          "report_pdf": "report.html"
+        },
+        "event": {
+          "category": "ghidra"
+        },
+        "@timestamp": "2026-10-14T09:10:00Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "ok",
+        "_doc_id": "ghidra:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "ioc_correlation": {
+          "has_sandbox_run": true,
+          "has_floss_data": true,
+          "is_empty": false,
+          "ips": {
+            "floss_only": [],
+            "sandbox_static_only": [],
+            "confirmed_at_runtime": [
+              "198.51.100.10"
+            ]
+          },
+          "domains": {
+            "floss_only": [],
+            "sandbox_static_only": [],
+            "confirmed_at_runtime": []
+          },
+          "urls": {
+            "floss_only": [],
+            "sandbox_static_only": [],
+            "confirmed_at_runtime": []
+          },
+          "unc_paths": {
+            "floss_only": [],
+            "sandbox_static_only": [],
+            "confirmed_at_runtime": []
+          }
+        }
+      },
+      {
+        "ghidra": {
+          "version": 3,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:10Z",
+          "completed_at": "2026-10-14T09:00:11Z",
+          "exit_status": "error",
+          "error": "service unreachable",
+          "functions": [],
+          "strings": [],
+          "imports": [],
+          "findcrypt": [],
+          "functions_deepened": 0,
+          "functions_deepened_truncated": false,
+          "call_graph_svg": null,
+          "ai_triage": null,
+          "types": [],
+          "globals": [],
+          "annotations": null,
+          "memory_map": [],
+          "fuzzy_hashes": null,
+          "lief": null,
+          "capa": null,
+          "floss": null,
+          "revdeck": null,
+          "revdeck_chat_threads": null,
+          "revdeck_recovery": null,
+          "report_pdf": null
+        },
+        "event": {
+          "category": "ghidra"
+        },
+        "@timestamp": "2026-10-14T09:00:11Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "error",
+        "_doc_id": "ghidra:err"
+      }
+    ]
+  },
+  "ghidraCallGraph": {
+    "nodes": [
+      {
+        "id": "00401000",
+        "label": "main",
+        "kind": "function"
+      },
+      {
+        "id": "00401100",
+        "label": "helper",
+        "kind": "leaf"
+      }
+    ],
+    "edges": [
+      {
+        "source": "00401000",
+        "target": "00401100"
+      }
+    ],
+    "truncated": false
+  },
+  "revdeckRunPage": {
+    "total": 1,
+    "rows": [
+      {
+        "_doc_id": "revdeck:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "requested_at": "2026-10-14T09:00:00Z",
+        "completed_at": "2026-10-14T09:10:00Z",
+        "exit_status": "ok",
+        "revdeck": {
+          "workflow": "triage",
+          "status": "complete",
+          "answer": "Looks like a Mirai variant.",
+          "steps": [
+            {
+              "tool": "decompile",
+              "input": "main",
+              "output": "..."
+            }
+          ],
+          "tool_calls": 1,
+          "citations": {
+            "valid": [
+              "00401000"
+            ],
+            "invalid": []
+          },
+          "warnings": []
+        }
+      }
+    ]
+  },
+  "capeRunPage": {
+    "total": 2,
+    "rows": [
+      {
+        "cape": {
+          "version": 1,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:10Z",
+          "completed_at": "2026-10-14T09:20:00Z",
+          "exit_status": "ok",
+          "task_id": 42,
+          "cape_status": "reported",
+          "route": "none",
+          "score": 4.5,
+          "category": "file",
+          "signatures": [
+            {
+              "name": "antivm",
+              "description": "Checks for a VM",
+              "severity": 2
+            }
+          ],
+          "report": {}
+        },
+        "event": {
+          "category": "cape"
+        },
+        "@timestamp": "2026-10-14T09:20:00Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "ok",
+        "_doc_id": "cape:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "cape": {
+          "version": 1,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:10Z",
+          "completed_at": "2026-10-14T09:00:11Z",
+          "exit_status": "error",
+          "error": "CAPE unreachable",
+          "task_id": null,
+          "cape_status": null,
+          "route": "none",
+          "score": null,
+          "category": null,
+          "signatures": [],
+          "report": {}
+        },
+        "event": {
+          "category": "cape"
+        },
+        "@timestamp": "2026-10-14T09:00:11Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "error",
+        "_doc_id": "cape:err"
+      }
+    ]
+  },
+  "githubAnalysisPage": {
+    "total": 1,
+    "rows": [
+      {
+        "github_analysis": {
+          "version": 1,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "requested_at": "2026-10-14T09:00:00Z",
+          "started_at": "2026-10-14T09:00:00Z",
+          "completed_at": "2026-10-14T09:30:00Z",
+          "exit_status": "ok",
+          "commit": "abc1234",
+          "report_commit": "def5678",
+          "run_id": 123,
+          "run_url": "https://github.example.test/org/repo/actions/runs/123",
+          "sample_path": "samples/x/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.zip",
+          "family": "mirai",
+          "verdict": {
+            "malicious": 12,
+            "suspicious": 1,
+            "total": 70,
+            "level": "high"
+          },
+          "scanners": [
+            {
+              "source": "virustotal",
+              "ok": true,
+              "positives": 12,
+              "total": 70,
+              "suspicious": true,
+              "permalink": "https://vt.example.test/x",
+              "error": ""
+            }
+          ],
+          "yara_auto_rules": [],
+          "report_pdf": "reports/pdf/samples/x-2026-10-14.pdf"
+        },
+        "event": {
+          "category": "github_analysis"
+        },
+        "@timestamp": "2026-10-14T09:30:00Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "ok",
+        "family": "mirai",
+        "_doc_id": "github:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "artifactList": {
+    "rows": [
+      {
+        "filename": "report.html",
+        "kind": "ghidra",
+        "content_type": "text/html",
+        "size_bytes": 2048,
+        "imported_at": "2026-10-14T09:11:00Z"
+      }
+    ]
+  },
+  "analyzerCatalog": {
+    "classification": {
+      "code": "elf",
+      "label": "ELF executable",
+      "platform": "linux",
+      "category": "executable",
+      "analysis_path": "sandbox",
+      "dynamic": true
+    },
+    "analyzers": [
+      {
+        "id": "ghidra",
+        "display_name": "Ghidra",
+        "description": "Static decompilation",
+        "accepted_kinds": [
+          "elf",
+          "pe"
+        ],
+        "availability": "configured",
+        "available": true,
+        "applicable": true,
+        "reason": "",
+        "result_link_shape": "/ghidra/{hash}",
+        "required_role": "viewer",
+        "confirmation": "none",
+        "concurrency_class": "ghidra",
+        "local_only": true,
+        "externally_publishing": false,
+        "detonates": false,
+        "gpu_consuming": false,
+        "requires_opt_in": false,
+        "default_options": {
+          "timeout_seconds": 600,
+          "max_queue_age_seconds": 1800,
+          "retry_limit": 1
+        },
+        "option_schema": {
+          "timeout_min_seconds": 60,
+          "timeout_max_seconds": 7200,
+          "queue_age_min_seconds": 60,
+          "queue_age_max_seconds": 86400,
+          "retry_limit_max": 3
+        }
+      }
+    ]
+  },
+  "workbenchRunCreated": {
+    "run": {
+      "schema_version": 1,
+      "id": "run-1",
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "payload_kind": "elf",
+      "owner": "analyst",
+      "recipe_revision": 0,
+      "recipe_name": "",
+      "recipe_snapshot": [],
+      "idempotency_key": "ik-1",
+      "state": "running",
+      "created_at": "2026-10-14T09:00:00Z",
+      "updated_at": "2026-10-14T09:01:00Z",
+      "children": [
+        {
+          "analyzer_id": "ghidra",
+          "display_name": "Ghidra",
+          "state": "queued",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          },
+          "created_at": "2026-10-14T09:00:00Z",
+          "updated_at": "2026-10-14T09:00:00Z",
+          "deadline": "2026-10-14T11:00:00Z",
+          "queue_deadline": "2026-10-14T09:30:00Z",
+          "attempts": 0,
+          "retryable": false,
+          "cancelable": true,
+          "detonates": false,
+          "gpu_consuming": false,
+          "local_only": true,
+          "stale": false
+        },
+        {
+          "analyzer_id": "linux-sandbox",
+          "display_name": "Linux sandbox",
+          "state": "completed",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          },
+          "created_at": "2026-10-14T09:00:00Z",
+          "updated_at": "2026-10-14T09:00:00Z",
+          "deadline": "2026-10-14T11:00:00Z",
+          "queue_deadline": "2026-10-14T09:30:00Z",
+          "attempts": 0,
+          "retryable": false,
+          "cancelable": true,
+          "detonates": true,
+          "gpu_consuming": false,
+          "local_only": true,
+          "stale": false,
+          "reason": "",
+          "summary": "risk 12/100",
+          "result_url": "/sandbox/job1",
+          "target_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    "reused": false
+  },
+  "workbenchRunEnvelope": {
+    "run": {
+      "schema_version": 1,
+      "id": "run-2",
+      "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "payload_kind": "elf",
+      "owner": "analyst",
+      "recipe_revision": 2,
+      "recipe_name": "Quick triage",
+      "recipe_snapshot": [
+        {
+          "analyzer_id": "ghidra",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          }
+        }
+      ],
+      "idempotency_key": "ik-1",
+      "state": "running",
+      "created_at": "2026-10-14T09:00:00Z",
+      "updated_at": "2026-10-14T09:01:00Z",
+      "children": [
+        {
+          "analyzer_id": "ghidra",
+          "display_name": "Ghidra",
+          "state": "queued",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          },
+          "created_at": "2026-10-14T09:00:00Z",
+          "updated_at": "2026-10-14T09:00:00Z",
+          "deadline": "2026-10-14T11:00:00Z",
+          "queue_deadline": "2026-10-14T09:30:00Z",
+          "attempts": 0,
+          "retryable": false,
+          "cancelable": true,
+          "detonates": false,
+          "gpu_consuming": false,
+          "local_only": true,
+          "stale": false
+        },
+        {
+          "analyzer_id": "linux-sandbox",
+          "display_name": "Linux sandbox",
+          "state": "completed",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          },
+          "created_at": "2026-10-14T09:00:00Z",
+          "updated_at": "2026-10-14T09:00:00Z",
+          "deadline": "2026-10-14T11:00:00Z",
+          "queue_deadline": "2026-10-14T09:30:00Z",
+          "attempts": 0,
+          "retryable": false,
+          "cancelable": true,
+          "detonates": true,
+          "gpu_consuming": false,
+          "local_only": true,
+          "stale": false,
+          "reason": "",
+          "summary": "risk 12/100",
+          "result_url": "/sandbox/job1",
+          "target_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "recipe_id": "rec-1"
+    }
+  },
+  "workbenchRunList": {
+    "runs": [
+      {
+        "schema_version": 1,
+        "id": "run-1",
+        "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "payload_kind": "elf",
+        "owner": "analyst",
+        "recipe_revision": 0,
+        "recipe_name": "",
+        "recipe_snapshot": [],
+        "idempotency_key": "ik-1",
+        "state": "running",
+        "created_at": "2026-10-14T09:00:00Z",
+        "updated_at": "2026-10-14T09:01:00Z",
+        "children": [
+          {
+            "analyzer_id": "ghidra",
+            "display_name": "Ghidra",
+            "state": "queued",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            },
+            "created_at": "2026-10-14T09:00:00Z",
+            "updated_at": "2026-10-14T09:00:00Z",
+            "deadline": "2026-10-14T11:00:00Z",
+            "queue_deadline": "2026-10-14T09:30:00Z",
+            "attempts": 0,
+            "retryable": false,
+            "cancelable": true,
+            "detonates": false,
+            "gpu_consuming": false,
+            "local_only": true,
+            "stale": false
+          },
+          {
+            "analyzer_id": "linux-sandbox",
+            "display_name": "Linux sandbox",
+            "state": "completed",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            },
+            "created_at": "2026-10-14T09:00:00Z",
+            "updated_at": "2026-10-14T09:00:00Z",
+            "deadline": "2026-10-14T11:00:00Z",
+            "queue_deadline": "2026-10-14T09:30:00Z",
+            "attempts": 0,
+            "retryable": false,
+            "cancelable": true,
+            "detonates": true,
+            "gpu_consuming": false,
+            "local_only": true,
+            "stale": false,
+            "reason": "",
+            "summary": "risk 12/100",
+            "result_url": "/sandbox/job1",
+            "target_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ]
+      },
+      {
+        "schema_version": 1,
+        "id": "run-2",
+        "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "payload_kind": "elf",
+        "owner": "analyst",
+        "recipe_revision": 2,
+        "recipe_name": "Quick triage",
+        "recipe_snapshot": [
+          {
+            "analyzer_id": "ghidra",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            }
+          }
+        ],
+        "idempotency_key": "ik-1",
+        "state": "running",
+        "created_at": "2026-10-14T09:00:00Z",
+        "updated_at": "2026-10-14T09:01:00Z",
+        "children": [
+          {
+            "analyzer_id": "ghidra",
+            "display_name": "Ghidra",
+            "state": "queued",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            },
+            "created_at": "2026-10-14T09:00:00Z",
+            "updated_at": "2026-10-14T09:00:00Z",
+            "deadline": "2026-10-14T11:00:00Z",
+            "queue_deadline": "2026-10-14T09:30:00Z",
+            "attempts": 0,
+            "retryable": false,
+            "cancelable": true,
+            "detonates": false,
+            "gpu_consuming": false,
+            "local_only": true,
+            "stale": false
+          },
+          {
+            "analyzer_id": "linux-sandbox",
+            "display_name": "Linux sandbox",
+            "state": "completed",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            },
+            "created_at": "2026-10-14T09:00:00Z",
+            "updated_at": "2026-10-14T09:00:00Z",
+            "deadline": "2026-10-14T11:00:00Z",
+            "queue_deadline": "2026-10-14T09:30:00Z",
+            "attempts": 0,
+            "retryable": false,
+            "cancelable": true,
+            "detonates": true,
+            "gpu_consuming": false,
+            "local_only": true,
+            "stale": false,
+            "reason": "",
+            "summary": "risk 12/100",
+            "result_url": "/sandbox/job1",
+            "target_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "recipe_id": "rec-1"
+      }
+    ]
+  },
+  "workbenchRecipeList": {
+    "recipes": [
+      {
+        "schema_version": 1,
+        "id": "rec-1",
+        "revision": 2,
+        "name": "Quick triage",
+        "description": "",
+        "owner": "analyst",
+        "scope": "personal",
+        "created_at": "2026-10-14T08:00:00Z",
+        "analyzers": [
+          {
+            "analyzer_id": "ghidra",
+            "options": {
+              "timeout_seconds": 600,
+              "max_queue_age_seconds": 1800,
+              "retry_limit": 1
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "workbenchRecipeSaved": {
+    "recipe": {
+      "schema_version": 1,
+      "id": "rec-1",
+      "revision": 2,
+      "name": "Quick triage",
+      "description": "",
+      "owner": "analyst",
+      "scope": "personal",
+      "created_at": "2026-10-14T08:00:00Z",
+      "analyzers": [
+        {
+          "analyzer_id": "ghidra",
+          "options": {
+            "timeout_seconds": 600,
+            "max_queue_age_seconds": 1800,
+            "retry_limit": 1
+          }
+        }
+      ]
+    }
+  },
+  "gpuQueue": [
+    {
+      "job_id": "gpu-1",
+      "job_type": "ghidra-triage",
+      "ref": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "model": "qwen3:14b",
+      "estimated_vram_mib": 9000,
+      "status": "queued",
+      "requested_at": "2026-10-14T09:00:00Z",
+      "started_at": "",
+      "finished_at": "",
+      "abort_requested": false,
+      "error": "",
+      "attempts": 0,
+      "result": null
+    },
+    {
+      "job_id": "gpu-2",
+      "job_type": "vault-rag",
+      "ref": "q",
+      "model": "qwen3:14b",
+      "estimated_vram_mib": 9000,
+      "status": "done",
+      "requested_at": "2026-10-14T08:00:00Z",
+      "started_at": "2026-10-14T08:00:05Z",
+      "finished_at": "2026-10-14T08:01:00Z",
+      "abort_requested": false,
+      "error": "",
+      "attempts": 1,
+      "result": {
+        "answer": "x",
+        "citations": []
+      }
+    }
+  ],
+  "gpuAbort": {
+    "ok": true,
+    "job_id": "gpu-1",
+    "abort_requested": true
+  },
+  "mlHealth": [
+    {
+      "model": "autoencoder",
+      "timestamp": "2026-10-14T06:00:00Z",
+      "accepted": true,
+      "reason": "",
+      "anomaly_rate_new": 0.012,
+      "anomaly_rate_previous": 0.015,
+      "train_samples": 50000
+    }
+  ]
+}

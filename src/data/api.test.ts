@@ -1102,7 +1102,7 @@ const topologyWire = {
     { sensor: 'dionaea', stack: 'honeypot-dionaea', containers: ['hp-dionaea'], ingress: ['traefik'], hostnames: ['smtp.example.test'], ports: [], rawIndex: 'unmapped' },
   ],
   flow: { nodes: [{ name: 'VPS Traefik (:443 hostnames)', layer: 0 }, { name: 'cowrie', layer: 1 }], links: [{ source: 'VPS Traefik (:443 hostnames)', target: 'cowrie' }] },
-  stacks: [{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', adapterVisible: true }] }],
+  stacks: [{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', adapter_visible: true }] }],
 }
 
 const sensorOverviewWire = {

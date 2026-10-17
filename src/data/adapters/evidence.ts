@@ -387,8 +387,9 @@ export function capeRun(wire: CapeRunWire): CapeRun {
     dumps: lines((summary?.payloads as string[] | undefined) ?? undefined),
     config: (summary?.configs as Record<string, string> | undefined) ?? {},
     log: typeof summary?.debug_log === 'string' ? summary.debug_log : '',
-    taskId: doc.task_id,
-    capeStatus: doc.cape_status,
+    // cape-worker.py's failure envelope writes null for both (CAPE never took the sample).
+    taskId: doc.task_id ?? 0,
+    capeStatus: doc.cape_status ?? '',
     malstatus: summary?.malstatus ?? '',
     totalCalls: summary?.total_calls ?? 0,
     sections: summary?.summary_keys ?? [],

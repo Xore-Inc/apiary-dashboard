@@ -1,0 +1,95 @@
+{
+  "_source": "backend-service charts.rs (Series/Bar/PiePoint, one fn per /api/v1/charts/{name}), kill_chain.rs (AttckGrid, SankeyData, TimelineRow, TACTICS), fusion.rs (Fusion, SIGNALS labels), topology.rs (FlowGraph/FlowNode/FlowLink). Values are synthetic; field names, nesting, key order and number kinds follow the serializers.",
+  "charts": {
+    "kill-chain-sankey": {
+      "nodes": [{ "name": "Reconnaissance" }, { "name": "Initial Access" }, { "name": "Execution" }, { "name": "Credential Access" }],
+      "links": [
+        { "source": "Reconnaissance", "target": "Initial Access", "value": 14 },
+        { "source": "Initial Access", "target": "Execution", "value": 9 },
+        { "source": "Initial Access", "target": "Credential Access", "value": 3 }
+      ]
+    },
+    "attck-coverage": {
+      "tactics": ["Reconnaissance", "Initial Access", "Execution", "Credential Access", "Lateral Movement", "Command and Control", "Impair Process Control"],
+      "techniques": ["T1595 Active Scanning", "T1190 Exploit Public-Facing Application", "T1110 Brute Force"],
+      "cells": [
+        { "tactic_idx": 0, "technique_idx": 0, "count": 120 },
+        { "tactic_idx": 1, "technique_idx": 1, "count": 41 },
+        { "tactic_idx": 3, "technique_idx": 2, "count": 960 }
+      ]
+    },
+    "campaign-timeline": [
+      { "cidr": "203.0.113.0/24", "start_ms": 1791000000000, "end_ms": 1791086400000, "score": 72.5, "events": 4210 },
+      { "cidr": "198.51.100.0/24", "start_ms": 1791043200000, "end_ms": 1791129600000, "score": 0, "events": 0 }
+    ],
+    "ml-backlog": [
+      {
+        "name": "honeypot-v2-2026.10.14",
+        "points": [
+          { "time": "2026-10-14T10:00:00.000Z", "value": 12.5 },
+          { "time": "2026-10-14T11:00:00.000Z", "value": 0 }
+        ]
+      }
+    ],
+    "netflow-bytes": [
+      {
+        "name": "bytes",
+        "points": [
+          { "time": "2026-10-14T10:00:00.000Z", "value": 1048576 },
+          { "time": "2026-10-14T11:00:00.000Z", "value": 0 }
+        ]
+      }
+    ],
+    "netflow-packets": [
+      {
+        "name": "packets",
+        "points": [
+          { "time": "2026-10-14T10:00:00.000Z", "value": 9120 },
+          { "time": "2026-10-14T11:00:00.000Z", "value": 0 }
+        ]
+      }
+    ],
+    "anomaly-trend": [
+      { "name": "(none)", "points": [{ "time": "2026-10-14T10:00:00.000Z", "value": 3 }] },
+      { "name": "http", "points": [{ "time": "2026-10-14T10:00:00.000Z", "value": 11 }] }
+    ],
+    "dionaea-cves": { "categories": ["SMB EternalBlue probe (CVE-2017-0144)", "Unclassified exploit"], "values": [18, 4] },
+    "os-distribution": [
+      { "name": "Linux 3.11 and newer", "value": 31 },
+      { "name": "Windows 7 or 8", "value": 6 }
+    ],
+    "tcp-stack-clusters": [
+      { "name": "t13d1516h2_8daaf6152771_02713d6af862", "value": 5 },
+      { "name": "t13d190900_9dc949149365_97f8aa674fd9", "value": 2 }
+    ],
+    "ics-functions": { "categories": ["modbus: READ_HOLDING_REGISTERS", "s7comm: Read Var"], "values": [57, 8] },
+    "decoy-requests": { "categories": ["/.env", "/wp-login.php"], "values": [203, 88] },
+    "decoy-client-fingerprints": { "categories": ["t13d1516h2_8daaf6152771_02713d6af862"], "values": [44] },
+    "ja4h-fingerprints": { "categories": ["ge11nn050000_f8f1d6b2b0a1_000000000000_000000000000"], "values": [12] },
+    "ja4x-fingerprints": { "categories": ["a37f80e0bf10_a37f80e0bf10_795797892f9c"], "values": [3] },
+    "ja4l-fingerprints": { "categories": ["0100_64_20"], "values": [7] },
+    "tls-fingerprints": { "categories": ["e7d705a3286e19ea42f587b344ee6865"], "values": [26] },
+    "ssh-fingerprints": { "categories": ["SSH-2.0-libssh_0.9.6"], "values": [90] },
+    "endlessh-held-histogram": { "categories": ["<1s", "1-5s", "5-15s", "15-60s", "1-5min", "5min+"], "values": [4, 9, 2, 0, 1, 0] },
+    "ml-anomaly-scores": [
+      { "name": "autoencoder", "points": [{ "time": "2026-10-14T10:00:00Z", "value": 0.91 }] },
+      { "name": "composite", "points": [{ "time": "2026-10-14T10:00:00Z", "value": 0.87 }] }
+    ],
+    "attacker-fusion": {
+      "categories": ["JA3", "JA4", "p0f OS", "SSH client", "Payload hash", "JA4T", "HASSH", "JA4SSH", "JA4S", "TCP signature"],
+      "values": [1, 0, 2, 0, 1, 0, 3, 0, 0, 1],
+      "ips": ["203.0.113.4", "203.0.113.9"]
+    }
+  },
+  "topologyFlow": {
+    "nodes": [
+      { "name": "VPS portbridge (raw ports)", "layer": 0 },
+      { "name": "cowrie", "layer": 1 },
+      { "name": "Filebeat", "layer": 2 }
+    ],
+    "links": [
+      { "source": "VPS portbridge (raw ports)", "target": "cowrie" },
+      { "source": "cowrie", "target": "Filebeat" }
+    ]
+  }
+}

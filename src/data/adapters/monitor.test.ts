@@ -49,6 +49,9 @@ const kpis: OverviewKpis = {
   unique_ips: 4_118,
   hourly: [812, 690, 741, 1204],
   logins: 96,
+  sessions_24h: 312,
+  sessions_previous24h: 280,
+  hourly_by_protocol: [{ hour: '2026-10-13T10:00:00.000Z', total: 812, counts: { ssh: 700, other: 112 } }],
   ready: true,
 }
 

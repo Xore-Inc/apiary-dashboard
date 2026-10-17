@@ -101,7 +101,7 @@ const topologyWire: TopologyWire = {
     { sensor: 'tanner', stack: 'honeypots', containers: [], ingress: ['traefik'], hostnames: [], ports: [], rawIndex: 'unmapped' },
   ],
   flow: { nodes: [{ name: 'portbridge', layer: 0 }, { name: 'cowrie', layer: 1 }, { name: 'pipeline', layer: 2 }], links: [{ source: 'portbridge', target: 'cowrie' }, { source: 'cowrie', target: 'pipeline' }] },
-  stacks: [{ stack: 'honeypots', containers: [{ name: 'hp-cowrie', adapterVisible: true }, { name: 'hp-unlisted', adapterVisible: false }] }],
+  stacks: [{ stack: 'honeypots', containers: [{ name: 'hp-cowrie', adapter_visible: true }, { name: 'hp-unlisted', adapter_visible: false }] }],
 }
 
 const services: ServicesWire = {

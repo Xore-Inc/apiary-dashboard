@@ -843,7 +843,8 @@
           "zeek_log": "weird"
         }
       }
-    ]
+    ],
+    "fingerprint_ips": null
   },
   "memberIps": [
     "203.0.113.105",

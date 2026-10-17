@@ -245,13 +245,13 @@ export interface GhidraRunWire {
   strings?: string[]
   imports?: Array<{ name: string; count?: number } | string>
   findcrypt?: Array<{ name: string; address: string; algorithm?: string }>
-  call_graph_svg?: string
+  call_graph_svg?: string | null
   types?: Array<{ name: string; kind: string; size: number; fields: Array<{ name: string; type: string; offset: number; size: number }> }>
   globals?: Array<{ address: string; name: string; type: string; size: number }>
-  annotations?: { revision?: number; entries?: Array<{ address: string; displayName: string; comment: string; tags: string[] }> }
+  annotations?: { revision?: number; entries?: Array<{ address: string; displayName: string; comment: string; tags: string[] }> } | null
   memory_map?: Array<{ name: string; start: string; end: string; size: number; permissions: string; hex: string; ascii: string }>
-  ai_triage?: { summary?: string; model?: string; confidence?: string; family_guess?: string; behaviors?: string[]; risk_level?: string; workflow?: string }
-  fuzzy_hashes?: { ssdeep?: string; tlsh?: string; imphash?: string }
+  ai_triage?: { summary?: string; model?: string; confidence?: string; family_guess?: string; behaviors?: string[]; risk_level?: string; workflow?: string } | null
+  fuzzy_hashes?: { ssdeep?: string; tlsh?: string; imphash?: string } | null
   lief?: {
     format?: string
     architecture?: string
@@ -262,9 +262,9 @@ export interface GhidraRunWire {
     compile_timestamp?: string | null
     section_count?: number
     libraries?: string[]
-  }
-  capa?: { capabilities?: Array<{ name: string; namespace: string; matches: number; attck?: string[] }>; attack?: Array<{ id: string; tactic: string; technique: string }>; mbc?: Array<{ id: string; objective: string; behavior: string }> }
-  floss?: { strings?: Record<string, string[] | undefined>; total?: number; truncated?: boolean }
+  } | null
+  capa?: { capabilities?: Array<{ name: string; namespace: string; matches: number; attck?: string[] }>; attack?: Array<{ id: string; tactic: string; technique: string }>; mbc?: Array<{ id: string; objective: string; behavior: string }> } | null
+  floss?: { strings?: Record<string, string[] | undefined>; total?: number; truncated?: boolean } | null
   revdeck?: RevDeckRunWire | null
   revdeck_chat_threads?: unknown
   revdeck_recovery?: unknown
@@ -384,8 +384,10 @@ export interface CapeRunWire {
   started_at: string
   completed_at: string
   exit_status: string
-  task_id: number
-  cape_status: string
+  /** null on the failure envelope (cape-worker.py `failure_result`), which
+   * is written when CAPE never accepted the sample. */
+  task_id: number | null
+  cape_status: string | null
   route?: string
   score?: number | null
   category?: string | null

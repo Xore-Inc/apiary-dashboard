@@ -299,13 +299,16 @@ export interface ServiceWire {
   /** running | exited | restarting | paused | created | removing | dead |
    * not_found | unknown */
   state: string
-  /** Docker's `State.ExitCode`. Null while the container is running. */
-  exit_code: number | null
+  /** Docker's `State.ExitCode`. Null while the container is running. Absent,
+   * with `started_at` and `restart_count`, on a `not_found` or `unknown` row:
+   * `container_status` returns just `{name, state}` when the inspect call
+   * failed or the container does not exist. */
+  exit_code?: number | null
   /** Docker's `State.StartedAt`. */
-  started_at: string | null
+  started_at?: string | null
   /** The container's `RestartCount` (a top-level inspect field), not
    * `State`'s. */
-  restart_count: number | null
+  restart_count?: number | null
   /** Docker's `State.Health.Status`. Absent unless the image declares a
    * HEALTHCHECK — services-adapter.py adds the key only when `Health` is a
    * dict carrying a truthy `Status`. */
@@ -511,7 +514,9 @@ export interface MailWire {
   body_path: string
   size_bytes: number
   imported_at: string
-  from?: MailAddressWire
+  /** mail.rs `from` is an `Option` with no skip_serializing_if: a message
+   * with no From header carries an explicit null, not an absent key. */
+  from: MailAddressWire | null
   to: MailAddressWire[]
   subject: string
   /** The Date header as sent, RFC 3339; "" when the message carried none. */

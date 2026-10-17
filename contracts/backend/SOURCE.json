@@ -1,7 +1,7 @@
 {
   "repo": "Xore-Inc/APIARY",
   "path": "arcane/home/honeypot-dashboard/backend-service/openapi.json",
-  "ref": "8df761b575f39c7c9c8ebf7e3c44cd149b0b19b7",
-  "sha": "8df761b575f39c7c9c8ebf7e3c44cd149b0b19b7",
+  "ref": "main",
+  "sha": "5b961620d0ade7637ce49e5994f0b3fd68310db3",
   "apiVersion": 1
 }
