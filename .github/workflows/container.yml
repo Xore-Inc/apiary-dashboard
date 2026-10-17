@@ -64,6 +64,10 @@ jobs:
             echo "::error::the image started without OIDC_ISSUER_URL"; exit 1
           fi
           grep -q E-OIDC-ISSUER refusal.log
+          if docker run --rm -e SERVICE_TOKEN=ci-token -e EXPORT_TOKEN=ci-token apiary-dashboard:ci >refusal.log 2>&1; then
+            echo "::error::the image started with EXPORT_TOKEN equal to SERVICE_TOKEN"; exit 1
+          fi
+          grep -q E-EXPORT-TOKEN refusal.log
           docker run -d --name dash -p 3000:3000 -e SERVICE_TOKEN=ci-token -e OIDC_ISSUER_URL=https://sso.invalid/realms/ci apiary-dashboard:ci
           for _ in $(seq 1 60); do curl -sf -o /dev/null http://localhost:3000/healthz && break; sleep 0.5; done
           test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/healthz)" = 200

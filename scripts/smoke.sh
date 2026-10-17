@@ -44,6 +44,7 @@ refuses() {
   if grep -q "$code" "$WORK/refusal.log"; then printf '  ok   refused with %s\n' "$code"; else printf '  FAIL no %s in the refusal\n' "$code"; return 1; fi
 }
 refuses E-SERVICE-TOKEN env
+refuses E-EXPORT-TOKEN env SERVICE_TOKEN=smoke EXPORT_TOKEN=smoke
 refuses E-OIDC-DISABLED env SERVICE_TOKEN=smoke OIDC_DISABLED=1 NODE_ENV=production
 refuses E-OIDC-ISSUER env SERVICE_TOKEN=smoke NODE_ENV=production
 

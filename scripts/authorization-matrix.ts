@@ -80,7 +80,7 @@ const ROUTE_ACCESS: Record<
     anonymous: '401 (or token)',
     viewer: 'allow',
     admin: 'allow',
-    enforcement: '`x-service-token` = `SERVICE_TOKEN`, else session with `getBlockedIps` access',
+    enforcement: '`x-export-token` = `EXPORT_TOKEN` (not `SERVICE_TOKEN`), else session with `getBlockedIps` access',
   },
   page: {
     anonymous: '307 sign-in',
