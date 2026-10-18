@@ -1015,6 +1015,7 @@
         "events": [
           {
             "event_id": "e1",
+            "source_index": "honeypot-v2-2026.10.14",
             "timestamp": "2026-10-14T09:00:00Z",
             "matched_rules": [
               {
@@ -1034,6 +1035,7 @@
           },
           {
             "event_id": "e2",
+            "source_index": "",
             "timestamp": "2026-10-14T09:20:00Z",
             "matched_rules": []
           }

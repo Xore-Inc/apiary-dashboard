@@ -629,6 +629,8 @@
   "last": "2026-10-09T15:07:53.682Z",
   "country": "DE",
   "asn": "IONOS SE",
+  "as_organization": "IONOS SE",
+  "as_number": 8560,
   "sensors": [
    {
     "key": "zeek",
@@ -700,7 +702,8 @@
    "tunnel_os_guesses": [
     "Linux 2.2.x-3.x"
    ],
-   "records": []
+   "records": [],
+   "sensors_total": 2
   },
   "confirmed_malicious": false
  },

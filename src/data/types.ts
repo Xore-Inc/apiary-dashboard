@@ -970,7 +970,8 @@ export interface BlockRecord {
 }
 
 export interface IpProfile {
-  source: SourceProfile & { asn: string; riskScore: number; tags: string[] }
+  /** `asn` is `AS<number>`, '' when the number is unknown; `org` is the AS organization. */
+  source: SourceProfile & { asn: string; asNumber: number | null; riskScore: number; tags: string[] }
   blocked: boolean
   block?: BlockRecord
   /** A sandbox detonation of a sample that references this address
@@ -1606,6 +1607,8 @@ export interface SourceGroup {
   first?: string
   last?: string
   sensors: CountRow[]
+  /** Distinct sensors reached; `sensors` is only the top 10. Absent where the source does not say. */
+  sensorsTotal?: number
   countries: CountRow[]
   networks: CountRow[]
   ports: CountRow[]

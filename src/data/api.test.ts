@@ -2037,8 +2037,8 @@ const campaignRow = {
   correlation_identifiers: ['203.0.113.42', 'fingerprint:curl/8.5.0'],
   event_count: 2,
   events: [
-    { event_id: 'ev_9f2c1a', timestamp: '2026-10-04T20:41:03Z', matched_rules: [{ rule: 'base64-pipe-shell', reason: 'echo | base64 -d | sh', trust_boundary: 'trust-boundary-3', decode_chain: [{ transform: 'base64', input_sha256: 'aa', output_sha256: 'bb', output_len: 128 }] }] },
-    { event_id: 'ev_9f2c1b', timestamp: '2026-10-04T20:55:00Z', matched_rules: [] },
+    { event_id: 'ev_9f2c1a', source_index: 'honeypot-v2-2026.10.14', timestamp: '2026-10-04T20:41:03Z', matched_rules: [{ rule: 'base64-pipe-shell', reason: 'echo | base64 -d | sh', trust_boundary: 'trust-boundary-3', decode_chain: [{ transform: 'base64', input_sha256: 'aa', output_sha256: 'bb', output_len: 128 }] }] },
+    { event_id: 'ev_9f2c1b', source_index: '', timestamp: '2026-10-04T20:55:00Z', matched_rules: [] },
   ],
 }
 
@@ -2507,17 +2507,11 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     expect(await live('semanticSearch')('beacon')).toEqual({ available: false, reason: 'embeddings are not configured' })
   })
 
-  it('keeps source_index empty on every campaign event — the backend never writes it', async () => {
+  it('maps source_index onto each campaign event, empty for a document stored before it was written', async () => {
     const calls = stub(monitorFixtures())
     const [campaign] = await live('getAgentCampaigns')()
     expect(calls[0]).toContain('/api/v1/store/agent-campaigns?offset=0&size=100')
-    // THE GAP: `build_campaign_verdict` reads the source hit's `_index` into
-    // a `CorrelatorEvent` field it then discards, and never writes
-    // `source_index` onto the stored document. AgentCampaign.tsx:19 builds a
-    // history link whose `_index:` clause is therefore empty and will never
-    // match. The adapter substitutes '' and no index name is synthesised —
-    // the real fix is APIARY writing the field. This link is dead until then.
-    expect(campaign.events.map((e) => e.sourceIndex)).toEqual(['', ''])
+    expect(campaign.events.map((e) => e.sourceIndex)).toEqual(['honeypot-v2-2026.10.14', ''])
     expect(campaign.events[0].matchedRules).toMatchObject([{ rule: 'base64-pipe-shell', trustBoundary: 'trust-boundary-3', decodeChain: [{ transform: 'base64', outputLen: 128 }] }])
   })
 
@@ -2691,10 +2685,10 @@ const clusterWire = { kind: 'asn', value: 'AS15169 Google LLC', events: 880, sou
  * there is no hit to take a document id from. */
 const correlationRecord = (srcIp: string, sensor = 'cowrie') => ({ id: '', src_ip_claimed: '', time: '2026-10-04T20:41:03Z', sensor, src_ip: srcIp, country: 'NL', port: '22', proto: 'ssh', detail: 'command.input: uname -a', session: 'sess-77a1', pivots: { ...pivots, shasum: 'ab12cd34' }, record: { honeypot: { eventid: 'cowrie.command.input' } } })
 
-const correlationWire: CorrelationWire = { total: 2, truncated: false, sensors: [{ key: 'cowrie', count: 2 }], tunnel_connections: 1, tunnel_os_guesses: ['Linux 4.x'], records: [correlationRecord(ip), correlationRecord('198.51.100.7')] }
+const correlationWire: CorrelationWire = { total: 2, truncated: false, sensors: [{ key: 'cowrie', count: 2 }], sensors_total: 1, tunnel_connections: 1, tunnel_os_guesses: ['Linux 4.x'], records: [correlationRecord(ip), correlationRecord('198.51.100.7')] }
 
 const ipProfileWire: IpProfileWire = {
-  ip, total: 4210, first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z', country: 'NL', asn: 'Example Hosting B.V.',
+  ip, total: 4210, first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z', country: 'NL', asn: 'Example Hosting B.V.', as_organization: 'Example Hosting B.V.', as_number: 64512,
   sensors: [{ key: 'cowrie', count: 3900 }], ports: [{ key: '22', count: 900 }], protos: [{ key: 'ssh', count: 800 }],
   credentials: [{ key: 'root', count: 96 }], commands: [{ key: 'uname -a', count: 40 }], sessions: [{ key: 'sess-77a1', count: 31 }],
   techniques: [{ id: 'T1059.004', name: 'Unix Shell', domain: 'Execution', evidence: 'a shell command was recorded', count: 40, url: 'https://attack.mitre.org/techniques/T1059/004/' }],
@@ -2875,24 +2869,30 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
     expect((await live('getIpProfile')(ip))!.blocked).toBe(false)
   })
 
-  it('GAP 7: the block write carries no duration and no actor — a permanent block', async () => {
-    // THE slice's dangerous gap. BlockBody takes `expires_days` and
-    // `actor`; the page's setter is `setIpBlocked(ip, blocked)` and has no
-    // field for either, so neither is sent and the backend stores
-    // `ExpiresAt: null`. An operator who wants a week gets one until they
-    // lift it, and the page's confirm dialog claims no duration either.
-    stub(sourcesFixtures({ '/api/v1/ip-block': { IP: ip, Blocked: true, BlockedBy: '', BlockedAt: '2026-10-04T21:00:00Z', ExpiresAt: null } }))
-    await live('setIpBlocked')(ip, true)
-    const [write] = bodiesOf().filter((call) => call.path === '/api/v1/ip-block')
-    expect(write.body).toEqual({ ip, blocked: true })
-    expect(write.body).not.toHaveProperty('expires_days')
-    expect(write.body).not.toHaveProperty('actor')
+  it('sends an explicit duration with a block, none with an unblock, and never an actor', async () => {
+    stub(sourcesFixtures({ '/api/v1/ip-block': { IP: ip, Blocked: true, BlockedBy: '', BlockedAt: '2026-10-04T21:00:00Z', ExpiresAt: '2026-10-11T21:00:00Z' } }))
+    await live('setIpBlocked')(ip, true, 7)
+    await live('setIpBlocked')(ip, true, 0)
+    await live('setIpBlocked')(ip, false)
+    const writes = bodiesOf().filter((call) => call.path === '/api/v1/ip-block')
+    expect(writes.map((w) => w.body)).toEqual([
+      { ip, blocked: true, expires_days: 7 },
+      { ip, blocked: true, expires_days: 0 },
+      { ip, blocked: false },
+    ])
+    for (const w of writes) expect(w.body).not.toHaveProperty('actor')
+  })
+
+  it('refuses a block with no duration before any write', async () => {
+    stub(sourcesFixtures())
+    await expect(live('setIpBlocked')(ip, true)).rejects.toThrow(/duration/)
+    expect(bodiesOf().filter((call) => call.path === '/api/v1/ip-block')).toHaveLength(0)
   })
 
   it('keeps the block write admin-only on the live path, before any fetch', async () => {
     const viewer = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
     const calls = stub(sourcesFixtures())
-    const refused = await liveQuery('setIpBlocked', viewer)!('203.0.113.42', true).catch((error: unknown) => error)
+    const refused = await liveQuery('setIpBlocked', viewer)!('203.0.113.42', true, 7).catch((error: unknown) => error)
     expect(refused).toBeInstanceOf(ApiError)
     expect((refused as ApiError).kind).toBe('forbidden')
     expect(calls).toHaveLength(0)
@@ -2900,7 +2900,7 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
 
   it('honours read-only before writing a block', async () => {
     stub(sourcesFixtures({ '/api/v1/config': { ...configWire, payload: { behavior: { read_only: true } } } }))
-    await expect(live('setIpBlocked')(ip, true)).rejects.toThrow(ApiError)
+    await expect(live('setIpBlocked')(ip, true, 7)).rejects.toThrow(ApiError)
   })
 
   it('builds a network page from its CIDR correlation, percent-encoding the slash', async () => {
@@ -2986,7 +2986,7 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
       ['getNetwork', () => live('getNetwork')(cidr), { '/api/v1/investigate/cidr/203.0.113.0%2F24': fail(502) }],
       ['getCluster', () => live('getCluster')('payload', '9f86'), { '/api/v1/investigate/cluster': fail(502) }],
       ['getIdentityFusion', () => live('getIdentityFusion')('att_1'), { '/api/v1/charts/attacker-fusion': fail(502) }],
-      ['setIpBlocked', () => live('setIpBlocked')(ip, true), { '/api/v1/ip-block': fail(502) }],
+      ['setIpBlocked', () => live('setIpBlocked')(ip, true, 7), { '/api/v1/ip-block': fail(502) }],
     ]
     for (const [name, call, fixtures] of cases) {
       stub(sourcesFixtures(fixtures))

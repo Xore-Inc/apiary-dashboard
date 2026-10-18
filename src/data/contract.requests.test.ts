@@ -60,7 +60,9 @@ const RUST = {
   sandboxSubmit: { rust: 'sandbox_submit.rs SubmitBody', required: ['hash'] },
   ghidraSubmit: { rust: 'ghidra_submit.rs SubmitBody', required: ['hash'] },
   githubSubmit: { rust: 'github_analysis_submit.rs SubmitBody', required: ['hash'], optional: ['confirm', 'actor_subject', 'actor_username'], handler: ['confirm'] },
-  ipBlock: { rust: 'ip_block.rs BlockBody', required: ['ip', 'blocked'], optional: ['expires_days', 'actor'] },
+  // `expires_days` is optional to serde, but the handler answers 422 without it when `blocked` is true
+  // (APIARY #3525, ip_block.rs BlockBody). Every ipBlock body checked here is a block; an unblock sends none.
+  ipBlock: { rust: 'ip_block.rs BlockBody', required: ['ip', 'blocked'], optional: ['expires_days', 'actor'], handler: ['expires_days'] },
   mlAck: { rust: 'detail.rs MlAckBody', required: ['key', 'ack'], optional: ['actor'] },
   mlAckAll: { rust: 'detail.rs MlAckAllBody', optional: ['actor'] },
   mlDisposition: { rust: 'detail.rs MlDispositionBody', required: ['key', 'status'], optional: ['reason', 'actor'] },
@@ -133,7 +135,8 @@ describe('the bodies the adapters build match the structs the backend decodes', 
   })
 
   it('block an address', () => {
-    expectBody('ipBlock', setIpBlockBody('203.0.113.4', true))
+    expectBody('ipBlock', setIpBlockBody('203.0.113.4', true, 7))
+    expectBody('ipBlock', setIpBlockBody('203.0.113.4', true, 0))
   })
 
   it('define a report, with and without a schedule', () => {
@@ -332,9 +335,10 @@ describe('the bodies api.ts builds inline match the structs the backend decodes'
   })
 
   it('reach the endpoints with the builders above', async () => {
-    const [block] = await requestsMadeBy(() => live('setIpBlocked')('203.0.113.4', true))
+    const [block] = await requestsMadeBy(() => live('setIpBlocked')('203.0.113.4', true, 7))
     expect(block).toMatchObject({ method: 'POST', path: '/api/v1/ip-block' })
     expectBody('ipBlock', block.body)
+    expect(block.body).toEqual({ ip: '203.0.113.4', blocked: true, expires_days: 7 })
     const [ack] = await requestsMadeBy(() => live('setAlertsAcknowledged')(['k1'], true))
     expect(ack).toMatchObject({ method: 'POST', path: '/api/v1/alerts/k1/ack' })
     expectBody('alertAck', ack.body)

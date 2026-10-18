@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AttackerEntityWire, CampaignWire, ClusterWire, CorrelationWire, CredEdgeWire, IpBlockWire, IpProfileWire, MapPointsWire, SourceRowWire } from '../contracts/sources'
 import type { HoneypotEvent } from '../types'
-import { sharedSignals, attackerGraph, attackers, correlation, credReuse, infraClusters, ipBlockRecord, ipCorrelation, ipProfile, mapPoints, networkCampaigns, setIpBlockBody, sourceProfiles } from './sources'
+import { sharedSignals, attackerGraph, attackers, correlation, correlationGroup, credReuse, infraClusters, ipBlockRecord, ipCorrelation, ipProfile, mapPoints, networkCampaigns, setIpBlockBody, sourceProfiles } from './sources'
 
 const sourceRow: SourceRowWire = {
   ip: '203.0.113.42',
@@ -85,6 +85,7 @@ const shared: CorrelationWire = {
     { key: 'cowrie', count: 3900 },
     { key: 'portbridge', count: 310 },
   ],
+  sensors_total: 14,
   tunnel_connections: 310,
   tunnel_os_guesses: ['Linux 4.x', 'Windows 7 or 8'],
   records: [],
@@ -157,19 +158,24 @@ describe('sources adapters', () => {
     expect(ipBlockRecord({ IP: '203.0.113.42', Blocked: false, Active: false })).toBeNull()
   })
 
-  it('builds the POST /ip-block body — the page carries no duration or actor', () => {
-    expect(setIpBlockBody('203.0.113.42', true)).toEqual({ ip: '203.0.113.42', blocked: true })
+  it('builds the POST /ip-block body — a block names its duration, an unblock sends none, and actor is never sent', () => {
+    expect(setIpBlockBody('203.0.113.42', true, 7)).toEqual({ ip: '203.0.113.42', blocked: true, expires_days: 7 })
+    expect(setIpBlockBody('203.0.113.42', true, 0)).toEqual({ ip: '203.0.113.42', blocked: true, expires_days: 0 })
+    expect(setIpBlockBody('203.0.113.42', false)).toEqual({ ip: '203.0.113.42', blocked: false })
+    expect(() => setIpBlockBody('203.0.113.42', true)).toThrow(/duration/)
+    expect(() => setIpBlockBody('203.0.113.42', true, -1)).toThrow(/duration/)
   })
 
   it('maps the one shared Correlation both drill-down envelopes carry', () => {
     expect(correlation({ ...shared, truncated: true })).toEqual({ totalMatches: 4210, tunnelConnections: 310, tunnelOsGuesses: ['Linux 4.x', 'Windows 7 or 8'] })
-    expect(ipCorrelation(shared).distinctSensors).toBe(2)
+    // `sensors` holds only the top 10: the count comes from `sensors_total`.
+    expect(ipCorrelation(shared).distinctSensors).toBe(14)
   })
 
-  it('maps GET /investigate/ip/{ip}, with the org name in the asn slot', () => {
+  it('maps GET /investigate/ip/{ip}, with the AS number and organization', () => {
     const wire: IpProfileWire = {
       ip: '203.0.113.42', total: 4210, first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z',
-      country: 'NL', asn: 'Example Hosting B.V.',
+      country: 'NL', asn: 'Example Hosting B.V.', as_organization: 'Example Hosting B.V.', as_number: 64512,
       sensors: [{ key: 'cowrie', count: 3900 }], ports: [{ key: '22', count: 900 }], protos: [{ key: 'ssh', count: 800 }],
       credentials: [{ key: 'root', count: 96 }], commands: [{ key: 'uname -a', count: 40 }], sessions: [{ key: 's-1', count: 31 }],
       techniques: [{ id: 'T1059.004', name: 'Unix Shell', domain: 'Execution', evidence: 'a shell command was recorded', count: 40, url: 'https://attack.mitre.org/techniques/T1059/004/' }],
@@ -179,23 +185,35 @@ describe('sources adapters', () => {
       correlation: shared, confirmed_malicious: true,
     }
     const out = ipProfile(wire)
-    expect(out.source).toMatchObject({ ip: '203.0.113.42', org: 'Example Hosting B.V.', asn: 'Example Hosting B.V.', riskScore: 0, tags: [], sessions: 31 })
+    expect(out.source).toMatchObject({ ip: '203.0.113.42', org: 'Example Hosting B.V.', asn: 'AS64512', asNumber: 64512, riskScore: 0, tags: [], sessions: 31 })
     expect(out.confirmedMalicious).toBe(true)
     expect(out.sensors).toEqual([{ id: 'cowrie', label: 'cowrie', count: 3900 }])
     expect(out.techniques).toEqual([{ id: 'T1059.004', name: 'Unix Shell', tactic: 'Execution', events: 40 }])
-    expect(out.correlation).toEqual({ totalMatches: 4210, tunnelConnections: 310, distinctSensors: 2, tunnelOsGuesses: ['Linux 4.x', 'Windows 7 or 8'] })
+    expect(out.correlation).toEqual({ totalMatches: 4210, tunnelConnections: 310, distinctSensors: 14, tunnelOsGuesses: ['Linux 4.x', 'Windows 7 or 8'] })
+  })
+
+  it('falls back for a backend from before APIARY #3696: asn is the org, no AS number, sensors.length counts', () => {
+    const { sensors_total: _drop, ...oldCorrelation } = shared
+    const old = { ip: '203.0.113.42', total: 1, first: '2026-10-04T00:00:00Z', last: '2026-10-04T00:00:00Z', country: 'NL', asn: 'Example Hosting B.V.',
+      sensors: [], ports: [], protos: [], credentials: [], commands: [], sessions: [], techniques: [],
+      payloads: [], alerts: [], fingerprints: [], paths: [], events: [], portbridge: null, correlation: oldCorrelation, confirmed_malicious: false } satisfies IpProfileWire
+    const out = ipProfile(old)
+    expect(out.source).toMatchObject({ org: 'Example Hosting B.V.', asn: '', asNumber: null })
+    expect(out.correlation.distinctSensors).toBe(2)
+    expect(ipCorrelation(oldCorrelation).distinctSensors).toBe(2)
+    expect(correlationGroup(oldCorrelation, []).sensorsTotal).toBe(2)
   })
 
   it('maps an address with no portbridge profile and no records', () => {
     const out = ipProfile({
-      ip: '198.51.100.7', total: 1, first: '2026-10-04T00:00:00Z', last: '2026-10-04T00:00:00Z', country: '', asn: '',
+      ip: '198.51.100.7', total: 1, first: '2026-10-04T00:00:00Z', last: '2026-10-04T00:00:00Z', country: '', asn: '', as_organization: '', as_number: null,
       sensors: [], ports: [], protos: [], credentials: [], commands: [], sessions: [], techniques: [],
       payloads: [], alerts: [], fingerprints: [], paths: [], events: [], portbridge: null,
-      correlation: { total: 1, truncated: false, sensors: [], tunnel_connections: 0, tunnel_os_guesses: [], records: [] },
+      correlation: { total: 1, truncated: false, sensors: [], sensors_total: 0, tunnel_connections: 0, tunnel_os_guesses: [], records: [] },
       confirmed_malicious: false,
     })
     expect(out.sensors).toEqual([])
-    expect(out.source.org).toBe('')
+    expect(out.source).toMatchObject({ org: '', asn: '', asNumber: null })
     expect(out.correlation.tunnelOsGuesses).toEqual([])
   })
 })

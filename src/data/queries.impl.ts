@@ -1049,7 +1049,7 @@ export async function getIpProfile(ip: string): Promise<IpProfile | null> {
   if (!source || !profile) return null
   const events = EVENTS.filter((e) => e.srcIp === ip)
   return {
-    source: { ...profile, asn: source.asn, riskScore: source.riskScore, tags: source.tags },
+    source: { ...profile, asn: source.asn, asNumber: Number(source.asn.replace(/\D/g, '')) || null, riskScore: source.riskScore, tags: source.tags },
     blocked: BLOCKED_IPS.has(ip),
     ...(BLOCKED_IPS.has(ip) ? { block: { ...BLOCKED_IPS.get(ip)! } } : {}),
     confirmedMalicious: sandboxConfirmed().has(ip),
@@ -1111,11 +1111,15 @@ export async function getBlockedIps(): Promise<string[]> {
 }
 
 /** Mock write: adds/removes the address on the portbridge manual blackhole,
- * as the signed-in operator, until lifted. */
-export async function setIpBlocked(ip: string, blocked: boolean): Promise<void> {
+ * as the signed-in operator. `expiresDays` is the block's length in days
+ * (0 = until lifted); it is required when blocking, as on the live endpoint. */
+export async function setIpBlocked(ip: string, blocked: boolean, expiresDays?: number): Promise<void> {
   await mockDelay()
-  if (blocked) BLOCKED_IPS.set(ip, { by: MOCK_USER.name, at: new Date().toISOString() })
-  else BLOCKED_IPS.delete(ip)
+  if (blocked) {
+    if (expiresDays === undefined || !Number.isInteger(expiresDays) || expiresDays < 0) throw new Error('a block needs a duration in whole days; 0 means permanent')
+    const at = new Date()
+    BLOCKED_IPS.set(ip, { by: MOCK_USER.name, at: at.toISOString(), ...(expiresDays > 0 ? { expiresAt: new Date(at.getTime() + expiresDays * 86_400_000).toISOString() } : {}) })
+  } else BLOCKED_IPS.delete(ip)
 }
 
 export async function getReplayDetail(shasum: string): Promise<ReplayDetail | null> {
@@ -1592,6 +1596,7 @@ function groupOf(ips: string[]): SourceGroup {
     first: events.at(-1)?.timestamp,
     last: events[0]?.timestamp,
     sensors: countBy(events.map((e) => e.sensor), 20),
+    sensorsTotal: new Set(events.map((e) => e.sensor)).size,
     countries: countBy(events.map((e) => e.country), 20),
     networks: countBy(events.map((e) => cidr26(e.srcIp)), 50),
     ports: countBy(events.map((e) => String(e.dstPort)), 20),

@@ -67,3 +67,7 @@ export function formatChange(value: number, previous: number): string {
   const pct = ((value - previous) / previous) * 100
   return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`
 }
+
+/** An autonomous system as one label: `AS64512 · Example Hosting`. Either
+ * half may be missing (no number known, no organization); both missing is ''. */
+export const formatAs = (asn: string, org: string) => [asn, org].filter(Boolean).join(' · ')
