@@ -36,7 +36,7 @@ GitHub Actions, on GitHub-hosted runners:
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` | every pull request, pushes to main | public-repository safety (`scripts/check-public-leaks.ts`: no secrets, no real deployment addresses, mock data in documentation ranges only); typecheck, lint, tests, theme and generated-file freshness, build; the release gate `scripts/smoke.sh` with the runner's Chrome; `actionlint` over the workflows |
-| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `SERVICE_TOKEN` and serves once given one, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore/apiary-dashboard:latest --owner Xore`). Nothing deploys it yet. |
+| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `SERVICE_TOKEN` and serves once given one, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore-inc/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard:latest --owner Xore-Inc`). Nothing deploys it yet. |
 | `codeql.yml` | pull requests, main, weekly | CodeQL `security-extended` over the TypeScript |
 | `dependency-review.yml` | pull requests | fails on a new dependency with a moderate or worse advisory |
 | `pr-title.yml` | pull requests | the title is a conventional commit (it becomes the squash commit), and its kind sets the release-notes label |
