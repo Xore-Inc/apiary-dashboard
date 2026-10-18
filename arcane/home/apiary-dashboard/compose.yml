@@ -58,7 +58,7 @@ services:
   dashboard:
     <<: *runtime-defaults
     # Release tag for reading, digest so a moved tag cannot change what runs.
-    image: ghcr.io/xore/apiary-dashboard:${APIARY_DASHBOARD_VERSION:?set APIARY_DASHBOARD_VERSION}@${APIARY_DASHBOARD_DIGEST:?set APIARY_DASHBOARD_DIGEST}
+    image: ghcr.io/xore-inc/apiary-dashboard:${APIARY_DASHBOARD_VERSION:?set APIARY_DASHBOARD_VERSION}@${APIARY_DASHBOARD_DIGEST:?set APIARY_DASHBOARD_DIGEST}
     container_name: hp-apiary-dashboard
     restart: unless-stopped
     depends_on:

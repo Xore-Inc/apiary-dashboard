@@ -16,7 +16,7 @@ The cutover is complete when all of the following are true:
 
 - Arcane has an enabled `apiary-dashboard` Git repository registration and a
   distinct `apiary-dashboard` GitOps sync/project.
-- The project runs a version-pinned `ghcr.io/xore/apiary-dashboard` image and
+- The project runs a version-pinned `ghcr.io/xore-inc/apiary-dashboard` image and
   its own Valkey instance for sessions.
 - The new dashboard reaches `backend-service` and
   `backend-service-mounted` over the existing `honeynet` network. It does not
@@ -109,7 +109,7 @@ compose file should contain:
 
 1. `name: apiary-dashboard`.
 2. A `dashboard` service using the readable tag plus immutable digest:
-   `ghcr.io/xore/apiary-dashboard:${APIARY_DASHBOARD_VERSION:?set APIARY_DASHBOARD_VERSION}@${APIARY_DASHBOARD_DIGEST:?set APIARY_DASHBOARD_DIGEST}`.
+   `ghcr.io/xore-inc/apiary-dashboard:${APIARY_DASHBOARD_VERSION:?set APIARY_DASHBOARD_VERSION}@${APIARY_DASHBOARD_DIGEST:?set APIARY_DASHBOARD_DIGEST}`.
    `APIARY_DASHBOARD_VERSION` must be a release tag such as `vX.Y.Z`, never
    `latest` or `main`; the digest prevents a moved tag from changing the
    deployed artifact.
@@ -189,7 +189,7 @@ sync and deployment operator-controlled.
 3. Verify the image before it reaches the homeserver:
 
    ```bash
-   gh attestation verify oci://ghcr.io/xore/apiary-dashboard:vX.Y.Z --owner Xore
+   gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard:vX.Y.Z --owner Xore-Inc
    ```
 
    Record the tag, manifest digest, source commit, workflow run, and verifier

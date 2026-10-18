@@ -23,7 +23,7 @@ concurrency:
 
 env:
   # Registry names are lowercase.
-  IMAGE: ghcr.io/xore/apiary-dashboard
+  IMAGE: ghcr.io/xore-inc/apiary-dashboard
 
 jobs:
   image:
@@ -117,7 +117,7 @@ jobs:
           sbom: true
           provenance: mode=max
       # A signed build-provenance attestation: `gh attestation verify
-      # oci://ghcr.io/xore/apiary-dashboard:<tag> --owner Xore`.
+      # oci://ghcr.io/xore-inc/apiary-dashboard:<tag> --owner Xore-Inc`.
       - uses: actions/attest-build-provenance@v4
         if: github.event_name != 'pull_request'
         with:
