@@ -14,9 +14,11 @@ export function categoryLabel(category: string): string {
 }
 
 /** Where the raw sensor document lives: event ids are only unique within
- * their own index, so both are pinned in the history query. */
+ * their own index, so both are pinned in the history query. Events stored
+ * before the index was recorded carry '' and fall back to the id alone. */
 export function sourceHref(event: CampaignEvent): string {
-  return `/history?q=${encodeURIComponent(`_id:"${event.eventId}" AND _index:"${event.sourceIndex}"`)}`
+  const byId = `_id:"${event.eventId}"`
+  return `/history?q=${encodeURIComponent(event.sourceIndex ? `${byId} AND _index:"${event.sourceIndex}"` : byId)}`
 }
 
 export function RuleDescription({ rule }: { rule: MatchedRule }) {

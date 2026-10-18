@@ -374,7 +374,8 @@
             "zeek_log": "rfb"
           }
         }
-      ]
+      ],
+      "sensors_total": 6
     }
   },
   "identity": {

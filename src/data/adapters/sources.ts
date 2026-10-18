@@ -206,13 +206,15 @@ export function ipBlockRecord(wire: IpBlockWire): BlockRecord | null {
   return { by: wire.BlockedBy ?? '', at: wire.BlockedAt ?? '', ...(wire.ExpiresAt ? { expiresAt: wire.ExpiresAt } : {}) }
 }
 
-/** POST /api/v1/ip-block body. The page's setter is `setIpBlocked(ip,
- * blocked)` and carries no duration or actor, so both are absent: the
- * backend then stores a permanent block (`ExpiresAt` null) attributed to
- * whoever the server fn puts in `actor`. This is the slice's one page-is-a-
- * subset save — nothing on the page expresses an expiry or a reason, so
- * neither can be sent. */
-export const setIpBlockBody = (ip: string, blocked: boolean): SetIpBlockBody => ({ ip, blocked })
+/** POST /api/v1/ip-block body. Blocking carries an explicit duration in
+ * days (`expires_days`; 0 = permanent): the backend refuses a block without
+ * one (422). Unblocking sends none. `actor` is bound server-side, so it is
+ * never sent from here. */
+export const setIpBlockBody = (ip: string, blocked: boolean, expiresDays?: number): SetIpBlockBody => {
+  if (!blocked) return { ip, blocked }
+  if (expiresDays === undefined || !Number.isInteger(expiresDays) || expiresDays < 0) throw new Error('a block needs a duration in whole days; 0 means permanent')
+  return { ip, blocked, expires_days: expiresDays }
+}
 
 // ---- GET /api/v1/investigate/{ip,cidr,cluster} ------------------------------
 
@@ -220,30 +222,30 @@ export const setIpBlockBody = (ip: string, blocked: boolean): SetIpBlockBody => 
  * share. `truncated` and `sensors` have no field there. */
 export const correlation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, tunnelOsGuesses: wire.tunnel_os_guesses })
 
-/** The same struct → the page IpProfile's `correlation` block. The page
- * counts distinct sensors itself, so `sensors.length` stands in — but that
- * list is capped at 10 by the backend, so on a wider spread this
- * undercounts. Noted rather than hidden; the field is informational. */
-export const ipCorrelation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, distinctSensors: wire.sensors.length, tunnelOsGuesses: wire.tunnel_os_guesses })
+/** The same struct → the page IpProfile's `correlation` block.
+ * `distinctSensors` is the backend's own `sensors_total`: `sensors` is only
+ * the top 10, so its length undercounts on a wider spread. */
+export const ipCorrelation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, distinctSensors: wire.sensors_total, tunnelOsGuesses: wire.tunnel_os_guesses })
 
 /** GET /api/v1/investigate/ip/{ip}. The page's `source` wants an `org`, a
- * `riskScore` and `tags`; the wire's `asn` is an organization name
- * (aggregated off `source.as.organization_name`, not the ASN number) and
- * there is no score, so 0 and []. `blocked`/`block` come from the ip-block
+ * `riskScore` and `tags`. `org` is `as_organization` and `asn` the formatted
+ * `AS<as_number>` ('' when the number is unknown); the wire's deprecated
+ * `asn` (the org name again) is not read. There is no score, so 0 and []. `blocked`/`block` come from the ip-block
  * endpoint and `attackerId` from the attackers store — neither is
  * something this endpoint can answer, so both are left to the caller. */
 export const ipProfile = (wire: IpProfileWire): IpProfile => ({
   source: {
     ip: wire.ip,
     country: wire.country,
-    org: wire.asn,
+    org: wire.as_organization,
     events: wire.total,
     logins: 0,
     sessions: wire.sessions.reduce((sum, row) => sum + row.count, 0),
     sensors: wire.sensors.map((row) => row.key),
     first: wire.first,
     last: wire.last,
-    asn: wire.asn,
+    asn: wire.as_number === null ? '' : `AS${wire.as_number}`,
+    asNumber: wire.as_number,
     riskScore: 0,
     tags: [],
   },
@@ -335,7 +337,8 @@ const tally = (values: string[]): CountRow[] => {
  * - `networks` — the /24 of each member, which is the grouping the page's
  *   "Networks" table shows and the finest one derivable from an address.
  * - `sensors` — the correlation's own sensor buckets, capped at 10
- *   upstream, which is why this is the buckets and not a recount. */
+ *   upstream, which is why this is the buckets and not a recount; the real
+ *   distinct count rides alongside as `sensorsTotal`. */
 export const correlationGroup = (wire: CorrelationWire, events: HoneypotEvent[]): SourceGroup => {
   const byIp = new Map<string, HoneypotEvent[]>()
   for (const row of events) if (row.srcIp) byIp.set(row.srcIp, [...(byIp.get(row.srcIp) ?? []), row])
@@ -360,6 +363,7 @@ export const correlationGroup = (wire: CorrelationWire, events: HoneypotEvent[])
     ...(times[0] ? { first: times[0] } : {}),
     ...(times.length ? { last: times.at(-1)! } : {}),
     sensors: wire.sensors.map((row) => ({ id: row.key, label: row.key, count: row.count })),
+    sensorsTotal: wire.sensors_total,
     countries: tally(events.flatMap((row) => (row.country ? [row.country] : []))),
     networks: tally(members.map((member) => `${member.ip.split('.').slice(0, 3).join('.')}.0/24`)),
     ports: tally(events.map((row) => String(row.dstPort))),

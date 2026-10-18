@@ -316,6 +316,9 @@ export interface CorrelationWire {
   sensors: KvWire[]
   tunnel_connections: number
   tunnel_os_guesses: string[]
+  /** The real distinct-sensor count. `sensors` stays the top 10 only, so
+   * `sensors.length` undercounts on a wider spread (APIARY #3696). */
+  sensors_total: number
   /** Capped at CORRELATION_LIMIT (200) across the honeypot/Suricata and
    * portbridge hits together, newest first. */
   records: CorrelationRecordWire[]
@@ -338,7 +341,13 @@ export interface IpProfileWire {
   first: string
   last: string
   country: string
+  /** DEPRECATED (APIARY #3696): holds the AS organization name, not a
+   * number. Same value as `as_organization`; nothing renders it. */
   asn: string
+  /** The AS organization name (investigate.rs IpProfile). */
+  as_organization: string
+  /** The AS number; null when unknown. */
+  as_number: number | null
   sensors: KvWire[]
   ports: KvWire[]
   protos: KvWire[]
@@ -399,6 +408,8 @@ export interface IpBlockWire {
 export interface SetIpBlockBody {
   ip: string
   blocked: boolean
+  /** Required when `blocked` is true (the backend answers 422 without it);
+   * 0 = permanent, N = N days. Absent on unblock. */
   expires_days?: number
   actor?: string
 }

@@ -258,7 +258,7 @@ export function GroupOverview({ group, base, sourcesTab, eventsTab }: { group: S
         <StatTile label="Events" value={group?.events.length} href={eventsTab && `${base}/${eventsTab}`} />
         <StatTile label="Total matches" value={group?.totalMatches} caption="honeypot, Suricata, portbridge" />
         <StatTile label="Tunnel connections" value={group?.tunnelConnections} caption={group ? osGuessCaption(group.tunnelOsGuesses) : ''} />
-        <StatTile label="Sensors reached" value={group?.sensors.length} href={`${base}/breakdown`} />
+        <StatTile label="Sensors reached" value={group && (group.sensorsTotal ?? group.sensors.length)} href={`${base}/breakdown`} />
       </Grid>
       <EventsPanel title="Newest events" events={group?.events.slice(0, 5)} rows={5} showSource action={eventsTab && <ActionLink href={`${base}/${eventsTab}`}>All events</ActionLink>} empty="No events." />
     </VStack>

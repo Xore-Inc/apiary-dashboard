@@ -330,8 +330,13 @@ describe('mock writes', () => {
   it('blocks and unblocks an address', async () => {
     const { sources } = await q.getSourceProfiles()
     const ip = sources[0].ip
-    await q.setIpBlocked(ip, true)
-    expect((await q.getIpProfile(ip))?.blocked).toBe(true)
+    await q.setIpBlocked(ip, true, 7)
+    const blocked = await q.getIpProfile(ip)
+    expect(blocked?.blocked).toBe(true)
+    expect(Date.parse(blocked!.block!.expiresAt!) - Date.parse(blocked!.block!.at)).toBe(7 * 86_400_000)
+    await q.setIpBlocked(ip, true, 0)
+    expect((await q.getIpProfile(ip))?.block).not.toHaveProperty('expiresAt')
+    await expect(q.setIpBlocked(ip, true)).rejects.toThrow(/duration/)
     await q.setIpBlocked(ip, false)
     expect((await q.getIpProfile(ip))?.blocked).toBe(false)
   })

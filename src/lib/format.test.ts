@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { configureTime, formatChange, formatRelative, now, zoneLabel, formatClock, formatCompact, formatDateTime, formatDay, formatNumber, formatTime } from './format'
+import { configureTime, formatChange, formatRelative, now, zoneLabel, formatClock, formatCompact, formatDateTime, formatDay, formatNumber, formatTime, formatAs } from './format'
 import { inRange } from '#/data/shared'
 
 describe('formatters', () => {
@@ -65,5 +65,14 @@ describe('time preferences', () => {
     expect(inRange('2026-09-23T09:00:00Z', '24h', now())).toBe(true)
     // With no clock given, a range counts back from the wall clock.
     expect(inRange('2026-09-23T11:30:00Z', '1h')).toBe(false)
+  })
+})
+
+describe('formatAs', () => {
+  it('joins the AS number and organization, omitting whichever is missing', () => {
+    expect(formatAs('AS64512', 'Example Hosting')).toBe('AS64512 · Example Hosting')
+    expect(formatAs('', 'Example Hosting')).toBe('Example Hosting')
+    expect(formatAs('AS64512', '')).toBe('AS64512')
+    expect(formatAs('', '')).toBe('')
   })
 })

@@ -58,7 +58,7 @@ describe('x-actor-assertion on the calls to the Rust tier', () => {
   it('signs a mutation that passes no explicit user, from the request scope', async () => {
     stubFetch()
     // setIpBlocked reads the config first (read-only guard), then POSTs with no `user`.
-    await liveQuery('setIpBlocked', alice)!('203.0.113.9', true).catch(() => undefined)
+    await liveQuery('setIpBlocked', alice)!('203.0.113.9', true, 7).catch(() => undefined)
     const post = sent.find((call) => call.method === 'POST')!
     expect(post.url.pathname).toBe('/api/v1/ip-block')
     expect(claimsOf(post.headers)).toMatchObject({ username: 'alice', htm: 'POST', htu: '/api/v1/ip-block' })

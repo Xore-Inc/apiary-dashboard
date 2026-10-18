@@ -1180,22 +1180,15 @@ const getIpProfile: Backend['getIpProfile'] = async (ip) => {
  * enforced before the fetch by `liveQuery`, the same decision the mock tier
  * makes, so no check is added here.
  *
- * The PAGE IS A SUBSET of the endpoint, and this is the slice's one place
- * where that is load-bearing rather than cosmetic. `BlockBody` carries
- * `expires_days` and `actor` (ip_block.rs L34); the page's setter is
- * `setIpBlocked(ip, blocked)` and has no field for either, so
- * `setIpBlockBody` sends neither and the backend stores `ExpiresAt: null` —
- * a PERMANENT block. An operator who wanted a week gets one until they lift
- * it, and nothing on the page says otherwise. The wire contract keeps both
- * fields typed (`SetIpBlockBody`), so the moment the page can express a
- * duration they are one line away.
+ * Blocking sends an explicit `expires_days` (0 = permanent): the backend
+ * refuses a block without one. Unblocking sends none. `actor` is bound
+ * server-side and never sent from here.
  *
- * The write is therefore the page's own two states and nothing more; the
- * returned record is dropped, exactly as `setAlertsAcknowledged` drops its
- * envelope, because the page re-reads the profile it came from. */
-const setIpBlocked: Backend['setIpBlocked'] = async (ip, blocked) => {
+ * The returned record is dropped, exactly as `setAlertsAcknowledged` drops
+ * its envelope, because the page re-reads the profile it came from. */
+const setIpBlocked: Backend['setIpBlocked'] = async (ip, blocked, expiresDays) => {
   await guardReadOnly('setIpBlocked')
-  await post('setIpBlocked', '/api/v1/ip-block', setIpBlockBody(ip, blocked))
+  await post('setIpBlocked', '/api/v1/ip-block', setIpBlockBody(ip, blocked, expiresDays))
 }
 
 /** GET /api/v1/investigate/cidr/{cidr} — a network's members, events and

@@ -36,7 +36,7 @@ function ClusterLayout() {
       facts={[
         { label: 'Source IPs', value: c && (formatNumber(c.group.members.length))},
         { label: 'Events', value: c && (formatNumber(c.group.events.length))},
-        { label: 'Sensors', value: c && (formatNumber(c.group.sensors.length))},
+        { label: 'Sensors', value: c && (formatNumber(c.group.sensorsTotal ?? c.group.sensors.length))},
         { label: 'Last seen', value: c && (c.group.last ? formatDateTime(c.group.last) : '—')},
       ]}
     >

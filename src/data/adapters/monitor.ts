@@ -374,9 +374,9 @@ export function toSemanticSearch(r: LlmSearchResponse): SemanticSearchResult {
 
 /** GET /api/v1/store/agent-campaigns row → AgentCampaign.
  *
- * Every field is required on the wire, so nothing here is defaulted. The
- * one adapter-side consequence: `sourceIndex` is always '' because
- * build_campaign_verdict never writes that key (see the contract). */
+ * Every field is required on the wire, so nothing here is defaulted.
+ * `sourceIndex` is the event's `source_index`, which is "" on documents
+ * stored before the backend recorded it; the page degrades for those. */
 export function toAgentCampaign(row: AgentCampaignRow): AgentCampaign {
   return {
     id: row.campaign_id,
@@ -389,7 +389,7 @@ export function toAgentCampaign(row: AgentCampaignRow): AgentCampaign {
     eventCount: row.event_count,
     events: (row.events ?? []).map((e) => ({
       eventId: e.event_id,
-      sourceIndex: e.source_index ?? '',
+      sourceIndex: e.source_index,
       timestamp: e.timestamp,
       matchedRules: (e.matched_rules ?? []).map((m) => ({
         rule: m.rule,
