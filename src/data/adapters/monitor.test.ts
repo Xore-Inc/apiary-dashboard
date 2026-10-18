@@ -353,6 +353,11 @@ describe('monitor adapters', () => {
     expect(stored.events[0].sourceIndex).toBe('honeypot-v2-cowrie')
   })
 
+  it("reads a missing source_index (a backend from before APIARY #3696) as ''", () => {
+    const old = toAgentCampaign({ ...campaign, events: [{ event_id: 'ev_1', timestamp: '2026-10-04T18:00:00Z' }] })
+    expect(old.events[0].sourceIndex).toBe('')
+  })
+
   it('maps an auth event, reading username and redirectUri out of details', () => {
     expect(toAuthFailure({ ...authEvent, _doc_id: 'kc-9f2b1c' })).toEqual({
       id: 'kc-9f2b1c',

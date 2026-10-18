@@ -437,13 +437,13 @@ export interface AgentCampaignDecodeStep {
 }
 
 /** One event inside an agent-campaign verdict. `source_index` is the
- * `_index` of the hit the event came from (APIARY #3696); documents stored
- * before that change carry `""` until rewritten, and the page degrades to an
- * `_id`-only history query for those. `matched_rules` is always present
+ * `_index` of the hit the event came from. Absent before APIARY #3696, and
+ * `""` on documents stored before it until rewritten; the page degrades to an
+ * `_id`-only history query for both. `matched_rules` is always present
  * (possibly empty). */
 export interface AgentCampaignEvent {
   event_id: string
-  source_index: string
+  source_index?: string
   timestamp: string
   matched_rules?: AgentCampaignMatchedRule[]
 }

@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AttackerEntityWire, CampaignWire, ClusterWire, CorrelationWire, CredEdgeWire, IpBlockWire, IpProfileWire, MapPointsWire, SourceRowWire } from '../contracts/sources'
 import type { HoneypotEvent } from '../types'
-import { sharedSignals, attackerGraph, attackers, correlation, credReuse, infraClusters, ipBlockRecord, ipCorrelation, ipProfile, mapPoints, networkCampaigns, setIpBlockBody, sourceProfiles } from './sources'
+import { sharedSignals, attackerGraph, attackers, correlation, correlationGroup, credReuse, infraClusters, ipBlockRecord, ipCorrelation, ipProfile, mapPoints, networkCampaigns, setIpBlockBody, sourceProfiles } from './sources'
 
 const sourceRow: SourceRowWire = {
   ip: '203.0.113.42',
@@ -190,6 +190,18 @@ describe('sources adapters', () => {
     expect(out.sensors).toEqual([{ id: 'cowrie', label: 'cowrie', count: 3900 }])
     expect(out.techniques).toEqual([{ id: 'T1059.004', name: 'Unix Shell', tactic: 'Execution', events: 40 }])
     expect(out.correlation).toEqual({ totalMatches: 4210, tunnelConnections: 310, distinctSensors: 14, tunnelOsGuesses: ['Linux 4.x', 'Windows 7 or 8'] })
+  })
+
+  it('falls back for a backend from before APIARY #3696: asn is the org, no AS number, sensors.length counts', () => {
+    const { sensors_total: _drop, ...oldCorrelation } = shared
+    const old = { ip: '203.0.113.42', total: 1, first: '2026-10-04T00:00:00Z', last: '2026-10-04T00:00:00Z', country: 'NL', asn: 'Example Hosting B.V.',
+      sensors: [], ports: [], protos: [], credentials: [], commands: [], sessions: [], techniques: [],
+      payloads: [], alerts: [], fingerprints: [], paths: [], events: [], portbridge: null, correlation: oldCorrelation, confirmed_malicious: false } satisfies IpProfileWire
+    const out = ipProfile(old)
+    expect(out.source).toMatchObject({ org: 'Example Hosting B.V.', asn: '', asNumber: null })
+    expect(out.correlation.distinctSensors).toBe(2)
+    expect(ipCorrelation(oldCorrelation).distinctSensors).toBe(2)
+    expect(correlationGroup(oldCorrelation, []).sensorsTotal).toBe(2)
   })
 
   it('maps an address with no portbridge profile and no records', () => {

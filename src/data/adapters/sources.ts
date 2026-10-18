@@ -223,9 +223,10 @@ export const setIpBlockBody = (ip: string, blocked: boolean, expiresDays?: numbe
 export const correlation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, tunnelOsGuesses: wire.tunnel_os_guesses })
 
 /** The same struct → the page IpProfile's `correlation` block.
- * `distinctSensors` is the backend's own `sensors_total`: `sensors` is only
- * the top 10, so its length undercounts on a wider spread. */
-export const ipCorrelation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, distinctSensors: wire.sensors_total, tunnelOsGuesses: wire.tunnel_os_guesses })
+ * `distinctSensors` is the backend's own `sensors_total`; `sensors` is only
+ * the top 10, so its length (the fallback for a backend from before APIARY
+ * #3696) undercounts on a wider spread. */
+export const ipCorrelation = (wire: CorrelationWire) => ({ totalMatches: wire.total, tunnelConnections: wire.tunnel_connections, distinctSensors: wire.sensors_total ?? wire.sensors.length, tunnelOsGuesses: wire.tunnel_os_guesses })
 
 /** GET /api/v1/investigate/ip/{ip}. The page's `source` wants an `org`, a
  * `riskScore` and `tags`. `org` is `as_organization` and `asn` the formatted
@@ -233,37 +234,41 @@ export const ipCorrelation = (wire: CorrelationWire) => ({ totalMatches: wire.to
  * `asn` (the org name again) is not read. There is no score, so 0 and []. `blocked`/`block` come from the ip-block
  * endpoint and `attackerId` from the attackers store — neither is
  * something this endpoint can answer, so both are left to the caller. */
-export const ipProfile = (wire: IpProfileWire): IpProfile => ({
-  source: {
-    ip: wire.ip,
-    country: wire.country,
-    org: wire.as_organization,
-    events: wire.total,
-    logins: 0,
-    sessions: wire.sessions.reduce((sum, row) => sum + row.count, 0),
-    sensors: wire.sensors.map((row) => row.key),
-    first: wire.first,
-    last: wire.last,
-    asn: wire.as_number === null ? '' : `AS${wire.as_number}`,
-    asNumber: wire.as_number,
-    riskScore: 0,
-    tags: [],
-  },
-  blocked: false,
-  confirmedMalicious: wire.confirmed_malicious,
-  events: [],
-  sensors: counts(wire.sensors),
-  credentials: counts(wire.credentials),
-  commands: counts(wire.commands),
-  paths: counts(wire.paths),
-  ports: counts(wire.ports),
-  protocols: counts(wire.protos),
-  sessions: counts(wire.sessions),
-  payloads: counts(wire.payloads),
-  alerts: counts(wire.alerts),
-  techniques: techniques(wire.techniques),
-  correlation: ipCorrelation(wire.correlation),
-})
+export const ipProfile = (wire: IpProfileWire): IpProfile => {
+  const asNumber = wire.as_number ?? null
+  return {
+    source: {
+      ip: wire.ip,
+      country: wire.country,
+      org: wire.as_organization ?? wire.asn,
+      events: wire.total,
+      logins: 0,
+      sessions: wire.sessions.reduce((sum, row) => sum + row.count, 0),
+      sensors: wire.sensors.map((row) => row.key),
+      first: wire.first,
+      last: wire.last,
+      asn: asNumber === null ? '' : `AS${asNumber}`,
+      asNumber,
+      riskScore: 0,
+      tags: [],
+    },
+    blocked: false,
+    confirmedMalicious: wire.confirmed_malicious,
+    events: [],
+    sensors: counts(wire.sensors),
+    credentials: counts(wire.credentials),
+    commands: counts(wire.commands),
+    paths: counts(wire.paths),
+    ports: counts(wire.ports),
+    protocols: counts(wire.protos),
+    sessions: counts(wire.sessions),
+    payloads: counts(wire.payloads),
+    alerts: counts(wire.alerts),
+    techniques: techniques(wire.techniques),
+    correlation: ipCorrelation(wire.correlation),
+  }
+}
+
 // ---- GET /api/v1/charts/{attck-coverage,kill-chain-sankey,campaign-timeline}
 
 /** GET /api/v1/charts/attck-coverage. The wire's `techniques` entries are
@@ -363,7 +368,7 @@ export const correlationGroup = (wire: CorrelationWire, events: HoneypotEvent[])
     ...(times[0] ? { first: times[0] } : {}),
     ...(times.length ? { last: times.at(-1)! } : {}),
     sensors: wire.sensors.map((row) => ({ id: row.key, label: row.key, count: row.count })),
-    sensorsTotal: wire.sensors_total,
+    sensorsTotal: wire.sensors_total ?? wire.sensors.length,
     countries: tally(events.flatMap((row) => (row.country ? [row.country] : []))),
     networks: tally(members.map((member) => `${member.ip.split('.').slice(0, 3).join('.')}.0/24`)),
     ports: tally(events.map((row) => String(row.dstPort))),
