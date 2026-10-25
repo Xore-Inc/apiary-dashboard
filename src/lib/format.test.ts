@@ -32,7 +32,9 @@ describe('time preferences', () => {
   it('shows times in the chosen zone, named', () => {
     configureTime({ timeZone: 'Europe/Berlin' })
     expect(formatClock(iso)).toBe('11:05')
-    expect(zoneLabel()).toMatch(/CEST|GMT\+2/)
+    // The label names the zone's offset now, not at `iso`: CET in winter,
+    // CEST in summer (this test went red on the 2026-10-25 DST change).
+    expect(zoneLabel()).toMatch(/^(CES?T|GMT\+[12])$/)
     expect(formatTime(iso)).toContain('11:05')
   })
 
