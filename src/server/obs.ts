@@ -2,8 +2,9 @@
 // canonical BFF's Prometheus series and names: requests served and their
 // wall time, load shed by an admission gate, named sign-in outcomes, and
 // the event loop's p99 delay. Named events also go out as one JSON line
-// each to DASHBOARD_BFF_LOG_FILE (Filebeat tails it), capped at 25 MiB plus
-// one rotated `.1` generation. Backend-call and payload-cache series join
+// each to stdout by default, or DASHBOARD_BFF_LOG_FILE when configured
+// (Filebeat tails it), capped at 25 MiB plus one rotated `.1` generation.
+// Backend-call and payload-cache series join
 // when the server functions call the real backend (#6).
 import { appendFile, rename, stat, unlink } from 'node:fs/promises'
 import { monitorEventLoopDelay } from 'node:perf_hooks'
@@ -45,13 +46,16 @@ export const flushNamedEvents = () => sinkTail
 
 async function writeLine(name: string, fields: Record<string, unknown>): Promise<void> {
   const file = process.env.DASHBOARD_BFF_LOG_FILE
-  if (!file) return
+  const line = { '@timestamp': new Date().toISOString(), 'event.category': 'dashboard_app', service: 'dashboard-bff', level: name.endsWith('failed') ? 'error' : 'info', 'event.action': name, ...fields }
+  if (!file) {
+    console.log(JSON.stringify(line))
+    return
+  }
   try {
     if (((await stat(file).catch(() => null))?.size ?? 0) >= MAX_SINK_BYTES) {
       await unlink(`${file}.1`).catch(() => {})
       await rename(file, `${file}.1`)
     }
-    const line = { '@timestamp': new Date().toISOString(), 'event.category': 'dashboard_app', service: 'dashboard-bff', level: name.endsWith('failed') ? 'error' : 'info', 'event.action': name, ...fields }
     await appendFile(file, `${JSON.stringify(line)}\n`)
   } catch {
     /* sink unavailable: the counter above still carries the event */

@@ -1,0 +1,15 @@
+# Co-located transition only: attach the standalone dashboard to APIARY's
+# existing host-local bridge while the backend still uses Docker DNS there.
+# Use with: docker compose -f compose.yml -f compose.honeynet.yml up -d
+services:
+  dashboard:
+    environment:
+      DASHBOARD_BFF_LOG_FILE: /logs/dashboard-bff/rewrite.jsonl
+    volumes:
+      - /opt/stacks/apiary/logs/dashboard-bff:/logs/dashboard-bff
+    networks:
+      - honeynet
+networks:
+  honeynet:
+    name: honeynet
+    external: true
