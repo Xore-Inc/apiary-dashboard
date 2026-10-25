@@ -29,12 +29,24 @@ export interface StorePage<TRow> {
 
 // ---- Overview --------------------------------------------------------------
 
+/** overview.rs `HourlyByProtocol`: one hour of the protocol timeline. `hour`
+ * is the start of the hour, UTC, ISO 8601 with milliseconds. `counts` always
+ * carries the same keys (the window's top five protocols, then `other`),
+ * zero-filled, so a chart can use each key as a stable series. */
+export interface HourlyByProtocol {
+  hour: string
+  total: number
+  counts: Record<string, number>
+}
+
 /** GET /api/v1/overview/kpis: overview.rs `OverviewKpis`, a
  * backend-built struct with every field set on both the rollup and the
  * live-aggregation path. `change24h` is a percent string like "+41%" and is
  * "" while the previous window was empty. `hourly` is the 24-bucket
  * sparkline, oldest first. `ready` is false while the rollup index has not
- * covered the window yet. */
+ * covered the window yet. `sessions_24h` is an upper bound (one session seen
+ * under two session-id fields counts twice) and `sessions_previous24h` is
+ * the same count over the day before. */
 export interface OverviewKpis {
   total: number
   last24h: number
@@ -44,6 +56,10 @@ export interface OverviewKpis {
   /** Events per hour, oldest → newest. */
   hourly: number[]
   logins: number
+  sessions_24h: number
+  sessions_previous24h: number
+  /** The same 24 hours as `hourly`, oldest first, split by protocol. */
+  hourly_by_protocol: HourlyByProtocol[]
   ready: boolean
 }
 
@@ -420,13 +436,11 @@ export interface AgentCampaignDecodeStep {
   output_len: number
 }
 
-/** One event inside an agent-campaign verdict. `source_index` is a GAP:
- * the worker's fetch path reads the source hit's `_index` into a
- * `CorrelatorEvent` field it then discards (`_source_index`) and
- * `build_campaign_verdict` never writes it, so the key is absent on every
- * stored campaign document. Optional here for that reason alone; the adapter
- * substitutes '' because the page type keeps `sourceIndex` required.
- * `matched_rules` is always present (possibly empty). */
+/** One event inside an agent-campaign verdict. `source_index` is the
+ * `_index` of the hit the event came from. Absent before APIARY #3696, and
+ * `""` on documents stored before it until rewritten; the page degrades to an
+ * `_id`-only history query for both. `matched_rules` is always present
+ * (possibly empty). */
 export interface AgentCampaignEvent {
   event_id: string
   source_index?: string

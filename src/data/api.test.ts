@@ -15,6 +15,7 @@ import type { EventPageWire, FilterValuesWire, RecordingsPageWire, ReplayWire, S
 import type { EventRow } from './contracts/events'
 import type { CorrelationWire, IpProfileWire, SourcesPageWire } from './contracts/sources'
 import type { Backend } from './backend'
+import { rememberActor } from '#/server/actorAssertion'
 
 /** One wire row, as events.rs's `row_from_hit` builds it. */
 /** Reports writes run the read-only guard first, so `calls` is offset by the
@@ -620,8 +621,8 @@ describe('the actor the Rust tier trusts', () => {
   // operator. The gate below is what makes the interleave real: the config
   // read answers only once BOTH requests have reached it, so the swap happens
   // inside the await rather than between two of this test's own ticks.
-  const alice = { id: 'u1', name: 'alice', email: 'a@example.test', roles: ['admin' as const] }
-  const bob = { id: 'u2', name: 'bob', email: 'b@example.test', roles: ['admin' as const] }
+  const alice = rememberActor({ name: 'alice', email: 'a@example.test', roles: ['admin' as const] }, { sub: 'oidc|alice', username: 'alice' })
+  const bob = rememberActor({ name: 'bob', email: 'b@example.test', roles: ['admin' as const] }, { sub: 'oidc|bob', username: 'bob' })
 
   /** A stub whose config read holds every request until two of them have
    * reached it, so the read-after-await is a real interleave rather than an
@@ -1101,7 +1102,7 @@ const topologyWire = {
     { sensor: 'dionaea', stack: 'honeypot-dionaea', containers: ['hp-dionaea'], ingress: ['traefik'], hostnames: ['smtp.example.test'], ports: [], rawIndex: 'unmapped' },
   ],
   flow: { nodes: [{ name: 'VPS Traefik (:443 hostnames)', layer: 0 }, { name: 'cowrie', layer: 1 }], links: [{ source: 'VPS Traefik (:443 hostnames)', target: 'cowrie' }] },
-  stacks: [{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', adapterVisible: true }] }],
+  stacks: [{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', adapter_visible: true }] }],
 }
 
 const sensorOverviewWire = {
@@ -1352,18 +1353,17 @@ describe('the fleet topology', () => {
     // live elsewhere").
     expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/services', '/api/v1/source-health', '/api/v1/topology'])
     expect(topo.sensors).toEqual([
-      { sensor: 'cowrie', ingress: ['portbridge'], hostnames: [], ports: [{ proto: 'tcp', public: 22, host: 19022 }], rawIndex: 'honeypot-v2', feed: 'fresh' },
+      { sensor: 'cowrie', ingress: ['portbridge', 'tunnel-only'], hostnames: [], ports: [{ proto: 'tcp', public: 22, host: 19022 }], rawIndex: 'honeypot-v2', feed: 'fresh' },
       { sensor: 'dionaea', ingress: ['traefik'], hostnames: ['smtp.example.test'], ports: [], rawIndex: 'unmapped', feed: 'silent' },
     ])
     expect(topo.stacks).toEqual([{ stack: 'honeypot-cowrie', containers: [{ name: 'hp-cowrie', state: 'running' }] }])
   })
 
-  it('drops an ingress the page cannot colour, and names the survivors it can', async () => {
-    // Gap #6: the wire's vocabulary is traefik / portbridge / tunnel-only,
-    // and the page's adds "direct" / "+PROXY" which the wire never emits.
-    // "tunnel-only" is dropped; the other two stay.
+  it('keeps every ingress the wire emits, tunnel-only included (#261)', async () => {
+    // The wire's vocabulary is traefik / portbridge / tunnel-only; all three
+    // are rendered, so a management-only sensor is not shown with no ingress.
     stub(operationsFixtures())
-    expect((await live('getTopology')()).sensors[0].ingress).toEqual(['portbridge'])
+    expect((await live('getTopology')()).sensors[0].ingress).toEqual(['portbridge', 'tunnel-only'])
   })
 
   it('turns flow node names into the indices the sankey wants', async () => {
@@ -1604,17 +1604,25 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
   it('mints a token through POST /api/v1/canarytokens, with the actor as created_by', async () => {
     stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
     process.env.BACKEND_URL = 'http://backend.test'
-    const analyst = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
+    // The OIDC username, not the display name (#256): `created_by` must match
+    // the `x-actor-username` and the signed assertion's username claim.
+    const analyst = rememberActor({ name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }, { sub: 'oidc|7', username: 'ada.analyst' })
     // A freshly minted token carries no filename_hint — the backend stamps
     // the file name onto the STORED record, not the created one (canarytokens.rs:246).
     const token = await (liveQuery('createCanarytoken', analyst) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll', snippet: 'Q3 adjustments' })
-    expect(bodiesOf()).toEqual([{ path: '/api/v1/canarytokens', body: { token_type: 'ms_word', memo: 'payroll', created_by: 'A', include_text_snippet: true, text_snippet: 'Q3 adjustments' } }])
+    expect(bodiesOf()).toEqual([{ path: '/api/v1/canarytokens', body: { token_type: 'ms_word', memo: 'payroll', created_by: 'ada.analyst', include_text_snippet: true, text_snippet: 'Q3 adjustments' } }])
     expect(token).toMatchObject({ id: 'a1b2c3d4e5f6a7b8c9d0e1f2a', type: 'ms_word', memo: 'finance share bait' })
   })
 
   it('sends no snippet and no file fields the dialog left blank', async () => {
     stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
     await live('createCanarytoken')({ type: 'ms_word', memo: 'payroll' })
+    expect(bodiesOf()[0].body).toEqual({ token_type: 'ms_word', memo: 'payroll', created_by: '' })
+  })
+
+  it('leaves created_by blank for a caller with no known username, never the display name', async () => {
+    stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
+    await (liveQuery('createCanarytoken', { name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll' })
     expect(bodiesOf()[0].body).toEqual({ token_type: 'ms_word', memo: 'payroll', created_by: '' })
   })
 
@@ -2029,8 +2037,8 @@ const campaignRow = {
   correlation_identifiers: ['203.0.113.42', 'fingerprint:curl/8.5.0'],
   event_count: 2,
   events: [
-    { event_id: 'ev_9f2c1a', timestamp: '2026-10-04T20:41:03Z', matched_rules: [{ rule: 'base64-pipe-shell', reason: 'echo | base64 -d | sh', trust_boundary: 'trust-boundary-3', decode_chain: [{ transform: 'base64', input_sha256: 'aa', output_sha256: 'bb', output_len: 128 }] }] },
-    { event_id: 'ev_9f2c1b', timestamp: '2026-10-04T20:55:00Z', matched_rules: [] },
+    { event_id: 'ev_9f2c1a', source_index: 'honeypot-v2-2026.10.14', timestamp: '2026-10-04T20:41:03Z', matched_rules: [{ rule: 'base64-pipe-shell', reason: 'echo | base64 -d | sh', trust_boundary: 'trust-boundary-3', decode_chain: [{ transform: 'base64', input_sha256: 'aa', output_sha256: 'bb', output_len: 128 }] }] },
+    { event_id: 'ev_9f2c1b', source_index: '', timestamp: '2026-10-04T20:55:00Z', matched_rules: [] },
   ],
 }
 
@@ -2499,17 +2507,11 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     expect(await live('semanticSearch')('beacon')).toEqual({ available: false, reason: 'embeddings are not configured' })
   })
 
-  it('keeps source_index empty on every campaign event — the backend never writes it', async () => {
+  it('maps source_index onto each campaign event, empty for a document stored before it was written', async () => {
     const calls = stub(monitorFixtures())
     const [campaign] = await live('getAgentCampaigns')()
     expect(calls[0]).toContain('/api/v1/store/agent-campaigns?offset=0&size=100')
-    // THE GAP: `build_campaign_verdict` reads the source hit's `_index` into
-    // a `CorrelatorEvent` field it then discards, and never writes
-    // `source_index` onto the stored document. AgentCampaign.tsx:19 builds a
-    // history link whose `_index:` clause is therefore empty and will never
-    // match. The adapter substitutes '' and no index name is synthesised —
-    // the real fix is APIARY writing the field. This link is dead until then.
-    expect(campaign.events.map((e) => e.sourceIndex)).toEqual(['', ''])
+    expect(campaign.events.map((e) => e.sourceIndex)).toEqual(['honeypot-v2-2026.10.14', ''])
     expect(campaign.events[0].matchedRules).toMatchObject([{ rule: 'base64-pipe-shell', trustBoundary: 'trust-boundary-3', decodeChain: [{ transform: 'base64', outputLen: 128 }] }])
   })
 
@@ -2683,10 +2685,10 @@ const clusterWire = { kind: 'asn', value: 'AS15169 Google LLC', events: 880, sou
  * there is no hit to take a document id from. */
 const correlationRecord = (srcIp: string, sensor = 'cowrie') => ({ id: '', src_ip_claimed: '', time: '2026-10-04T20:41:03Z', sensor, src_ip: srcIp, country: 'NL', port: '22', proto: 'ssh', detail: 'command.input: uname -a', session: 'sess-77a1', pivots: { ...pivots, shasum: 'ab12cd34' }, record: { honeypot: { eventid: 'cowrie.command.input' } } })
 
-const correlationWire: CorrelationWire = { total: 2, truncated: false, sensors: [{ key: 'cowrie', count: 2 }], tunnel_connections: 1, tunnel_os_guesses: ['Linux 4.x'], records: [correlationRecord(ip), correlationRecord('198.51.100.7')] }
+const correlationWire: CorrelationWire = { total: 2, truncated: false, sensors: [{ key: 'cowrie', count: 2 }], sensors_total: 1, tunnel_connections: 1, tunnel_os_guesses: ['Linux 4.x'], records: [correlationRecord(ip), correlationRecord('198.51.100.7')] }
 
 const ipProfileWire: IpProfileWire = {
-  ip, total: 4210, first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z', country: 'NL', asn: 'Example Hosting B.V.',
+  ip, total: 4210, first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z', country: 'NL', asn: 'Example Hosting B.V.', as_organization: 'Example Hosting B.V.', as_number: 64512,
   sensors: [{ key: 'cowrie', count: 3900 }], ports: [{ key: '22', count: 900 }], protos: [{ key: 'ssh', count: 800 }],
   credentials: [{ key: 'root', count: 96 }], commands: [{ key: 'uname -a', count: 40 }], sessions: [{ key: 'sess-77a1', count: 31 }],
   techniques: [{ id: 'T1059.004', name: 'Unix Shell', domain: 'Execution', evidence: 'a shell command was recorded', count: 40, url: 'https://attack.mitre.org/techniques/T1059/004/' }],
@@ -2867,24 +2869,30 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
     expect((await live('getIpProfile')(ip))!.blocked).toBe(false)
   })
 
-  it('GAP 7: the block write carries no duration and no actor — a permanent block', async () => {
-    // THE slice's dangerous gap. BlockBody takes `expires_days` and
-    // `actor`; the page's setter is `setIpBlocked(ip, blocked)` and has no
-    // field for either, so neither is sent and the backend stores
-    // `ExpiresAt: null`. An operator who wants a week gets one until they
-    // lift it, and the page's confirm dialog claims no duration either.
-    stub(sourcesFixtures({ '/api/v1/ip-block': { IP: ip, Blocked: true, BlockedBy: '', BlockedAt: '2026-10-04T21:00:00Z', ExpiresAt: null } }))
-    await live('setIpBlocked')(ip, true)
-    const [write] = bodiesOf().filter((call) => call.path === '/api/v1/ip-block')
-    expect(write.body).toEqual({ ip, blocked: true })
-    expect(write.body).not.toHaveProperty('expires_days')
-    expect(write.body).not.toHaveProperty('actor')
+  it('sends an explicit duration with a block, none with an unblock, and never an actor', async () => {
+    stub(sourcesFixtures({ '/api/v1/ip-block': { IP: ip, Blocked: true, BlockedBy: '', BlockedAt: '2026-10-04T21:00:00Z', ExpiresAt: '2026-10-11T21:00:00Z' } }))
+    await live('setIpBlocked')(ip, true, 7)
+    await live('setIpBlocked')(ip, true, 0)
+    await live('setIpBlocked')(ip, false)
+    const writes = bodiesOf().filter((call) => call.path === '/api/v1/ip-block')
+    expect(writes.map((w) => w.body)).toEqual([
+      { ip, blocked: true, expires_days: 7 },
+      { ip, blocked: true, expires_days: 0 },
+      { ip, blocked: false },
+    ])
+    for (const w of writes) expect(w.body).not.toHaveProperty('actor')
+  })
+
+  it('refuses a block with no duration before any write', async () => {
+    stub(sourcesFixtures())
+    await expect(live('setIpBlocked')(ip, true)).rejects.toThrow(/duration/)
+    expect(bodiesOf().filter((call) => call.path === '/api/v1/ip-block')).toHaveLength(0)
   })
 
   it('keeps the block write admin-only on the live path, before any fetch', async () => {
     const viewer = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
     const calls = stub(sourcesFixtures())
-    const refused = await liveQuery('setIpBlocked', viewer)!('203.0.113.42', true).catch((error: unknown) => error)
+    const refused = await liveQuery('setIpBlocked', viewer)!('203.0.113.42', true, 7).catch((error: unknown) => error)
     expect(refused).toBeInstanceOf(ApiError)
     expect((refused as ApiError).kind).toBe('forbidden')
     expect(calls).toHaveLength(0)
@@ -2892,7 +2900,7 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
 
   it('honours read-only before writing a block', async () => {
     stub(sourcesFixtures({ '/api/v1/config': { ...configWire, payload: { behavior: { read_only: true } } } }))
-    await expect(live('setIpBlocked')(ip, true)).rejects.toThrow(ApiError)
+    await expect(live('setIpBlocked')(ip, true, 7)).rejects.toThrow(ApiError)
   })
 
   it('builds a network page from its CIDR correlation, percent-encoding the slash', async () => {
@@ -2978,7 +2986,7 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
       ['getNetwork', () => live('getNetwork')(cidr), { '/api/v1/investigate/cidr/203.0.113.0%2F24': fail(502) }],
       ['getCluster', () => live('getCluster')('payload', '9f86'), { '/api/v1/investigate/cluster': fail(502) }],
       ['getIdentityFusion', () => live('getIdentityFusion')('att_1'), { '/api/v1/charts/attacker-fusion': fail(502) }],
-      ['setIpBlocked', () => live('setIpBlocked')(ip, true), { '/api/v1/ip-block': fail(502) }],
+      ['setIpBlocked', () => live('setIpBlocked')(ip, true, 7), { '/api/v1/ip-block': fail(502) }],
     ]
     for (const [name, call, fixtures] of cases) {
       stub(sourcesFixtures(fixtures))

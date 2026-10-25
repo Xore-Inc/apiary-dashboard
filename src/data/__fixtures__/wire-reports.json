@@ -1,0 +1,238 @@
+{
+  "_source": "backend-service reports_api.rs (templates, list/create/update/delete definitions, generate), reports_store.rs (ReportDefinition, ReportBranding, ReportScope, ReportSchedule, GeneratedReportMeta; empty strings and a zero failures count are skipped on serialize), stores.rs (generated-reports page with pdf_base64 excluded, sandbox-runs raw page), payload_inventory.rs.",
+  "templates": {
+    "templates": [
+      {
+        "id": "executive",
+        "name": "Executive report",
+        "description": "Management-ready summary.",
+        "title": "Honeypot Executive Security Report",
+        "theme": "dark",
+        "window": "24h",
+        "elements": [
+          "cover",
+          "metrics"
+        ],
+        "sandbox": false,
+        "payload": false,
+        "ghidra": false
+      },
+      {
+        "id": "sandbox",
+        "name": "Sandbox report",
+        "description": "One sandbox run.",
+        "title": "Sandbox Analysis Report",
+        "theme": "dark",
+        "window": "24h",
+        "elements": [
+          "cover"
+        ],
+        "sandbox": true,
+        "payload": false,
+        "ghidra": false
+      }
+    ],
+    "elements": [
+      {
+        "id": "cover",
+        "label": "Cover page",
+        "description": "Title and period."
+      },
+      {
+        "id": "metrics",
+        "label": "Key metrics",
+        "description": "Headline totals."
+      }
+    ]
+  },
+  "definitions": {
+    "definitions": [
+      {
+        "id": "def-1",
+        "name": "Weekly executive",
+        "template": "executive",
+        "theme": "dark",
+        "branding": {
+          "title": "Weekly",
+          "classification": "INTERNAL"
+        },
+        "scope": {
+          "window": "7d",
+          "ip": "203.0.113.4"
+        },
+        "elements": [
+          "cover",
+          "metrics"
+        ],
+        "appendix_limit": 50,
+        "schedule": {
+          "enabled": true,
+          "frequency": "weekly",
+          "hour": 6,
+          "minute": 30,
+          "weekday": 1,
+          "month_day": 1,
+          "last_run_at": "2026-10-13T06:30:00+00:00",
+          "next_run_at": "2026-10-20T06:30:00+00:00",
+          "failures": 2
+        },
+        "created": "2026-10-10T08:00:00+00:00",
+        "updated": "2026-10-12T08:00:00+00:00"
+      },
+      {
+        "id": "def-2",
+        "name": "Ad hoc",
+        "template": "security",
+        "theme": "light",
+        "branding": {},
+        "scope": {},
+        "elements": [],
+        "appendix_limit": 0,
+        "created": "2026-10-10T08:00:00+00:00",
+        "updated": "2026-10-10T08:00:00+00:00"
+      }
+    ]
+  },
+  "definitionCreated": {
+    "definition": {
+      "id": "def-1",
+      "name": "Weekly executive",
+      "template": "executive",
+      "theme": "dark",
+      "branding": {
+        "title": "Weekly",
+        "classification": "INTERNAL"
+      },
+      "scope": {
+        "window": "7d",
+        "ip": "203.0.113.4"
+      },
+      "elements": [
+        "cover",
+        "metrics"
+      ],
+      "appendix_limit": 50,
+      "schedule": {
+        "enabled": true,
+        "frequency": "weekly",
+        "hour": 6,
+        "minute": 30,
+        "weekday": 1,
+        "month_day": 1,
+        "last_run_at": "2026-10-13T06:30:00+00:00",
+        "next_run_at": "2026-10-20T06:30:00+00:00",
+        "failures": 2
+      },
+      "created": "2026-10-10T08:00:00+00:00",
+      "updated": "2026-10-12T08:00:00+00:00"
+    }
+  },
+  "definitionUpdated": {
+    "definition": {
+      "id": "def-2",
+      "name": "Ad hoc",
+      "template": "security",
+      "theme": "light",
+      "branding": {},
+      "scope": {},
+      "elements": [],
+      "appendix_limit": 0,
+      "created": "2026-10-10T08:00:00+00:00",
+      "updated": "2026-10-10T08:00:00+00:00"
+    }
+  },
+  "definitionDeleted": {
+    "deleted": "def-1"
+  },
+  "generatedDeleted": {
+    "deleted": "gen-1"
+  },
+  "generated": {
+    "generated": {
+      "id": "gen-1",
+      "definition_id": "def-1",
+      "name": "Weekly executive",
+      "template": "executive",
+      "theme": "dark",
+      "title": "Honeypot Executive Security Report",
+      "size_bytes": 181234,
+      "created_at": "2026-10-13T06:30:05+00:00",
+      "origin": "schedule"
+    }
+  },
+  "generatedReportsPage": {
+    "total": 2,
+    "rows": [
+      {
+        "id": "gen-1",
+        "definition_id": "def-1",
+        "name": "Weekly executive",
+        "template": "executive",
+        "theme": "dark",
+        "title": "Honeypot Executive Security Report",
+        "size_bytes": 181234,
+        "created_at": "2026-10-13T06:30:05+00:00",
+        "origin": "schedule",
+        "_doc_id": "gen-1"
+      },
+      {
+        "id": "gen-2",
+        "name": "Weekly executive",
+        "template": "executive",
+        "theme": "dark",
+        "title": "Honeypot Executive Security Report",
+        "size_bytes": 181234,
+        "created_at": "2026-10-13T06:30:05+00:00",
+        "origin": "manual",
+        "_doc_id": "gen-2"
+      }
+    ]
+  },
+  "sandboxRunsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "_doc_id": "sandbox:e3b0",
+        "sandbox": {
+          "job": "job1",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "event": {
+          "category": "sandbox"
+        },
+        "@timestamp": "2026-10-14T09:02:00Z",
+        "file": {
+          "hash": {
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        "exit_status": "ok",
+        "risk_level": "low",
+        "risk_score": 12,
+        "platform": "linux"
+      }
+    ]
+  },
+  "payloadSearchPage": {
+    "total": 1,
+    "rows": [
+      {
+        "Hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "Kind": "ELF executable",
+        "SizeH": "4.0 KiB",
+        "Sources": [
+          "cowrie"
+        ],
+        "Size": 4096,
+        "_doc_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "source_buckets": [
+      {
+        "key": "cowrie",
+        "doc_count": 2
+      }
+    ],
+    "source_other": 0
+  }
+}

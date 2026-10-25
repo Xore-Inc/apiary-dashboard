@@ -584,7 +584,7 @@ export interface SourceHealth {
 
 export interface TopologySensor extends Record<string, unknown> {
   sensor: string
-  ingress: Array<'portbridge' | 'traefik' | 'direct' | 'proxy'>
+  ingress: Array<'portbridge' | 'traefik' | 'tunnel-only' | 'direct' | 'proxy'>
   hostnames: string[]
   ports: Array<{ proto: 'tcp' | 'udp'; public: number; host: number }>
   rawIndex: string
@@ -970,7 +970,8 @@ export interface BlockRecord {
 }
 
 export interface IpProfile {
-  source: SourceProfile & { asn: string; riskScore: number; tags: string[] }
+  /** `asn` is `AS<number>`, '' when the number is unknown; `org` is the AS organization. */
+  source: SourceProfile & { asn: string; asNumber: number | null; riskScore: number; tags: string[] }
   blocked: boolean
   block?: BlockRecord
   /** A sandbox detonation of a sample that references this address
@@ -1134,6 +1135,8 @@ export interface DashboardConfig {
     footerText: string
     aiDisclaimer: string
     privacyNotice: string
+    /** The stored `brand_prefix` (max 20 chars). No page control edits it: it is carried so a presentation save does not erase it. Absent when the document has none. */
+    brandPrefix?: string
   }
   behavior: {
     defaultLanding: string
@@ -1451,8 +1454,8 @@ export interface CapeRun extends Record<string, unknown> {
   log: string
   /** CAPE's own task number, and its raw task status (`reported`,
    * `failed_analysis`, …). */
-  taskId: number
-  capeStatus: string
+  taskId: number | null
+  capeStatus: string | null
   /** CAPE's verdict word for the score (Malicious, Suspicious, Clean). */
   malstatus: string
   /** API calls the behavior log recorded. */
@@ -1604,6 +1607,8 @@ export interface SourceGroup {
   first?: string
   last?: string
   sensors: CountRow[]
+  /** Distinct sensors reached; `sensors` is only the top 10. Absent where the source does not say. */
+  sensorsTotal?: number
   countries: CountRow[]
   networks: CountRow[]
   ports: CountRow[]

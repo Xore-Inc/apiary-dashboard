@@ -11,7 +11,7 @@ import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
 import { getIpProfile } from '#/data/queries'
-import { formatDateTime, formatNumber } from '#/lib/format'
+import { formatAs, formatDateTime, formatNumber } from '#/lib/format'
 
 export const Route = createFileRoute('/_layout/sources/$ip')({
   ssr: pageSsr,
@@ -56,7 +56,7 @@ function SourceLayout() {
         )
       }
       facts={[
-        { label: 'Network', value: p && <EntityLink kind="asn" id={p.source.asn}>{`${p.source.asn} · ${p.source.org}`}</EntityLink> },
+        { label: 'Network', value: p && (p.source.asn ? <EntityLink kind="asn" id={p.source.asn}>{formatAs(p.source.asn, p.source.org)}</EntityLink> : (p.source.org || '—')) },
         { label: 'First seen', value: p && formatDateTime(p.source.first) },
         { label: 'Last seen', value: p && formatDateTime(p.source.last) },
         { label: 'Events', value: p && formatNumber(p.source.events) },

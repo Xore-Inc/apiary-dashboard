@@ -36,7 +36,7 @@ GitHub Actions, on GitHub-hosted runners:
 | Workflow | When | What |
 |---|---|---|
 | `ci.yml` | every pull request, pushes to main | public-repository safety (`scripts/check-public-leaks.ts`: no secrets, no real deployment addresses, mock data in documentation ranges only); typecheck, lint, tests, theme and generated-file freshness, build; the release gate `scripts/smoke.sh` with the runner's Chrome; `actionlint` over the workflows |
-| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `SERVICE_TOKEN` and serves once given one, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore/apiary-dashboard:latest --owner Xore`). Nothing deploys it yet. |
+| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `SERVICE_TOKEN` and serves once given one, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore-inc/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard:latest --owner Xore-Inc`). Nothing deploys it yet. |
 | `codeql.yml` | pull requests, main, weekly | CodeQL `security-extended` over the TypeScript |
 | `dependency-review.yml` | pull requests | fails on a new dependency with a moderate or worse advisory |
 | `pr-title.yml` | pull requests | the title is a conventional commit (it becomes the squash commit), and its kind sets the release-notes label |
@@ -54,6 +54,8 @@ To release: `git tag v0.1.0 && git push origin v0.1.0`.
 ```bash
 docker build -t apiary-dashboard .
 docker run -p 3000:3000 -e SERVICE_TOKEN=… apiary-dashboard
+# or from a mounted secret file:
+# docker run -p 3000:3000 -v ./service-token:/run/secrets/service-token:ro -e SERVICE_TOKEN_FILE=/run/secrets/service-token apiary-dashboard
 ```
 
 `bun run test` covers the authorization matrix, the boot policies, sessions, nav roll-ups, formatters, and invariants over the mock backend: numbers shown on different pages must agree, and every id one page links to must resolve on its target page.
@@ -70,24 +72,34 @@ On the server:
 - every server function passes a **same-origin check** (a cross-site state-changing call gets 403), and a state-changing one must carry the `x-csrf-token` header the dashboard's own fetch adds;
 - every query is **authorized for the caller**: no session → 401; a viewer calling an admin-only write → 403; the canonical permissions are in `src/server/authorize.ts`;
 - direct handlers (`/api/*`) check the session themselves; `/healthz` is deliberately public; `/metrics` needs the service token in `x-service-token`;
-- the firewall blocklist export (`/export/portbridge-manual-blackhole.txt`) takes either that service token or a signed-in session the query policy allows (see below);
+- the firewall blocklist export (`/export/portbridge-manual-blackhole.txt`) takes either an export-only token (`X-Export-Token`, not the service token) or a signed-in session the query policy allows (see below);
 - `/auth/logout` needs a same-origin Origin or Referer, then destroys the session.
 
 #### Machine access: the blocklist export
 
 `GET /export/portbridge-manual-blackhole.txt` returns the manual blackhole list, one IP per line (`text/plain`, `no-store`). It is the only URL the VPS firewall puller reads.
 
-- Machine client: send the header `X-Service-Token: <SERVICE_TOKEN>`. The token is compared in constant time and is never taken from the URL or the query string. With `SERVICE_TOKEN` unset, this path never matches.
+- Machine client: send the header `X-Export-Token: <EXPORT_TOKEN>`. The token is compared in constant time and is never taken from the URL or the query string. With `EXPORT_TOKEN` unset (the default), this path never matches. `SERVICE_TOKEN` is **not** accepted here: it reaches the whole backend, and the VPS must not hold it.
 - Person: a signed-in session whose role `getBlockedIps` allows under `src/server/authorize.ts`.
 - No credentials: `401 unauthorized`. A signed-in role the policy refuses: `403 forbidden`.
 
-The VPS job sends the header from its `DASHBOARD_SERVICE_TOKEN`, which must hold the same value as `SERVICE_TOKEN`.
+The VPS job sends the header from its `BLACKHOLE_EXPORT_TOKEN`, which must hold the same value as `EXPORT_TOKEN` and a different value from `SERVICE_TOKEN`. Generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`.
+
+#### Machine access: the backend
+
+Calls to the backend carry `x-service-token`. When a signing key is configured they also carry `x-actor-assertion`: a short-lived (60 s) Ed25519-signed JWS naming the signed-in operator (`sub`, `username`, `role`) and bound to one request (`htm`, `htu`). The backend verifies it with the public key only, so the bearer token cannot mint an identity; see `docs/BACKEND-TRUST-BOUNDARY.md` in the APIARY repository for the claims, the `off`/`log`/`enforce` modes and the rollout order.
+
+- The `username` claim, and the plain `x-actor-username` header, are the OIDC username, not the display name. Workbench run and recipe ownership is keyed on it.
+- No assertion is sent for a call with no signed-in operator (machine reads), or when no key is configured.
+- Roll back to a build that does not sign only after the backend is in `log` or `off`.
 
 The server refuses to boot in an environment that would open it:
 
 | Variable | |
 |---|---|
-| `SERVICE_TOKEN` | Shared secret with the backend. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
+| `SERVICE_TOKEN` / `SERVICE_TOKEN_FILE` | Shared secret with the backend, inline or as a path to a file holding it (a swarm secret); exactly one, and a file that is missing or empty refuses to boot. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
+| `EXPORT_TOKEN` / `EXPORT_TOKEN_FILE` | Optional export-only secret (inline or file, as above) for the blocklist export (`X-Export-Token`). Unset turns machine access to the export off. Equal to `SERVICE_TOKEN` refuses to boot (`E-EXPORT-TOKEN`). |
+| `ACTOR_ASSERTION_PRIVATE_KEY` / `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key (PEM; `\n` for newlines inline) that signs operator identities for the backend. Both set, or a key that is unparsable or not Ed25519, refuses to boot (`E-ACTOR-ASSERTION-KEY`). Unset signs nothing. |
 | `BACKEND_URL` | Base URL of the backend tier. Unset — the development default — leaves queries answering from the mock. Production requires it. |
 | `APIARY_ALLOW_UNAUTH_DEV` | Exactly `1`: a local development instance. `bun run dev` sets it. |
 | `OIDC_DISABLED` | `1` skips sign-in: everyone is a fixture admin. Only with `NODE_ENV=development` or `APIARY_ALLOW_UNAUTH_DEV=1` (`E-OIDC-DISABLED`). |

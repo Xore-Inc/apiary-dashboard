@@ -1,0 +1,1079 @@
+{
+  "_source": "backend-service overview.rs (OverviewKpis, HourlyByProtocol), dashboard.rs (Dashboard, Kv, HeatRow, MapPoint, PayloadRow, SensorFeed), stores.rs store_page (total + rows with _doc_id), correlator.rs score_campaigns (campaigns-v1 json!), config.rs get_config, detail.rs write_ml_ack / ml_anomaly_ack_all / ml_anomaly_stats / ml_anomaly_disposition, ml_health.rs ModelHealth, llm_search.rs search; store rows written outside backend-service: ml-worker/worker.py write_anomaly, llm-worker/worker.py base_document, auth-events-worker/worker.py redact, backend-service agent_intrusion.rs build_campaign_verdict.",
+  "kpis": {
+    "total": 895516,
+    "last24h": 4210,
+    "previous24h": 2990,
+    "change24h": "+41%",
+    "unique_ips": 318,
+    "hourly": [
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12
+    ],
+    "logins": 1203,
+    "sessions_24h": 97,
+    "sessions_previous24h": 80,
+    "hourly_by_protocol": [
+      {
+        "hour": "2026-10-13T00:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T01:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T02:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T03:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T04:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T05:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T06:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T07:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T08:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T09:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T10:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T11:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T12:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T13:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T14:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T15:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T16:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T17:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T18:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T19:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T20:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T21:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T22:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T23:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      }
+    ],
+    "ready": true
+  },
+  "kpisEmptyPrevious": {
+    "total": 895516,
+    "last24h": 4210,
+    "previous24h": 0,
+    "change24h": "",
+    "unique_ips": 318,
+    "hourly": [
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12,
+      10,
+      11,
+      12
+    ],
+    "logins": 1203,
+    "sessions_24h": 97,
+    "sessions_previous24h": 80,
+    "hourly_by_protocol": [
+      {
+        "hour": "2026-10-13T00:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T01:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T02:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T03:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T04:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T05:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T06:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T07:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T08:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T09:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T10:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T11:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T12:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T13:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T14:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T15:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T16:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T17:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T18:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T19:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T20:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T21:00:00.000Z",
+        "total": 10,
+        "counts": {
+          "ssh": 6,
+          "http": 2,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T22:00:00.000Z",
+        "total": 11,
+        "counts": {
+          "ssh": 6,
+          "http": 3,
+          "other": 2
+        }
+      },
+      {
+        "hour": "2026-10-13T23:00:00.000Z",
+        "total": 12,
+        "counts": {
+          "ssh": 6,
+          "http": 4,
+          "other": 2
+        }
+      }
+    ],
+    "ready": false
+  },
+  "dashboard": {
+    "protocols": [
+      {
+        "key": "ssh",
+        "count": 3100,
+        "link": "/events?proto=ssh"
+      }
+    ],
+    "top_ports": [
+      {
+        "key": "22",
+        "count": 3100,
+        "link": "/events?port=22"
+      }
+    ],
+    "countries": [
+      {
+        "key": "NL",
+        "count": 1200,
+        "link": "/events?country=NL"
+      }
+    ],
+    "asns": [
+      {
+        "key": "AS64496 Example Transit",
+        "count": 900,
+        "link": "/events?asn=64496"
+      }
+    ],
+    "providers": [
+      {
+        "key": "hosting",
+        "count": 700,
+        "link": "/events?provider=hosting"
+      }
+    ],
+    "top_ips": [
+      {
+        "key": "203.0.113.4",
+        "count": 410,
+        "link": "/events?ip=203.0.113.4"
+      }
+    ],
+    "top_paths": [
+      {
+        "key": "/.env",
+        "count": 88,
+        "link": "/events?path=%2F.env"
+      }
+    ],
+    "top_creds": [
+      {
+        "key": "root / toor",
+        "count": 55,
+        "link": "/events?user=root&pass=toor"
+      }
+    ],
+    "top_commands": [
+      {
+        "key": "uname -a",
+        "count": 31,
+        "link": "/events?cmd=uname%20-a"
+      }
+    ],
+    "clients": [
+      {
+        "key": "curl/8.5.0",
+        "count": 44,
+        "link": "/events?fingerprint=curl%2F8.5.0"
+      }
+    ],
+    "fingerprints": [
+      {
+        "key": "t13d1516h2_8daaf6152771_02713d6af862",
+        "count": 12,
+        "link": "/events?fingerprint=t13d1516h2_8daaf6152771_02713d6af862"
+      }
+    ],
+    "alerts": [
+      {
+        "key": "ET SCAN Potential SSH Scan",
+        "count": 19,
+        "link": "/events?alert=ET%20SCAN%20Potential%20SSH%20Scan"
+      }
+    ],
+    "alert_cats": [
+      {
+        "key": "Attempted Information Leak",
+        "count": 19,
+        "link": "/events?category=Attempted%20Information%20Leak"
+      }
+    ],
+    "payloads": [
+      {
+        "shasum": "d41d8cd98f00b204e9800998ecf8427e",
+        "download": "http://203.0.113.4/bins/x86",
+        "count": 4,
+        "link": "/payloads/d41d8cd98f00b204e9800998ecf8427e",
+        "vt": "https://www.virustotal.com/gui/file/d41d8cd98f00b204e9800998ecf8427e"
+      }
+    ],
+    "logins": 1203,
+    "heatmap": [
+      {
+        "sensor": "cowrie",
+        "cells": [
+          {
+            "label": "00",
+            "count": 12,
+            "pct": 100
+          },
+          {
+            "label": "01",
+            "count": 0,
+            "pct": 0
+          }
+        ]
+      }
+    ],
+    "map_points": [
+      {
+        "city": "Amsterdam",
+        "country": "NL",
+        "lat": 52.37,
+        "lon": 4.89,
+        "events": 410,
+        "ips": 7,
+        "url": "/events?country=NL&city=Amsterdam"
+      }
+    ],
+    "sensors": [
+      {
+        "name": "cowrie",
+        "count": 3100,
+        "last_seen": "2026-10-14T10:02:11.000Z",
+        "state": "active"
+      },
+      {
+        "name": "dionaea",
+        "count": 0,
+        "last_seen": "",
+        "state": "stale"
+      }
+    ]
+  },
+  "dashboardNoParts": {
+    "protocols": [],
+    "top_ports": [],
+    "countries": [],
+    "asns": [],
+    "providers": [],
+    "top_ips": [],
+    "top_paths": [],
+    "top_creds": [],
+    "top_commands": [],
+    "clients": [],
+    "fingerprints": [],
+    "alerts": [],
+    "alert_cats": [],
+    "payloads": [],
+    "logins": 0,
+    "heatmap": [],
+    "map_points": [],
+    "sensors": []
+  },
+  "campaignsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "cidr": "203.0.113.0/24",
+        "score": 72,
+        "events": 4210,
+        "unique_ips": 14,
+        "dst_ips_touched": 3,
+        "ports_touched_counted": 5,
+        "protocols_touched": 2,
+        "scan": false,
+        "sensors": [
+          "cowrie",
+          "dionaea"
+        ],
+        "ports": [
+          "22",
+          "445"
+        ],
+        "creds": [
+          "root:toor"
+        ],
+        "payloads": [
+          "d41d8cd98f00b204e9800998ecf8427e"
+        ],
+        "alerts": [
+          "ET SCAN Potential SSH Scan"
+        ],
+        "providers": [
+          "hosting"
+        ],
+        "fingerprints": [
+          "curl/8.5.0"
+        ],
+        "first": "2026-10-13T08:00:00Z",
+        "last": "2026-10-14T09:30:00Z",
+        "generated": "2026-10-14T10:00:00+00:00",
+        "explanation": "14 unique IPs; repeated activity from one routable network",
+        "_doc_id": "203.0.113.0_24"
+      }
+    ]
+  },
+  "payloadsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "Hash": "d41d8cd98f00b204e9800998ecf8427e",
+        "Kind": "elf",
+        "_doc_id": "d41d8cd98f00b204e9800998ecf8427e"
+      }
+    ],
+    "source_buckets": [
+      {
+        "key": "cowrie",
+        "doc_count": 4
+      }
+    ],
+    "source_other": 0
+  },
+  "configNever": {
+    "revision": 0,
+    "payload": {}
+  },
+  "configStored": {
+    "schema_version": 4,
+    "revision": 7,
+    "payload": {
+      "presentation": {
+        "dashboard_title": "APIARY",
+        "dashboard_subtitle": "",
+        "footer_text": "",
+        "banner_text": "Maintenance at 22:00",
+        "banner_severity": "warning"
+      },
+      "behavior": {
+        "default_time_window": "24h"
+      }
+    },
+    "updated": "2026-10-14T09:00:00+00:00"
+  },
+  "mlAnomaliesPage": {
+    "total": 2,
+    "rows": [
+      {
+        "@timestamp": "2026-10-14T09:58:00.000Z",
+        "source_event_id": "wtE0IaEBXGgnD02F2rjA",
+        "source_index": "honeypot-v2-2026.10.14",
+        "src_ip": "203.0.113.4",
+        "src_country": "NL",
+        "composite_score": 0.9132,
+        "severity": "high",
+        "model_scores": {
+          "autoencoder": 0.9132,
+          "isolation_forest": null
+        },
+        "contributing_detectors": [
+          "autoencoder"
+        ],
+        "explanation": "unusual port mix",
+        "event_type": "modbus_detailed",
+        "dst_port": 502,
+        "proto": "tcp",
+        "dst_ip": "198.51.100.10",
+        "src_port": 51310,
+        "sensor": "zeek",
+        "community_id": "1:NRxRI5aNdT6AHHe3kDrIXrvAw/o=",
+        "alert_threshold": 0.8,
+        "model_state_id": null,
+        "src_internal": false,
+        "_doc_id": "anom-0001"
+      },
+      {
+        "@timestamp": "2026-10-14T09:58:00.000Z",
+        "source_event_id": "wtE0IaEBXGgnD02F2rjA",
+        "source_index": "honeypot-v2-2026.10.14",
+        "src_ip": null,
+        "src_country": null,
+        "composite_score": 0.9132,
+        "severity": "high",
+        "model_scores": {
+          "autoencoder": 0.9132,
+          "isolation_forest": null
+        },
+        "contributing_detectors": [
+          "autoencoder"
+        ],
+        "explanation": "unusual port mix",
+        "event_type": null,
+        "dst_port": null,
+        "proto": null,
+        "dst_ip": null,
+        "src_port": null,
+        "sensor": null,
+        "community_id": null,
+        "alert_threshold": 0.8,
+        "model_state_id": null,
+        "src_internal": false,
+        "_doc_id": "anom-0002",
+        "status": "true_positive",
+        "disposition_reason": "confirmed scan",
+        "disposition_by": "analyst",
+        "disposed_at": "2026-10-14T10:05:00+00:00"
+      }
+    ]
+  },
+  "mlAck": {
+    "Key": "anom-0001",
+    "Acknowledged": true,
+    "AckedBy": "analyst",
+    "AckedAt": "2026-10-14T10:00:00+00:00"
+  },
+  "mlAckAll": {
+    "changed": 3
+  },
+  "mlAcks": {
+    "anom-0001": {
+      "Key": "anom-0001",
+      "Acknowledged": false,
+      "AckedBy": "",
+      "AckedAt": "2026-10-14T10:01:00+00:00"
+    }
+  },
+  "mlStats": {
+    "total": 120,
+    "open": 97
+  },
+  "mlDisposition": {
+    "key": "anom-0002",
+    "status": "true_positive",
+    "disposed_at": "2026-10-14T10:05:00+00:00"
+  },
+  "mlDispositionRetract": {
+    "key": "anom-0002",
+    "status": "open",
+    "disposed_at": "2026-10-14T10:06:00+00:00"
+  },
+  "mlHealth": [
+    {
+      "model": "autoencoder",
+      "timestamp": "2026-10-14T06:00:00Z",
+      "accepted": true,
+      "reason": "",
+      "anomaly_rate_new": 0.012,
+      "anomaly_rate_previous": 0.015,
+      "train_samples": 50000
+    }
+  ],
+  "llmPage": {
+    "total": 2,
+    "rows": [
+      {
+        "@timestamp": "2026-10-14T09:00:00.000Z",
+        "analysis_id": "an-1",
+        "doc_type": "session",
+        "source_index": "honeypot-v2-2026.10.14",
+        "source_id": "sess-77a1",
+        "session_id": "sess-77a1",
+        "src_ip": "203.0.113.4",
+        "payload_sha256": "",
+        "model": "qwen3:14b",
+        "model_digest": "sha256:abc",
+        "worker_version": "1.4.0",
+        "schema_version": 3,
+        "prompt_version": "session-v2",
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "summary": "Credential stuffing followed by recon commands.",
+        "intent": "recon",
+        "language": "en",
+        "behaviors": [
+          "credential-stuffing"
+        ],
+        "mitre_attack": [
+          "T1110"
+        ],
+        "iocs": [],
+        "severity": "medium",
+        "model_severity": "medium",
+        "confidence": "high",
+        "highlights": [],
+        "trends": [],
+        "recommended_checks": [],
+        "deterministic_flags": [],
+        "prompt_truncated": false,
+        "analysis_ms": 4210,
+        "prompt_tokens": 812,
+        "error": "",
+        "_doc_id": "an-1"
+      },
+      {
+        "@timestamp": "2026-10-14T09:00:00.000Z",
+        "analysis_id": "an-2",
+        "doc_type": "error",
+        "source_index": "honeypot-v2-2026.10.14",
+        "source_id": "sess-77a1",
+        "session_id": "sess-77a1",
+        "src_ip": null,
+        "payload_sha256": "",
+        "model": "qwen3:14b",
+        "model_digest": "sha256:abc",
+        "worker_version": "1.4.0",
+        "schema_version": 3,
+        "prompt_version": "session-v2",
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "summary": "",
+        "intent": "recon",
+        "language": "en",
+        "behaviors": [],
+        "mitre_attack": [
+          "T1110"
+        ],
+        "iocs": [],
+        "severity": "",
+        "model_severity": "medium",
+        "confidence": "",
+        "highlights": [],
+        "trends": [],
+        "recommended_checks": [],
+        "deterministic_flags": [],
+        "prompt_truncated": false,
+        "analysis_ms": 4210,
+        "prompt_tokens": 812,
+        "error": "model timed out",
+        "_doc_id": "an-2"
+      }
+    ]
+  },
+  "llmSearch": {
+    "available": true,
+    "hits": [
+      {
+        "@timestamp": "2026-10-14T09:00:00.000Z",
+        "analysis_id": "an-1",
+        "doc_type": "session",
+        "source_index": "honeypot-v2-2026.10.14",
+        "source_id": "sess-77a1",
+        "session_id": "sess-77a1",
+        "src_ip": "203.0.113.4",
+        "payload_sha256": "",
+        "model": "qwen3:14b",
+        "model_digest": "sha256:abc",
+        "worker_version": "1.4.0",
+        "schema_version": 3,
+        "prompt_version": "session-v2",
+        "input_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "summary": "Credential stuffing followed by recon commands.",
+        "intent": "recon",
+        "language": "en",
+        "behaviors": [
+          "credential-stuffing"
+        ],
+        "mitre_attack": [
+          "T1110"
+        ],
+        "iocs": [],
+        "severity": "medium",
+        "model_severity": "medium",
+        "confidence": "high",
+        "highlights": [],
+        "trends": [],
+        "recommended_checks": [],
+        "deterministic_flags": [],
+        "prompt_truncated": false,
+        "analysis_ms": 4210,
+        "prompt_tokens": 812,
+        "error": "",
+        "_doc_id": "an-1",
+        "score": 0.83
+      }
+    ]
+  },
+  "llmSearchForeign": {
+    "available": true,
+    "hits": [],
+    "foreign_embeddings": 12,
+    "note": "12 analyses are embedded by a different model and are not searchable."
+  },
+  "llmSearchUnavailable": {
+    "available": false,
+    "reason": "semantic search is not configured"
+  },
+  "agentCampaignsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "@timestamp": "2026-10-14T09:30:00+00:00",
+        "campaign_id": "3f9a1c2d4e5b6a70",
+        "start": "2026-10-14T09:00:00Z",
+        "end": "2026-10-14T09:20:00Z",
+        "severity": "high",
+        "matched_categories": [
+          "container-escape"
+        ],
+        "correlation_identifiers": [
+          "session:s1"
+        ],
+        "event_count": 2,
+        "events": [
+          {
+            "event_id": "e1",
+            "source_index": "honeypot-v2-2026.10.14",
+            "timestamp": "2026-10-14T09:00:00Z",
+            "matched_rules": [
+              {
+                "rule": "privileged-container",
+                "reason": "--privileged with host mount",
+                "trust_boundary": "container",
+                "decode_chain": [
+                  {
+                    "transform": "base64",
+                    "input_sha256": "aa",
+                    "output_sha256": "bb",
+                    "output_len": 42
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "event_id": "e2",
+            "source_index": "",
+            "timestamp": "2026-10-14T09:20:00Z",
+            "matched_rules": []
+          }
+        ],
+        "_doc_id": "3f9a1c2d4e5b6a70"
+      }
+    ]
+  },
+  "authEventsPage": {
+    "total": 2,
+    "rows": [
+      {
+        "@timestamp": "2026-10-14T09:10:00+00:00",
+        "event_id": "kc-1",
+        "type": "LOGIN_ERROR",
+        "realm": "apiary",
+        "client_id": "dashboard",
+        "user_id": null,
+        "ip_address": "203.0.113.9",
+        "error": "invalid_user_credentials",
+        "details": {
+          "username": "admin",
+          "auth_method": "openid-connect"
+        },
+        "_doc_id": "kc-1"
+      },
+      {
+        "@timestamp": "2026-10-14T09:11:00+00:00",
+        "event_id": "kc-2",
+        "type": "LOGIN_ERROR",
+        "realm": "apiary",
+        "client_id": null,
+        "user_id": null,
+        "ip_address": null,
+        "error": null,
+        "details": {},
+        "_doc_id": "kc-2"
+      }
+    ]
+  }
+}

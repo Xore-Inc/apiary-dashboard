@@ -17,6 +17,7 @@
 // never in an error message — it only ever rides as a request header.
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ApiError, NOT_YET } from './errors'
+import { ACTOR_ASSERTION_HEADER, actorOf as sessionIdentityOf, mintActorAssertion } from '#/server/actorAssertion'
 import {
   commandsQuery,
   eventDetail,
@@ -108,6 +109,7 @@ import type { DashboardViews } from './adapters/monitor'
 import { readingOf } from '#/lib/sensorSpecs'
 import { authorize } from '#/server/authorize'
 import { envInt } from '#/server/admission'
+import { secretValue } from '#/server/secret'
 import { recordShed } from '#/server/obs'
 import { isRead, READ_ONLY_EXEMPT } from './readOnly'
 import {
@@ -330,7 +332,7 @@ async function raw(path: string, opts: { mounted?: boolean; user?: Caller; searc
   const query = queryOf(opts.search)
   let response: Response
   try {
-    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '', ...hopHeaders(opts.user) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
+    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('unavailable', endpoint)
@@ -382,15 +384,30 @@ export async function getRaw(endpoint: string, path: string, search: SearchParam
  * wire-level `owner` field alone was not enough). Built from the SESSION
  * user `liveQuery` already receives — never from client input. Omitted
  * entirely when there is no signed-in user, so a trusted internal caller
- * still reaches the endpoints that do not require an actor. */
+ * still reaches the endpoints that do not require an actor.
+ *
+ * `x-actor-username` carries the OIDC username (#249), the same value the
+ * signed assertion's `username` claim does, not the display name: the backend
+ * in `log` mode warns on every request whose plain header differs from the
+ * assertion, and the log has to go silent before it can be switched to
+ * `enforce`. A user with no known username (not built from a session) falls
+ * back to the display name. */
 const actorHeaders = (user: Caller): Record<string, string> =>
-  user ? { 'x-actor-username': user.name, 'x-actor-role': user.roles[0] ?? '' } : {}
+  user ? { 'x-actor-username': sessionIdentityOf(user)?.username ?? user.name, 'x-actor-role': user.roles[0] ?? '' } : {}
+
+/** `x-actor-assertion` for one call, whenever a signing key is configured and
+ * there is a caller (opts.user, else the request scope's). Bound to this
+ * method and path, so it is minted per call, never reused. */
+const assertionHeaders = (user: Caller, method: string, path: string): Record<string, string> => {
+  const assertion = mintActorAssertion(user ?? callerOf(), method, path)
+  return assertion ? { [ACTOR_ASSERTION_HEADER]: assertion } : {}
+}
 
 /** The actor, plus the request's one id across the hop chain (canonical
  * `x-request-id`), when the call runs inside a request's scope. */
-const hopHeaders = (user: Caller): Record<string, string> => {
+const hopHeaders = (user: Caller, method: string, path: string): Record<string, string> => {
   const requestId = requestScope.getStore()?.requestId
-  return { ...actorHeaders(user), ...(requestId ? { 'x-request-id': requestId } : {}) }
+  return { ...actorHeaders(user), ...assertionHeaders(user, method, path), ...(requestId ? { 'x-request-id': requestId } : {}) }
 }
 
 /** One call to the Rust tier, GET or POST, mounted or not.
@@ -411,7 +428,7 @@ async function request<T>(endpoint: string, path: string, opts: { method: 'GET' 
       // Only a request that carries a body declares a content type: a
       // bodyless PUT/PATCH declares none, so the tier is not invited to
       // reject an empty body against a header that promised JSON.
-      headers: { ...(opts.body === undefined ? {} : { 'content-type': 'application/json' }), 'x-service-token': process.env.SERVICE_TOKEN ?? '', ...hopHeaders(opts.user) },
+      headers: { ...(opts.body === undefined ? {} : { 'content-type': 'application/json' }), 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, opts.method, path) },
       ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     }))
@@ -456,8 +473,10 @@ const post = async <T>(endpoint: string, path: string, body: unknown, opts: { mo
  * What it does share with `request()` is the base URL and the one place the
  * token is attached, so neither can drift. Two deliberate differences: it is
  * NOT mounted (no sandbox/ghidra/github spool answers the live stream, so the
- * mounted instance would gain nothing), and it sends no actor headers — its one
- * caller is the fleet-wide feed, not an operator action to attribute. Nothing
+ * mounted instance would gain nothing), and it sends no plain actor headers — its one
+ * caller is the fleet-wide feed, not an operator action to attribute. It does
+ * carry the signed assertion when the stream runs inside a request's scope
+ * and a key is configured, so a backend in `enforce` still knows the reader. Nothing
  * is buffered and nothing is re-encoded: the upstream body is handed back as-is,
  * so the connection
  * closes when the client goes away and a frame is never held waiting on the
@@ -467,7 +486,7 @@ async function stream(endpoint: string, path: string, signal: AbortSignal): Prom
   const url = `${baseURL()}${path}`
   let response: Response
   try {
-    response = await fetch(url, { headers: { 'x-service-token': process.env.SERVICE_TOKEN ?? '' }, signal })
+    response = await fetch(url, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...assertionHeaders(undefined, 'GET', path) }, signal })
   } catch {
     // Unreachable or refused. The upstream sent no status, so there is none
     // to pass through — same ApiError the JSON path raises, which the route
@@ -600,8 +619,10 @@ const getCanarytokens: Backend['getCanarytokens'] = async () => {
 
 /** POST /api/v1/canarytokens (canarytokens.rs `create`, L154).
  *
- * `created_by` is the signed-in operator's name, read off `callerOf()` exactly as
- * the mounted mutations below take their actor: the Rust tier has no session
+ * `created_by` is the signed-in operator's OIDC username (#256), the same value
+ * `x-actor-username` and the signed assertion carry, read off `callerOf()` the
+ * way `actorHeaders` reads it, so `log` mode sees no mismatch. A caller with
+ * no known username sends a blank value, as before. The Rust tier has no session
  * concept, so `canarytokens.rs CreateBody.created_by` is a field this tier
  * fills from the session it already resolved — never from client input.
  *
@@ -620,7 +641,7 @@ const createCanarytoken: Backend['createCanarytoken'] = async (input) => {
   const wire = await post<CreatedCanarytokenWire>('createCanarytoken', '/api/v1/canarytokens', {
     token_type: input.type,
     memo: input.memo,
-    created_by: callerOf()?.name ?? '',
+    created_by: sessionIdentityOf(callerOf())?.username ?? '',
     ...(input.snippet ? { include_text_snippet: true, text_snippet: input.snippet } : {}),
     ...(input.image ? { file_base64: input.image.base64, file_name: input.image.name, file_content_type: input.image.contentType } : {}),
   })
@@ -1159,22 +1180,15 @@ const getIpProfile: Backend['getIpProfile'] = async (ip) => {
  * enforced before the fetch by `liveQuery`, the same decision the mock tier
  * makes, so no check is added here.
  *
- * The PAGE IS A SUBSET of the endpoint, and this is the slice's one place
- * where that is load-bearing rather than cosmetic. `BlockBody` carries
- * `expires_days` and `actor` (ip_block.rs L34); the page's setter is
- * `setIpBlocked(ip, blocked)` and has no field for either, so
- * `setIpBlockBody` sends neither and the backend stores `ExpiresAt: null` —
- * a PERMANENT block. An operator who wanted a week gets one until they lift
- * it, and nothing on the page says otherwise. The wire contract keeps both
- * fields typed (`SetIpBlockBody`), so the moment the page can express a
- * duration they are one line away.
+ * Blocking sends an explicit `expires_days` (0 = permanent): the backend
+ * refuses a block without one. Unblocking sends none. `actor` is bound
+ * server-side and never sent from here.
  *
- * The write is therefore the page's own two states and nothing more; the
- * returned record is dropped, exactly as `setAlertsAcknowledged` drops its
- * envelope, because the page re-reads the profile it came from. */
-const setIpBlocked: Backend['setIpBlocked'] = async (ip, blocked) => {
+ * The returned record is dropped, exactly as `setAlertsAcknowledged` drops
+ * its envelope, because the page re-reads the profile it came from. */
+const setIpBlocked: Backend['setIpBlocked'] = async (ip, blocked, expiresDays) => {
   await guardReadOnly('setIpBlocked')
-  await post('setIpBlocked', '/api/v1/ip-block', setIpBlockBody(ip, blocked))
+  await post('setIpBlocked', '/api/v1/ip-block', setIpBlockBody(ip, blocked, expiresDays))
 }
 
 /** GET /api/v1/investigate/cidr/{cidr} — a network's members, events and

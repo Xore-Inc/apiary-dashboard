@@ -36,7 +36,7 @@ const trimIndexSlash = (path: string) =>
 
 export function routePolicy(path: string, type = generatedTypes.get(path)): RoutePolicy {
   const route = trimIndexSlash(path)
-  if (['/auth/login', '/auth/callback', '/healthz'].includes(route))
+  if (['/auth/login', '/auth/callback', '/healthz', '/readyz'].includes(route))
     return 'public'
   if (route === '/auth/logout') return 'same-origin'
   if (route === '/metrics') return 'service-token'
@@ -80,7 +80,7 @@ const ROUTE_ACCESS: Record<
     anonymous: '401 (or token)',
     viewer: 'allow',
     admin: 'allow',
-    enforcement: '`x-service-token` = `SERVICE_TOKEN`, else session with `getBlockedIps` access',
+    enforcement: '`x-export-token` = `EXPORT_TOKEN` (not `SERVICE_TOKEN`), else session with `getBlockedIps` access',
   },
   page: {
     anonymous: '307 sign-in',

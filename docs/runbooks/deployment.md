@@ -6,12 +6,13 @@ Owner: deployment operator. This expands the system; it does not change canonica
 
 - [Release gates](../release-gates.md) are green except the operator-only soak and rollback rehearsal.
 - The environment runbook is complete.
-- The target is an immutable `ghcr.io/xore/apiary-dashboard@sha256:…` digest with a verified GitHub attestation.
+- The target is an immutable `ghcr.io/xore-inc/apiary-dashboard@sha256:…` digest with a verified GitHub attestation.
+  Releases up to v0.1.5 were published as `ghcr.io/xore/apiary-dashboard` (before the repo moved to `Xore-Inc`, #267); rolling back to one of them means setting that image path as well as its digest.
 - Canonical remains deployed and its route is unchanged.
 
 ## Deploy
 
-1. Verify provenance: `gh attestation verify oci://ghcr.io/xore/apiary-dashboard@sha256:<digest> --owner Xore`.
+1. Verify provenance: `gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard@sha256:<digest> --owner Xore-Inc`.
 2. Pin the rewrite Arcane project to that digest. The project is [`arcane/home/apiary-dashboard/compose.yml`](../../arcane/home/apiary-dashboard/compose.yml), with its own Valkey; its host-local `.env` follows the [`.env.example`](../../arcane/home/apiary-dashboard/.env.example) beside it. Registration and the first sync are in the [cutover plan](../cutover-plan.md), section 2.
 3. Pull and redeploy through the normal Arcane operation. Do not edit the canonical project.
 4. Wait for the container health check, then run:

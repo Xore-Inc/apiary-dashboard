@@ -1,0 +1,297 @@
+{
+  "_source": "backend-service aggregates.rs FilterValues, event_page.rs EventPage/Relation/RelatedEvent, session.rs SessionDetail/Kv/Technique/Sequence, stores.rs recordings, replay.rs Replay, search.rs SearchResult/Group/Hit. The session's event rows are a captured EventRow from entity-reads.json.",
+  "filterValues": {
+    "sensors": [
+      "cowrie",
+      "zeek"
+    ],
+    "countries": [
+      "NL"
+    ],
+    "cities": [
+      "Amsterdam"
+    ],
+    "protos": [
+      "ssh",
+      "tcp"
+    ],
+    "ports": [
+      "22",
+      "502"
+    ],
+    "kinds": [
+      "command",
+      "login"
+    ]
+  },
+  "eventPage": {
+    "id": "wtE0IaEBXGgnD02F2rjA",
+    "index": "honeypot-v2-2026.10.14",
+    "time": "2026-10-09T15:07:53.682Z",
+    "sensor": "zeek",
+    "src_ip": "203.0.113.4",
+    "session": "",
+    "community_id": "1:NRxRI5aNdT6AHHe3kDrIXrvAw/o=",
+    "hashes": [],
+    "record": {
+      "@timestamp": "2026-10-09T15:07:53.682Z",
+      "_zeek_suffix": "log",
+      "destination": {
+        "ip": "198.51.100.10",
+        "port": 502
+      },
+      "event": {
+        "category": "modbus_detailed",
+        "sensor": "zeek"
+      },
+      "host": {
+        "name": "1cad270d6214"
+      },
+      "log": {
+        "file": {
+          "device_id": "64",
+          "inode": "818",
+          "path": "/logs/zeek/modbus_detailed.log"
+        }
+      },
+      "logset": "zeek",
+      "network": {
+        "community_id": "1:NRxRI5aNdT6AHHe3kDrIXrvAw/o=",
+        "session_id": "Cddyki4rZeq7rKvgXe",
+        "transport": "tcp"
+      },
+      "pipeline": "honeypot",
+      "source": {
+        "ip": "203.0.113.4",
+        "port": 51310
+      },
+      "zeek": {
+        "func": "ENCAP_INTERFACE_TRANSPORT",
+        "id.orig_h": "203.0.113.4",
+        "id.orig_p": 51310,
+        "id.resp_h": "198.51.100.10",
+        "id.resp_p": 502,
+        "matched": false,
+        "mei_type": "Read Device Identification",
+        "modbus_detailed_link_id": "lFmkX0mHYLyfyCLl",
+        "tid": 36439,
+        "ts": 1790185847.677632,
+        "uid": "Cddyki4rZeq7rKvgXe",
+        "unit": 0
+      },
+      "zeek_log": "modbus_detailed"
+    },
+    "session_events": {
+      "key": "",
+      "total": 0,
+      "rows": []
+    },
+    "flow_events": {
+      "key": "1:NRxRI5aNdT6AHHe3kDrIXrvAw/o=",
+      "total": 2,
+      "rows": [
+        {
+          "time": "2026-10-09T15:07:53.682Z",
+          "sensor": "suricata",
+          "src_ip": "203.0.113.4",
+          "detail": "flow end"
+        }
+      ]
+    },
+    "source_events": {
+      "key": "203.0.113.4",
+      "total": 340,
+      "rows": [
+        {
+          "time": "2026-10-09T15:07:53.682Z",
+          "sensor": "zeek",
+          "src_ip": "203.0.113.4",
+          "detail": ""
+        }
+      ]
+    },
+    "flow_link": null
+  },
+  "sessionDetail": {
+    "id": "sess-77a1",
+    "ip": "203.0.113.4",
+    "country": "NL",
+    "first": "2026-10-14T09:00:00.000Z",
+    "last": "2026-10-14T09:10:00.000Z",
+    "total": 1,
+    "sensors": [
+      {
+        "key": "cowrie",
+        "count": 1
+      }
+    ],
+    "commands": [
+      {
+        "key": "uname -a",
+        "count": 1
+      }
+    ],
+    "credentials": [
+      {
+        "key": "root / toor",
+        "count": 1
+      }
+    ],
+    "payloads": [],
+    "techniques": [
+      {
+        "id": "T1059",
+        "name": "Command and Scripting Interpreter",
+        "domain": "Execution",
+        "evidence": "shell command executed",
+        "count": 1,
+        "url": "https://attack.mitre.org/techniques/T1059/"
+      }
+    ],
+    "sequences": [
+      {
+        "name": "recon-then-login",
+        "severity": "medium",
+        "summary": "Recon followed by credential use"
+      }
+    ],
+    "events": [
+      {
+        "id": "wtE0IaEBXGgnD02F2rjA",
+        "time": "2026-10-09T15:07:53.682Z",
+        "sensor": "zeek",
+        "src_ip": "203.0.113.4",
+        "country": "",
+        "port": "502",
+        "proto": "",
+        "detail": "",
+        "session": "",
+        "pivots": {
+          "persona": "",
+          "site": "",
+          "asset": "",
+          "fingerprint": "",
+          "fingerprint_kind": "",
+          "command": "",
+          "user": "",
+          "pass": "",
+          "path": "",
+          "shasum": "",
+          "asn": "",
+          "org": "",
+          "provider": "",
+          "alert": "",
+          "category": "",
+          "payload_class": "",
+          "tty_replay": "",
+          "ics_severity": ""
+        },
+        "record": {
+          "@timestamp": "2026-10-09T15:07:53.682Z",
+          "_zeek_suffix": "log",
+          "destination": {
+            "ip": "198.51.100.10",
+            "port": 502
+          },
+          "event": {
+            "category": "modbus_detailed",
+            "sensor": "zeek"
+          },
+          "host": {
+            "name": "1cad270d6214"
+          },
+          "log": {
+            "file": {
+              "device_id": "64",
+              "inode": "818",
+              "path": "/logs/zeek/modbus_detailed.log"
+            }
+          },
+          "logset": "zeek",
+          "network": {
+            "community_id": "1:NRxRI5aNdT6AHHe3kDrIXrvAw/o=",
+            "session_id": "Cddyki4rZeq7rKvgXe",
+            "transport": "tcp"
+          },
+          "pipeline": "honeypot",
+          "source": {
+            "ip": "203.0.113.4",
+            "port": 51310
+          },
+          "zeek": {
+            "func": "ENCAP_INTERFACE_TRANSPORT",
+            "id.orig_h": "203.0.113.4",
+            "id.orig_p": 51310,
+            "id.resp_h": "198.51.100.10",
+            "id.resp_p": 502,
+            "matched": false,
+            "mei_type": "Read Device Identification",
+            "modbus_detailed_link_id": "lFmkX0mHYLyfyCLl",
+            "tid": 36439,
+            "ts": 1790185847.677632,
+            "uid": "Cddyki4rZeq7rKvgXe",
+            "unit": 0
+          },
+          "zeek_log": "modbus_detailed"
+        }
+      }
+    ]
+  },
+  "recordingsPage": {
+    "total": 1,
+    "rows": [
+      {
+        "when": "2026-10-14T09:10:00.000Z",
+        "src_ip": "203.0.113.4",
+        "country": "NL",
+        "session": "sess-77a1",
+        "shasum": "ab12cd34",
+        "size_bytes": 8192,
+        "duration_ms": 42000
+      },
+      {
+        "when": "2026-10-14T08:10:00.000Z",
+        "src_ip": "",
+        "country": "",
+        "session": "",
+        "shasum": "",
+        "size_bytes": 0,
+        "duration_ms": 0
+      }
+    ]
+  },
+  "replay": {
+    "shasum": "ab12cd34",
+    "size_bytes": 8192,
+    "imported_at": "2026-10-14T09:11:00Z",
+    "frames": 118,
+    "duration_seconds": 41.5,
+    "transcript": "Linux honeypot 6.1\r\n",
+    "ttylog_base64": "AAAAAA=="
+  },
+  "searchResult": {
+    "query": "uname",
+    "redirect": null,
+    "groups": [
+      {
+        "title": "Commands",
+        "hits": [
+          {
+            "label": "uname -a",
+            "count": 12,
+            "url": "/events?cmd=uname%20-a"
+          }
+        ],
+        "more": 340,
+        "more_url": "/history?q=uname"
+      }
+    ],
+    "total": 1
+  },
+  "searchRedirect": {
+    "query": "203.0.113.4",
+    "redirect": "/investigate/ip/203.0.113.4",
+    "groups": [],
+    "total": 0
+  }
+}

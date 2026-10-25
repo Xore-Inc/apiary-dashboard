@@ -101,7 +101,7 @@ const topologyWire: TopologyWire = {
     { sensor: 'tanner', stack: 'honeypots', containers: [], ingress: ['traefik'], hostnames: [], ports: [], rawIndex: 'unmapped' },
   ],
   flow: { nodes: [{ name: 'portbridge', layer: 0 }, { name: 'cowrie', layer: 1 }, { name: 'pipeline', layer: 2 }], links: [{ source: 'portbridge', target: 'cowrie' }, { source: 'cowrie', target: 'pipeline' }] },
-  stacks: [{ stack: 'honeypots', containers: [{ name: 'hp-cowrie', adapterVisible: true }, { name: 'hp-unlisted', adapterVisible: false }] }],
+  stacks: [{ stack: 'honeypots', containers: [{ name: 'hp-cowrie', adapter_visible: true }, { name: 'hp-unlisted', adapter_visible: false }] }],
 }
 
 const services: ServicesWire = {
@@ -261,7 +261,7 @@ describe('operations adapters', () => {
         { source: 1, target: 2, value: 1 },
       ])
       const [cowrie, tanner] = page.sensors
-      expect(cowrie).toMatchObject({ sensor: 'cowrie', ingress: ['portbridge'], rawIndex: 'honeypot-v2-cowrie', feed: 'fresh' })
+      expect(cowrie).toMatchObject({ sensor: 'cowrie', ingress: ['portbridge', 'tunnel-only'], rawIndex: 'honeypot-v2-cowrie', feed: 'fresh' })
       expect(cowrie.ports).toEqual([{ proto: 'tcp', public: 2222, host: 22 }])
       expect(tanner).toMatchObject({ sensor: 'tanner', ingress: ['traefik'], rawIndex: 'unmapped', feed: 'stale' })
       expect(page.stacks[0].containers).toEqual([
@@ -281,6 +281,14 @@ describe('operations adapters', () => {
       const page = topology(topologyWire, [], { available: true, services: [{ name: 'hp-cowrie', state: 'exited', exit_code: 137, started_at: null, restart_count: null }] })
       expect(page.stacks[0].containers[0]).toEqual({ name: 'hp-cowrie', state: 'exited', exitCode: 137 })
       expect(page.stacks[0].containers[0]).not.toHaveProperty('exitCode', null)
+    })
+
+    it('keeps a tunnel-only sensor ingress so a management-only sensor is not shown with none', () => {
+      const wire: TopologyWire = {
+        ...topologyWire,
+        sensors: [{ ...topologyWire.sensors[0], sensor: 'canarytokens', ingress: ['tunnel-only'], ports: [] }],
+      }
+      expect(topology(wire, [], services).sensors[0].ingress).toEqual(['tunnel-only'])
     })
 
     it('drops an ingress the page cannot colour and an unknown link endpoint', () => {

@@ -317,12 +317,17 @@ export interface TopologyFlowWire {
 }
 
 /** topology.rs `StackRow` (`rename_all = "camelCase"`) and
- * `ContainerRef`. `adapterVisible` false means the container is outside
+ * `ContainerRef`. `adapter_visible` false means the container is outside
  * the services adapter's allowlist, so no live state exists for it —
- * which is not the same as stopped. */
+ * which is not the same as stopped.
+ *
+ * `ContainerRef` is a separate struct with no `rename_all` of its own (serde
+ * applies it per struct, not to nested ones), so its key is snake_case even
+ * though the rows around it are camelCase. The canonical frontend reads
+ * `adapter_visible` (routes/topology.tsx). */
 export interface TopologyStackWire {
   stack: string
-  containers: Array<{ name: string; adapterVisible: boolean }>
+  containers: Array<{ name: string; adapter_visible: boolean }>
 }
 
 /** GET /api/v1/topology — static fleet shape only; liveness is joined

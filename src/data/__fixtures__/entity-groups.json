@@ -374,7 +374,8 @@
             "zeek_log": "rfb"
           }
         }
-      ]
+      ],
+      "sensors_total": 6
     }
   },
   "identity": {
@@ -843,7 +844,8 @@
           "zeek_log": "weird"
         }
       }
-    ]
+    ],
+    "fingerprint_ips": null
   },
   "memberIps": [
     "203.0.113.105",

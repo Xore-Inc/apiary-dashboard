@@ -49,6 +49,9 @@ const kpis: OverviewKpis = {
   unique_ips: 4_118,
   hourly: [812, 690, 741, 1204],
   logins: 96,
+  sessions_24h: 312,
+  sessions_previous24h: 280,
+  hourly_by_protocol: [{ hour: '2026-10-13T10:00:00.000Z', total: 812, counts: { ssh: 700, other: 112 } }],
   ready: true,
 }
 
@@ -126,10 +129,11 @@ const campaign: AgentCampaignRow = {
   events: [
     {
       event_id: 'ev_7f3a91',
+      source_index: '',
       timestamp: '2026-10-04T18:11:00Z',
       matched_rules: [{ rule: 'burst-failed-logins', reason: '12 logins in 60s', trust_boundary: 'identity', decode_chain: [{ transform: 'base64', input_sha256: 'a1', output_sha256: 'b2', output_len: 48 }] }],
     },
-    { event_id: 'ev_7f3a92', timestamp: '2026-10-04T18:59:00Z', matched_rules: [] },
+    { event_id: 'ev_7f3a92', source_index: '', timestamp: '2026-10-04T18:59:00Z', matched_rules: [] },
   ],
 }
 
@@ -342,11 +346,16 @@ describe('monitor adapters', () => {
     } satisfies Partial<AgentCampaign>)
   })
 
-  it("substitutes '' for a missing sourceIndex, and passes a stored one through", () => {
+  it("keeps '' for an event stored before source_index existed, and passes a stored one through", () => {
     const [withRule] = toAgentCampaign(campaign).events
     expect(withRule.sourceIndex).toBe('')
     const stored = toAgentCampaign({ ...campaign, events: [{ event_id: 'ev_1', source_index: 'honeypot-v2-cowrie', timestamp: '2026-10-04T18:00:00Z' }] })
     expect(stored.events[0].sourceIndex).toBe('honeypot-v2-cowrie')
+  })
+
+  it("reads a missing source_index (a backend from before APIARY #3696) as ''", () => {
+    const old = toAgentCampaign({ ...campaign, events: [{ event_id: 'ev_1', timestamp: '2026-10-04T18:00:00Z' }] })
+    expect(old.events[0].sourceIndex).toBe('')
   })
 
   it('maps an auth event, reading username and redirectUri out of details', () => {
