@@ -322,8 +322,49 @@ const kindOf = (status: number): ApiErrorKind =>
  * list that renders empty because the backend was down reads as "no
  * activity", and an operator cannot tell that from a quiet fleet. */
 async function get<T>(endpoint: string, path: string, search: SearchParams = {}, opts: { mounted?: boolean; user?: Caller } = {}): Promise<T | null> {
-  return request<T>(endpoint, path, { method: 'GET', search, ...opts })
+  if (opts.user || opts.mounted || !SHARED_READ.test(path) || READ_TTL_MS <= 0) return request<T>(endpoint, path, { method: 'GET', search, ...opts })
+  const key = `${path}?${queryOf(search).toString()}`
+  const hit = readCache.get(key)
+  if (hit && (hit.pending || hit.at + READ_TTL_MS > Date.now())) return hit.value as Promise<T | null>
+  const value = request<T>(endpoint, path, { method: 'GET', search })
+  const entry = { at: Date.now(), pending: true, value: value as Promise<unknown> }
+  readCache.set(key, entry)
+  if (readCache.size > READ_CACHE_MAX) {
+    const oldest = readCache.keys().next()
+    if (!oldest.done) readCache.delete(oldest.value)
+  }
+  value.then(
+    () => {
+      entry.pending = false
+      entry.at = Date.now()
+    },
+    // A failure is never served from the cache: the next caller asks again.
+    () => {
+      if (readCache.get(key) === entry) readCache.delete(key)
+    },
+  )
+  return value
 }
+
+/** The aggregate reads every operator's page asks for the same answer to
+ * (charts, the overview, the sources list, source health). They take
+ * seconds on the Rust tier under load (14-19 s for sources and the JA4L
+ * chart, measured 2026-10-31), and a page fans out a dozen of them, so
+ * without sharing a single page load filled the limiter above and shed
+ * (503 `overloaded`) or timed out (502). Canonical kept the same answers
+ * behind a 15 s TTL cache with request sharing; this is that cache, per
+ * process. Only calls with no operator identity (no `user`) on the regular
+ * instance are shared, so nothing actor-scoped is ever served to another
+ * operator. */
+const SHARED_READ = /^\/api\/v1\/(charts\/|overview\/|sources$|source-health$)/
+const READ_TTL_MS = (() => {
+  // Not envInt: 0 is meaningful here (off), where envInt reads it as unset.
+  const configured = process.env.BACKEND_READ_CACHE_TTL_MS
+  const value = configured === undefined || configured.trim() === '' ? 15_000 : Number(configured)
+  return Number.isFinite(value) && value >= 0 ? value : 15_000
+})()
+const READ_CACHE_MAX = 256
+const readCache = new Map<string, { at: number; pending: boolean; value: Promise<unknown> }>()
 
 /** A binary body, for the file routes (artifacts.rs and the rest serve the
  * stored bytes, not a JSON envelope). Same failure contract as `get`: a 404

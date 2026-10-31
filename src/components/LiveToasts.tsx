@@ -66,6 +66,9 @@ export function LiveToasts() {
       // toast per blip.
       return
     }
+    // An error response can resolve to nothing at all rather than throw;
+    // treat it like the failure above, not as an empty fleet.
+    if (!Array.isArray((health as Partial<SourceHealth> | undefined)?.feeds)) return
     const current = conditionsFrom(health)
     const { raised, cleared } = transitions(known.current, current)
     if (primed.current) {

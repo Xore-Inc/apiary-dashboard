@@ -6,17 +6,24 @@ export type Severity = 'warning' | 'danger' | 'success'
 export type Condition = { key: string; message: string; severity: Severity; to: string }
 
 /** What is wrong right now, according to source health. */
-export function conditionsFrom(health: SourceHealth): Condition[] {
+export function conditionsFrom(health: SourceHealth | null | undefined): Condition[] {
   const conditions: Condition[] = []
-  for (const feed of health.feeds) {
+  // A failed or partial reading (an upstream 502/503, a body the wire
+  // changed) says nothing about the fleet: no conditions, rather than a
+  // crash of the whole shell (2026-10-31 production check, dash#237). Typed
+  // loosely on purpose: the wire can deliver less than the type promises.
+  const reading = health as Partial<SourceHealth> | null | undefined
+  if (!reading || !Array.isArray(reading.feeds) || !reading.ingest || !reading.pipeline) return conditions
+  const h = reading as SourceHealth
+  for (const feed of h.feeds) {
     if (feed.state === 'silent') conditions.push({ key: `sensor:${feed.sensor}`, message: `${feed.sensor} stopped reporting`, severity: 'warning', to: '/source-health' })
   }
-  if (health.ingest.state === 'stale' || health.ingest.state === 'silent') conditions.push({ key: 'ingest', message: 'Ingestion has stalled: no new events are being indexed', severity: 'danger', to: '/source-health' })
-  else if (health.ingest.state === 'delayed') conditions.push({ key: 'ingest', message: 'Ingestion is falling behind', severity: 'warning', to: '/source-health' })
+  if (h.ingest.state === 'stale' || h.ingest.state === 'silent') conditions.push({ key: 'ingest', message: 'Ingestion has stalled: no new events are being indexed', severity: 'danger', to: '/source-health' })
+  else if (h.ingest.state === 'delayed') conditions.push({ key: 'ingest', message: 'Ingestion is falling behind', severity: 'warning', to: '/source-health' })
   // Red only: yellow is the steady state of a single-node cluster.
-  if (health.clusterStatus === 'red') conditions.push({ key: 'cluster', message: 'Elasticsearch cluster is red: shards are unavailable', severity: 'danger', to: '/source-health' })
-  if (health.pipeline.state === 'stopped') conditions.push({ key: 'pipeline', message: 'Filebeat is unreachable', severity: 'danger', to: '/source-health' })
-  if (health.deadLetters > 0) conditions.push({ key: 'dead-letters', message: `${health.deadLetters} documents rejected by Elasticsearch`, severity: 'warning', to: '/dead-letters' })
+  if (h.clusterStatus === 'red') conditions.push({ key: 'cluster', message: 'Elasticsearch cluster is red: shards are unavailable', severity: 'danger', to: '/source-health' })
+  if (h.pipeline.state === 'stopped') conditions.push({ key: 'pipeline', message: 'Filebeat is unreachable', severity: 'danger', to: '/source-health' })
+  if (h.deadLetters > 0) conditions.push({ key: 'dead-letters', message: `${h.deadLetters} documents rejected by Elasticsearch`, severity: 'warning', to: '/dead-letters' })
   return conditions
 }
 
