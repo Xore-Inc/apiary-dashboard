@@ -35,3 +35,10 @@ declare module '@astryxdesign/core/Badge' {
     'gray': true;
   }
 }
+
+declare module '@astryxdesign/core/Avatar' {
+  interface AvatarStatusDotVariantMap {
+    'success': true;
+    'error': true;
+  }
+}
