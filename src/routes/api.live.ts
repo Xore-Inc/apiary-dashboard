@@ -44,89 +44,102 @@ export const Route = createFileRoute('/api/live')({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        // A direct handler: it checks the session itself.
-        if (!(await resolveUser(request))) return new Response('unauthorized', { status: 401 })
-        const mock = new URL(request.url).searchParams.get('mock')
-        const mockScenario = mockScenariosAllowed() && isScenario(mock) ? mock : undefined
-        const scenario = mockScenario ?? 'normal'
-        const outage = mockScenario ? (OUTAGE[mockScenario] as (typeof OUTAGE)[string] | undefined) : undefined
-        if (outage) return new Response(`live stream: ${mockScenario}`, { status: outage.status, headers: outage.headers })
-        // The gate, in front of both arms. See the note above.
-        const release = streams.admit()
-        if (release instanceof Response) return release
-
-        // No allowed development scenario, and a backend configured: the
-        // Rust tier's own stream.
-        if (isLiveBackend() && !mockScenario) {
-          try {
-            const upstream = await openLiveStream(request.signal)
-            return new Response(relay(upstream.body!, release), { headers: SSE })
-          } catch (error) {
-            release()
-            // The tier refused or never answered. Canonical answers 502 for
-            // the same failure (its api/live.ts `limitedStreamProxy` option),
-            // and EventSource gives up on a non-200 — the honest outcome: the
-            // browser says the feed is not connected rather than sitting on a
-            // stream that will never produce.
-            const api = asApiError(error)
-            return new Response(api ? `${api.endpoint}: ${api.kind}` : 'stream unavailable', { status: api?.status ?? 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-          }
+        // Nothing below may escape as an unhandled rejection: h3 turns one
+        // into a 500 with an AbortError cause, which is what a browser that
+        // navigated away mid-open produced on 2026-10-31 (and, through
+        // Cloudflare, an ERR_QUIC_PROTOCOL_ERROR on the stream).
+        try {
+          return await openLive(request)
+        } catch {
+          if (request.signal.aborted) return new Response(null, { status: 499 })
+          return new Response('stream unavailable', { status: 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
         }
-
-        // The mock tier is loaded only for the arm that serves it.
-        const { listen } = await import('#/data/mock/liveFeed')
-        // The client may have left while the module loaded: the abort
-        // listener below is not attached yet, so release the slot here.
-        if (request.signal.aborted) {
-          release()
-          return new Response(null, { status: 499 })
-        }
-        const encoder = new TextEncoder()
-        let stop = () => {}
-        const body = new ReadableStream<Uint8Array>({
-          start(controller) {
-            const send = (text: string) => {
-              try {
-                controller.enqueue(encoder.encode(text))
-              } catch {
-                stop()
-              }
-            }
-            send('retry: 3000\n: open\n\n')
-            let sent = 0
-            const unlisten = listen({
-              event: (event) => {
-                if (scenario === 'empty' || scenario === 'loading') return
-                // A slow backend: one event in five.
-                if (scenario === 'slow' && sent++ % 5 !== 0) return
-                send(`data: ${JSON.stringify(event)}\n\n`)
-              },
-              health: () => send('event: health\ndata: {}\n\n'),
-            })
-            const ping = setInterval(() => send(': ping\n\n'), 15_000)
-            stop = () => {
-              clearInterval(ping)
-              unlisten()
-              release()
-            }
-            request.signal.addEventListener('abort', () => {
-              stop()
-              try {
-                controller.close()
-              } catch {
-                /* already closed */
-              }
-            })
-          },
-          cancel() {
-            stop()
-          },
-        })
-        return new Response(body, { headers: SSE })
       },
     },
   },
 })
+
+async function openLive(request: Request): Promise<Response> {
+  // A direct handler: it checks the session itself.
+  if (!(await resolveUser(request))) return new Response('unauthorized', { status: 401 })
+  const mock = new URL(request.url).searchParams.get('mock')
+  const mockScenario = mockScenariosAllowed() && isScenario(mock) ? mock : undefined
+  const scenario = mockScenario ?? 'normal'
+  const outage = mockScenario ? (OUTAGE[mockScenario] as (typeof OUTAGE)[string] | undefined) : undefined
+  if (outage) return new Response(`live stream: ${mockScenario}`, { status: outage.status, headers: outage.headers })
+  // The gate, in front of both arms. See the note above.
+  const release = streams.admit()
+  if (release instanceof Response) return release
+
+  // No allowed development scenario, and a backend configured: the
+  // Rust tier's own stream.
+  if (isLiveBackend() && !mockScenario) {
+    try {
+      const upstream = await openLiveStream(request.signal)
+      return new Response(relay(upstream.body!, release), { headers: SSE })
+    } catch (error) {
+      release()
+      // The tier refused or never answered. Canonical answers 502 for
+      // the same failure (its api/live.ts `limitedStreamProxy` option),
+      // and EventSource gives up on a non-200 — the honest outcome: the
+      // browser says the feed is not connected rather than sitting on a
+      // stream that will never produce.
+      const api = asApiError(error)
+      return new Response(api ? `${api.endpoint}: ${api.kind}` : 'stream unavailable', { status: api?.status ?? 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    }
+  }
+
+  // The mock tier is loaded only for the arm that serves it.
+  const { listen } = await import('#/data/mock/liveFeed')
+  // The client may have left while the module loaded: the abort
+  // listener below is not attached yet, so release the slot here.
+  if (request.signal.aborted) {
+    release()
+    return new Response(null, { status: 499 })
+  }
+  const encoder = new TextEncoder()
+  let stop = () => {}
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      const send = (text: string) => {
+        try {
+          controller.enqueue(encoder.encode(text))
+        } catch {
+          stop()
+        }
+      }
+      send('retry: 3000\n: open\n\n')
+      let sent = 0
+      const unlisten = listen({
+        event: (event) => {
+          if (scenario === 'empty' || scenario === 'loading') return
+          // A slow backend: one event in five.
+          if (scenario === 'slow' && sent++ % 5 !== 0) return
+          send(`data: ${JSON.stringify(event)}\n\n`)
+        },
+        health: () => send('event: health\ndata: {}\n\n'),
+      })
+      const ping = setInterval(() => send(': ping\n\n'), 15_000)
+      stop = () => {
+        clearInterval(ping)
+        unlisten()
+        release()
+      }
+      request.signal.addEventListener('abort', () => {
+        stop()
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
+      })
+    },
+    cancel() {
+      stop()
+    },
+  })
+  return new Response(body, { headers: SSE })
+}
 
 /** The upstream body relayed to the browser, holding the gate's slot until
  * the stream ends however it ends.
@@ -143,10 +156,14 @@ function relay(upstream: ReadableStream<Uint8Array>, release: () => void): Reada
   const decoder = new TextDecoder()
   const encoder = new TextEncoder()
   let buffered = ''
+  // Set by cancel(): the browser left, so nothing may be enqueued or closed
+  // afterwards (doing so throws, and a throw out of pull is a 500 upstream).
+  let cancelled = false
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
         const { done, value } = await reader.read()
+        if (cancelled) return
         if (done) {
           release()
           // Whatever the upstream left unterminated (a frame cut by a close),
@@ -170,10 +187,16 @@ function relay(upstream: ReadableStream<Uint8Array>, release: () => void): Reada
         // The upstream failed mid-stream. Closing is the honest end: the
         // browser's EventSource reconnects and re-syncs from /api/v1/events.
         release()
-        controller.close()
+        if (cancelled) return
+        try {
+          controller.close()
+        } catch {
+          /* already closed */
+        }
       }
     },
     cancel() {
+      cancelled = true
       release()
       void reader.cancel().catch(() => {})
     },

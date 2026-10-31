@@ -19,7 +19,7 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 | `DASHBOARD_BFF_LOG_FILE` | Optional JSONL file sink; unset emits named events to stdout for the container log collector. |
 | `PORT` | Container port; image default `3000`. |
 
-Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`, `BACKEND_MAX_QUEUE=50`, `LIVE_MAX_STREAMS=500`, and `BFF_EVENT_LOOP_SHED_MS=250`. Change them only from measured load evidence.
+Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`, `BACKEND_MAX_QUEUE=50`, `LIVE_MAX_STREAMS=500`, `BFF_EVENT_LOOP_SHED_MS=250`, and `BACKEND_READ_CACHE_TTL_MS=15000` (the shared cache for the aggregate reads: charts, overview, sources, source health; `0` turns it off). Change them only from measured load evidence.
 
 Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset. The server refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, `E-DEV-HTTP-COOKIE`, `E-EXPORT-TOKEN`, or `E-ACTOR-ASSERTION-KEY`.
 
