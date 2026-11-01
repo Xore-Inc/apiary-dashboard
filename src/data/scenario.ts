@@ -31,6 +31,14 @@ const ZERO_ITEMS: Record<string, readonly string[]> = {
   getOverview: ['kpis'],
 }
 
+/** How long the "slow" scenario holds each call: 2.5 s, or APIARY_MOCK_SLOW_MS
+ * (mock only). The smoke test raises it past Bun's old 10 s idle cut-off,
+ * which emptied every slower answer (see server/idleTimeout.ts). */
+function slowMs(): number {
+  const configured = Number(process.env.APIARY_MOCK_SLOW_MS)
+  return Number.isInteger(configured) && configured >= 0 ? configured : 2500
+}
+
 /** The same shape with nothing in it: arrays empty, numbers zero. */
 function emptied<T>(value: T, keep: readonly string[] = [], zeroItems: readonly string[] = []): T {
   if (Array.isArray(value)) return [] as T
@@ -61,7 +69,7 @@ export function runScenario<TArgs extends unknown[], TResult>(name: string, quer
     if (MOCK_CONTROLS.has(name)) return query(...args)
     // The session is read from the sign-in cookie on every navigation, not
     // from the backend: a slow backend does not slow it.
-    if (scenario === 'slow' && name !== 'getSessionUser') await wait(2500)
+    if (scenario === 'slow' && name !== 'getSessionUser') await wait(slowMs())
     if (scenario === 'unavailable' || (scenario === 'partial' && isRead(name) && failsPartly(name))) throw new ApiError('unavailable', name)
     if (scenario === 'overloaded') throw new ApiError('overloaded', name, { retryAfter: 30 })
     if (scenario === 'expired') throw new ApiError('expired', name)

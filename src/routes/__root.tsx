@@ -11,6 +11,7 @@ import { getMockClock } from '#/data/serverFn'
 import type { Preferences } from '#/data/types'
 import { browserTimeZone, rememberBrowserZone } from '#/lib/browserZone'
 import { configureTime } from '#/lib/format'
+import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
 
 import appCss from '../styles.css?url'
 
@@ -75,7 +76,7 @@ function useTimePreferences(prefs: (Preferences & { followsBrowser: boolean; moc
     if (!rendered || !rememberBrowserZone(rendered)) return
     // Times are formatted from module state, so refresh only once the whole
     // page has hydrated with the zone the server used.
-    const idle = requestIdleCallback(() => void router.invalidate(), { timeout: 2000 })
+    const idle = requestIdleCallback(() => refreshWhenSettled(router), { timeout: 2000 })
     return () => cancelIdleCallback(idle)
   }, [rendered, router])
   if (!prefs) return

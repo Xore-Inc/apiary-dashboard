@@ -1,4 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
+import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
@@ -67,7 +68,7 @@ function SourceHealthPage() {
   const router = useRouter()
   // Health moves in minutes: re-read it on the live interval, and at once
   // when a simulated incident changes it.
-  const refresh = useCallback(() => void router.invalidate(), [router])
+  const refresh = useCallback(() => refreshWhenSettled(router), [router])
   useLiveInterval(refresh, (usePreferences()?.refreshSeconds ?? 30) * 1000)
   useEffect(() => {
     window.addEventListener(HEALTH_CHANGED, refresh)
