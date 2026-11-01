@@ -110,6 +110,7 @@ The server refuses to boot in an environment that would open it:
 | `OIDC_ALLOW_INSECURE` | Exactly `1`: a plain-HTTP issuer, for a local Keycloak only. |
 | `OIDC_SESSION_REDIS_URL` | Redis for sessions and pending sign-ins. Default `redis://127.0.0.1:6379/0`. |
 | `EXTERNAL_URL` | The public origin, when a proxy in front changes the Host the server sees (same-origin check, Keycloak redirect URIs). |
+| `APIARY_MOCK_SLOW_MS` | Mock only: how long the `slow` scenario holds each call (default 2500). The smoke test sets 12000 to prove an answer slower than Bun's default 10 s idle window still arrives. |
 | `APIARY_MOCK_FAULTS` | Mock only: `session-store` and/or `identity-provider` (comma-separated) stop answering, to exercise the outage paths. Pages then go to sign-in, direct handlers answer 401, and the sign-in pages say sign-in is unavailable or failed; smoke checks both. |
 
 See `.env.example`.

@@ -47,6 +47,7 @@ refuses E-SERVICE-TOKEN env
 refuses E-EXPORT-TOKEN env SERVICE_TOKEN=smoke EXPORT_TOKEN=smoke
 refuses E-OIDC-DISABLED env SERVICE_TOKEN=smoke OIDC_DISABLED=1 NODE_ENV=production
 refuses E-OIDC-ISSUER env SERVICE_TOKEN=smoke NODE_ENV=production
+refuses E-IDLE-TIMEOUT env SERVICE_TOKEN=smoke APIARY_ALLOW_UNAUTH_DEV=1 BFF_IDLE_TIMEOUT_S=10
 
 step "start production server on :$PORT"
 APIARY_ALLOW_UNAUTH_DEV=1 SERVICE_TOKEN=smoke-token PORT="$PORT" bun run start >"$WORK/server.log" 2>&1 &
@@ -231,6 +232,19 @@ elif grep -Fq "$FIXTURE_MARKER" <<<"$BACKEND_PAGE"; then
 else
   printf '  ok   the live-backend error page renders no fixture identifier\n'
 fi
+kill "$BACKEND_PID" 2>/dev/null; wait "$BACKEND_PID" 2>/dev/null || true
+BACKEND_PID=""
+
+step "an answer slower than Bun's default 10 s idle window still arrives"
+# Bun cut such answers off (empty response) until server.ts set idleTimeout;
+# on beta that held cold pages on their skeletons (2026-11-01).
+SLOW_PORT=$((PORT + 3))
+APIARY_MOCK_SLOW_MS=12000 APIARY_ALLOW_UNAUTH_DEV=1 SERVICE_TOKEN=smoke-token PORT="$SLOW_PORT" bun run start >"$WORK/slow.log" 2>&1 &
+BACKEND_PID=$!
+for _ in $(seq 1 50); do curl -s -o /dev/null "http://localhost:$SLOW_PORT/healthz" && break; sleep 0.2; done
+SLOW_COOKIE="$(curl -s -o /dev/null -D - "http://localhost:$SLOW_PORT/auth/callback?code=mock&role=admin" | tr -d '\r' | sed -n 's/^[Ss]et-[Cc]ookie: \([^;]*\).*/\1/p')"
+[[ -n "$SLOW_COOKIE" ]] || { echo "slow-backend sign-in failed"; exit 1; }
+check "a 12 s chart answers 200, not an empty reply" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -b "$SLOW_COOKIE" "http://localhost:$SLOW_PORT/api/chart/os-distribution?mock=slow")" 200
 kill "$BACKEND_PID" 2>/dev/null; wait "$BACKEND_PID" 2>/dev/null || true
 BACKEND_PID=""
 

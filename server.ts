@@ -65,6 +65,7 @@
 
 import path from 'node:path'
 import { assertBootPolicies } from './src/server/policy'
+import { serverIdleTimeoutSeconds } from './src/server/idleTimeout'
 
 // Configuration
 const SERVER_PORT = Number(process.env.PORT ?? 3000)
@@ -505,6 +506,8 @@ async function initializeServer() {
   // (no SERVICE_TOKEN, OIDC_DISABLED outside development) stops the process
   // here, before it accepts a single request.
   assertBootPolicies()
+  // Refuses a window shorter than one backend call before listening.
+  serverIdleTimeoutSeconds()
 
   log.header('Starting Production Server')
 
@@ -527,6 +530,9 @@ async function initializeServer() {
   // Create Bun server
   const server = Bun.serve({
     port: SERVER_PORT,
+    // Bun's 10 s default cut every server function that waited longer on the
+    // backend (empty response, page stuck on its skeleton). See idleTimeout.ts.
+    idleTimeout: serverIdleTimeoutSeconds(),
 
     routes: {
       // Serve static assets (preloaded or on-demand)
