@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useRouter } from '@tanstack/react-router'
 import { openLiveStream } from '#/data/liveStream'
+import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
 import type { HoneypotEvent } from '#/data/types'
 
 type LiveState = { paused: boolean; connectionHealthy: boolean }
@@ -133,7 +134,8 @@ export function useLiveRefresh(minMs = 5000): number {
   const refresh = useCallback(() => {
     last.current = Date.now()
     pending.current = undefined
-    void router.invalidate()
+    // Never on top of a load still running: that would discard it (lib/refreshWhenSettled).
+    refreshWhenSettled(router)
   }, [router])
   const onEvent = useCallback(() => {
     setArrived((n) => n + 1)
