@@ -35,6 +35,7 @@ import type {
   DashboardConfig,
   FeedState,
   Kpi,
+  TimeBucket,
   LlmAnalysis,
   LlmDocType,
   MlAnomaly,
@@ -75,8 +76,31 @@ export function toOverviewKpis(k: OverviewKpis): Kpi[] {
   return [
     { id: 'events', label: 'Events', value: k.last24h, previous: k.previous24h, trend: k.hourly },
     { id: 'sources', label: 'Unique sources', value: k.unique_ips, previous: k.unique_ips, trend: [] },
+    // APIARY#3558. A backend older than that sends no session count: the
+    // tile is then left out, and the page renders it as not available.
+    ...(typeof k.sessions_24h === 'number'
+      ? [{ id: 'sessions', label: 'Sessions', value: k.sessions_24h, previous: typeof k.sessions_previous24h === 'number' ? k.sessions_previous24h : k.sessions_24h, trend: [] }]
+      : []),
     { id: 'logins', label: 'Successful logins', value: k.logins, previous: k.logins, trend: [] },
   ]
+}
+
+/** `hourly_by_protocol` (APIARY#3558) → the overview's 24 h protocol
+ * timeline, oldest first. Null on a backend older than that (no field), so
+ * the panel says not available rather than drawing an empty day. */
+export function toProtocolTimeline(k: OverviewKpis): TimeBucket[] | null {
+  if (!Array.isArray(k.hourly_by_protocol)) return null
+  return k.hourly_by_protocol.map((bucket) => ({ time: bucket.hour, total: bucket.total, byProtocol: { ...bucket.counts } }))
+}
+
+/** The window's protocols, busiest first, from the same 24 buckets. `other`
+ * is the backend's remainder bucket, not a protocol, and is left out. */
+export function toTopProtocols(k: OverviewKpis): string[] | null {
+  const timeline = toProtocolTimeline(k)
+  if (!timeline) return null
+  const totals = new Map<string, number>()
+  for (const bucket of timeline) for (const [protocol, count] of Object.entries(bucket.byProtocol)) totals.set(protocol, (totals.get(protocol) ?? 0) + count)
+  return [...totals].filter(([protocol, count]) => protocol !== 'other' && count > 0).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([protocol]) => protocol)
 }
 
 const FEED_STATE: Record<Dashboard['sensors'][number]['state'], FeedState> = {

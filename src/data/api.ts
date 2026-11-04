@@ -16,7 +16,7 @@
 // which is the default. The token is never logged, never in a URL, and
 // never in an error message — it only ever rides as a request header.
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { ApiError, NOT_YET } from './errors'
+import { ApiError } from './errors'
 import { ACTOR_ASSERTION_HEADER, actorOf as sessionIdentityOf, mintActorAssertion } from '#/server/actorAssertion'
 import {
   commandsQuery,
@@ -47,6 +47,8 @@ import {
   toModelHealth,
   toOpenBacklog,
   toOverviewKpis,
+  toProtocolTimeline,
+  toTopProtocols,
   toOverviewViews,
   toPayloadCount,
   toSemanticSearch,
@@ -141,6 +143,8 @@ import {
 import type { ApiErrorKind } from './errors'
 import type { EventPageWire, EventsQueryWire, FilterValuesWire, RecordingsPageWire, ReplayWire, SearchResultWire, SessionDetailWire } from './contracts/explorer'
 import type { EventKindWire, EventRow, EventsPage as EventsPageWire } from './contracts/events'
+import type { EntityRelatedWire, EntityTimelineWire, FacetsWire, IocCatalogWire, IocDetailWire, ReportPreviewWire } from './contracts/entities'
+import { IOC_KINDS, entityId, entityRange, entityRelated, entityTimeline, facets, iocCatalog, reportPreview, summaryRow } from './adapters/entities'
 import type { ChartName, Charts, FlowGraph, Series as SeriesWire } from './contracts/charts'
 import type {
   CanaryFiredPageWire,
@@ -239,7 +243,7 @@ import type {
   SourcesPageWire,
 } from './contracts/sources'
 import type { Backend, Caller } from './backend'
-import type { ClusterEntity, CountRow, EventType, HoneypotEvent, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
+import type { ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
 
 /** A dashboard that hangs forever is worse than one that errors. */
 const TIMEOUT_MS = envInt('BACKEND_TIMEOUT_MS', 30_000)
@@ -2061,12 +2065,10 @@ const getAnalysisResults: Backend['getAnalysisResults'] = async () => {
 
 /** GET /api/v1/overview/kpis (overview.rs `kpis`, L115) — the five KPI tiles.
  *
- * Only three have a counterpart here and `toOverviewKpis` is a Pick of three.
- * The other two are a real GAP, named in the tests rather than invented:
+ * Four have a counterpart here: events, unique sources, sessions
+ * (`sessions_24h`, APIARY#3558, an upper bound) and logins. The fifth is
+ * read elsewhere:
  *
- * - **sessions** — no endpoint counts sessions. A session is an event
- *   correlation the events slice's own endpoint builds per row; there is no
- *   aggregation over them anywhere in the Rust tier.
  * - **payloads** — overview.rs's own module doc says it is not here: "captured
  *   payloads stay on the store listing the frontend already reads; their
  *   count is a doc count over captured artifacts, not an event aggregation".
@@ -2099,12 +2101,10 @@ const getOverview: Backend['getOverview'] = async () => {
     // A missing leg is a broken endpoint, not an empty fleet: its tiles are
     // null (not available), and the other legs still fill the overview.
     kpis: (kpis ? toOverviewKpis(kpis) : KPI_GAPS).concat(payloads ? kpiTile('payloads', 'Payloads captured', toPayloadCount(payloads)) : kpiGap('payloads', 'Payloads captured')),
-    // GAP (APIARY#3556): there is no 24 h hourly rollup on the wire. The
-    // timeline used to be built from the first 18 events, which is not a 24 h
-    // figure, so it is unavailable rather than approximated.
-    timeline: null,
-    // GAP: derived from the same 18 events as the timeline, so not a 24 h figure.
-    topProtocols: null,
+    // The 24 h rollup split by protocol (APIARY#3558); null on an older
+    // backend, which has no such field, rather than approximated.
+    timeline: kpis ? toProtocolTimeline(kpis) : null,
+    topProtocols: kpis ? toTopProtocols(kpis) : null,
     // `/api/v1/sources` ranks by events (sources.rs), so the first rows are the top sources.
     topSources: sources ? overviewSources(sources, TOP_SOURCES) : null,
     topCountries: countries ? toCountRows(countries.countries) : null,
@@ -2131,7 +2131,7 @@ const kpiTile = (id: string, label: string, value: number): Kpi => ({ id, label,
 const kpiGap = (id: string, label: string): Kpi => ({ id, label, value: null, previous: null, trend: [] })
 
 /** The three tiles `/overview/kpis` fills, when that endpoint is missing. */
-const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique sources'), kpiGap('logins', 'Successful logins')]
+const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique sources'), kpiGap('sessions', 'Sessions'), kpiGap('logins', 'Successful logins')]
 
 /** GET /api/v1/overview/dashboard — the four of the eighteen views tabs.
  *
@@ -2427,11 +2427,6 @@ const getAuthEvents: Backend['getAuthEvents'] = async () => {
   }
 }
 
-/** A query no backend route serves yet. It throws rather than answering
- * empty, so the page's unavailable state names the gap instead of showing a
- * calm empty list. `gap` is the issue that tracks the missing route. */
-const unavailable = (endpoint: string, gap: string): ApiError => new ApiError('unavailable', endpoint, { detail: `${NOT_YET} (${gap})` })
-
 /** A list read's answer, or an error when there is none. A 404 on a list is a
  * route this tier calls that the backend does not register; it must never
  * read as an empty list. */
@@ -2566,28 +2561,92 @@ const getBlockedIps: Backend['getBlockedIps'] = async () => activeBlockIps(listO
 
 // ---- queries with no backend route yet: they throw, they never answer empty ----
 
-const getEntityTimeline: Backend['getEntityTimeline'] = async () => {
-  throw unavailable('getEntityTimeline', 'Xore/APIARY#3554')
-}
-const getRelated: Backend['getRelated'] = async () => {
-  throw unavailable('getRelated', 'Xore/APIARY#3554')
-}
-const getIoc: Backend['getIoc'] = async () => {
-  throw unavailable('getIoc', 'Xore/APIARY#3554')
-}
-const getIocCatalog: Backend['getIocCatalog'] = async () => {
-  throw unavailable('getIocCatalog', 'Xore/APIARY#3554')
-}
-const getFacets: Backend['getFacets'] = async () => {
-  throw unavailable('getFacets', 'Xore/APIARY#3524')
+/** GET /api/v1/entities/{id}/timeline (APIARY#3572) — the entity's events,
+ * alerts, captures, canary triggers, ML anomalies and LLM analyses, newest
+ * first, as the backend already merges them. 500 items, the handler's cap.
+ * A 404 (an identity or campaign that does not exist) is an empty timeline:
+ * the entity page itself answers not-found for it. */
+const getEntityTimeline: Backend['getEntityTimeline'] = async (kind, id, range) => {
+  const wire = await get<EntityTimelineWire>('getEntityTimeline', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/timeline`, { ...entityRange(range), limit: 500 })
+  return wire ? entityTimeline(wire) : []
 }
 
-/** There is no preview route (APIARY#3524): the backend renders a stored
- * report (`reports_api::render_definition_to_stored`) but does not render a
- * draft without saving it. So a live deployment has no preview and answers
- * `null` without a request. The wizard runs its checks without counts and
- * shows the document's structure only, and the mock keeps its preview. */
-const previewReport: Backend['previewReport'] = async () => null
+/** GET /api/v1/entities/{id}/related (APIARY#3572), over the backend's widest
+ * window (30d). An event is not a backend entity, so its related panel is
+ * the event's own source, session and sensor, then what is related to its
+ * source address (GET /api/v1/event/{id} names both). */
+const getRelated: Backend['getRelated'] = async (kind, id) => {
+  if (kind === 'event') {
+    const event = await get<EventPageWire>('getRelated', `/api/v1/event/${encodeURIComponent(id)}`)
+    if (!event) return []
+    const own: RelatedGroup[] = [
+      { kind: 'source', label: 'Source IP', items: event.src_ip ? [{ id: event.src_ip }] : [] },
+      { kind: 'session', label: 'Session', items: event.session ? [{ id: event.session }] : [] },
+      { kind: 'sensor', label: 'Sensor', items: event.sensor ? [{ id: event.sensor }] : [] },
+    ].filter((group) => group.items.length > 0)
+    return event.src_ip ? [...own, ...(await relatedOf('source', event.src_ip)).filter((group) => group.kind !== 'sensor')] : own
+  }
+  return relatedOf(kind, id)
+}
+
+const relatedOf = async (kind: TimelineEntity, id: string): Promise<RelatedGroup[]> => {
+  const wire = await get<EntityRelatedWire>('getRelated', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/related`, { range: '30d' })
+  return wire ? entityRelated(wire) : []
+}
+
+/** GET /api/v1/ioc/{kind}/{value} (APIARY#3572) — one indicator over the
+ * backend's widest window (30d): its exact counts, its newest 20 events and
+ * sessions, the payloads seen with it and its top 20 sources, which are
+ * profiled into the page's group as the identity page's members are. The
+ * group's totals and first/last are the aggregation's own. 404 (not seen)
+ * is the page's not-found. */
+const getIoc: Backend['getIoc'] = async (kind, value) => {
+  if (!IOC_KINDS.includes(kind as IocHubKind)) return null
+  const wire = await get<IocDetailWire>('getIoc', `/api/v1/ioc/${encodeURIComponent(kind)}/${encodeURIComponent(value)}`, { range: '30d' })
+  if (!wire) return null
+  const events = wire.recent_events.map((row) => pageEvent(summaryRow(row)))
+  const ips = wire.sources.map((row) => String(row.key)).filter((ip) => ip !== '')
+  const members = ips.length ? await memberProfiles('getIoc', ips) : []
+  const group = membersGroup(members, events, wire.events)
+  return {
+    kind: wire.kind,
+    value: wire.value,
+    events,
+    group: { ...group, ...(wire.first_seen ? { first: wire.first_seen } : {}), ...(wire.last_seen ? { last: wire.last_seen } : {}) },
+    sessions: sessionBuckets(wire.sessions, events),
+    payloads: keyCounts(wire.payloads),
+  }
+}
+
+/** GET /api/v1/ioc/catalog (APIARY#3572) — every kind, the 100 busiest values
+ * of each (the handler's cap) over 30 days. */
+const getIocCatalog: Backend['getIocCatalog'] = async () => {
+  const wire = await get<IocCatalogWire>('getIocCatalog', '/api/v1/ioc/catalog', { size: 100, range: '30d' })
+  if (!wire) throw new ApiError('unavailable', 'getIocCatalog')
+  return iocCatalog(wire)
+}
+
+/** GET /api/v1/facets/events (APIARY#3569) — every value each filter can
+ * take, over the same filters and window /api/v1/events lists. */
+const getFacets: Backend['getFacets'] = async (kind = 'events', filters = {}) => {
+  const wire = await get<FacetsWire>('getFacets', `/api/v1/facets/${encodeURIComponent(kind)}`, eventsQuery(filters))
+  if (!wire) throw new ApiError('unavailable', 'getFacets')
+  return facets(wire)
+}
+
+/** POST /api/v1/reports/preview (APIARY#3569) — what a draft definition would
+ * cover, rendered without saving it. The body is the one the save sends. An
+ * artifact template has no telemetry to preview and is a 422; the wizard
+ * reads that as no preview (`null`) and shows the structure only. */
+const previewReport: Backend['previewReport'] = async (definition) => {
+  try {
+    const wire = await post<ReportPreviewWire | null>('previewReport', '/api/v1/reports/preview', reportDefinitionBody(definition))
+    return wire ? reportPreview(wire) : null
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === 'invalid') return null
+    throw error
+  }
+}
 
 /** This slice's queries, and nothing else. Each keeps the mock
  * implementation's signature exactly — `queries.ts` is generated from it and

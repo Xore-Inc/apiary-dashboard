@@ -112,8 +112,8 @@ export const REPORT_WIDE = '(min-width: 1600px)'
 /** The steps' column beside the preview: a form's width. */
 const STEPS_WIDTH = 720
 
-/** The checks each automatic step ticks through. With no preview (the live
- * tier has none, APIARY#3524) the data check cannot count, so it runs only
+/** The checks each automatic step ticks through. With no preview (the
+ * backend has none for an artifact template) the data check cannot count, so it runs only
  * the checks that need no counts, and the render step names its sections
  * without rows. */
 export function automaticChecks(
@@ -150,7 +150,7 @@ export function automaticChecks(
   }
 }
 
-/** A counted facet list, or none while the facets read is unavailable (#3524).
+/** A counted facet list, or none while the facets read is unavailable.
  * The pickers that take a typed value still accept one. */
 const facetOptions = (facets: Facets | BackendGap, key: keyof Facets): Facets[keyof Facets] => (isBackendGap(facets) ? [] : facets[key])
 

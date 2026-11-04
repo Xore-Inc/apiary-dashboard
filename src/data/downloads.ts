@@ -360,7 +360,7 @@ export const reportPdf = (id: string) => async (_search: URLSearchParams, q: Bac
     { text: report.title, size: 22, bold: true, gap: 8 },
     { text: `${template?.name ?? report.template} - generated ${report.createdAt.slice(0, 16).replace('T', ' ')} UTC`, size: 10 },
   ]
-  // The live tier has no preview (APIARY#3524): the document then has no counts.
+  // No preview (an artifact template): the document then has no counts.
   if (preview) {
     lines.push({ text: `Covers ${preview.period.from.slice(0, 10)} to ${preview.period.to.slice(0, 10)}`, size: 10 })
     lines.push({ text: `${formatNumber(preview.events)} events from ${formatNumber(preview.sources)} sources on ${formatNumber(preview.sensors)} sensors, ${formatNumber(preview.sessions)} sessions`, size: 11, gap: 10 })

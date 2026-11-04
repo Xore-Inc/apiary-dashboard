@@ -174,11 +174,10 @@ export interface OverviewSource extends Record<string, unknown> {
 export interface OverviewData {
   generatedAt: string
   kpis: Kpi[]
-  /** Unavailable: a 24 h protocol timeline needs a windowed rollup the backend
-   * does not serve yet (APIARY#3556). */
+  /** The 24 h protocol timeline (`hourly_by_protocol`, APIARY#3558);
+   * unavailable on an older backend. */
   timeline: Unavailable<TimeBucket[]>
-  /** Unavailable: derived from the same 18 recent events as the timeline, so
-   * it is not a 24 h figure. */
+  /** The window's protocols, busiest first, from the same timeline. */
   topProtocols: Unavailable<Protocol[]>
   topSources: Unavailable<OverviewSource[]>
   topCountries: Unavailable<CountRow[]>
@@ -660,6 +659,10 @@ export interface Facets {
   cities: FacetValue[]
 }
 
+/** The scope fields a report preview names as matching nothing
+ * (reports_data.rs `PreviewEmptyFilter`). */
+export type PreviewFilterField = 'window' | 'ip' | 'network' | 'sensor' | 'port' | 'signature' | 'country' | 'asn' | 'type' | 'session' | 'text'
+
 /** What a draft definition would cover, checked before rendering. */
 export interface ReportPreview {
   events: number
@@ -680,7 +683,7 @@ export interface ReportPreview {
   /** The period the scope window covers, as ISO timestamps. */
   period: { from: string; to: string }
   /** The scope filter that matched nothing, when one did. */
-  emptyFilter?: { field: 'ip' | 'sensor' | 'port' | 'signature' | 'window'; message: string }
+  emptyFilter?: { field: PreviewFilterField; message: string }
 }
 
 export interface ReportsData {
