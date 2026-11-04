@@ -9,7 +9,7 @@ Source of truth: `Xore/APIARY@62ee45d30ff49e58a8dd9db2e75e4306b84b682a`, `arcane
 | Components | 25 | [components.md](components.md) | Canonical component inventory equals matrix; every owner exists | 25 mapped, 0 gaps |
 | Shell behaviors | 27 | [shell.md](shell.md) | Behavior owner and disposition recorded | 27 mapped |
 | Data fields | 1,096 | [field-coverage.md](field-coverage.md) | Generated field coverage test | 0 gaps |
-| Rewrite server queries | 108 | [backend-coverage.md](backend-coverage.md) | Every non-live query has an explicit classification and reason | 82 live, 5 local, 1 unused, 20 mock-only |
+| Rewrite server queries | 109 | [backend-coverage.md](backend-coverage.md) | Every non-live query has an explicit classification and reason | 106 live, 3 local, 0 unused, 0 mock-only |
 | Authorization | 187 HTTP routes, 108 queries | [authorization-matrix.md](authorization-matrix.md) | Generated route tree and query facade are the inputs | Complete |
 
 The route-local canonical server functions are not copied one-for-one. `src/data/queries.ts` is the stable rewrite facade, `src/data/api.ts` owns backend calls, and `src/data/adapters/*` owns wire-to-page translation. The server-function matrix records those owners per source function.
@@ -18,4 +18,4 @@ The two canonical catch-all BFF routes are replaced by fixed server-side adapter
 
 ## Cutover conclusion
 
-Inventory coverage is complete: there are no silent or unexplained rows. Runtime backend parity is not yet complete: 20 production query shapes still use mock implementations when `BACKEND_URL` is set. They are explicit in `backend-coverage.md` and are a **NO-GO** cutover gate until each is implemented or its behavior difference is separately accepted by the product and security owners.
+Inventory coverage is complete: there are no silent or unexplained rows. Every production query has a live adapter when `BACKEND_URL` is set (`backend-coverage.md`: 0 mock-only). The three local rows are the mock-scenario controls and the no-backend replay fallback, none of which a production route reaches. Runtime parity still has to be shown on real data during the soak (release gates 3 and 4).

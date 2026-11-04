@@ -4,13 +4,13 @@ Issue #7 proves what is equivalent, exposes every known deviation, and defines t
 
 ## Current decision: NO-GO
 
-Inventory, security, failure, and build evidence are complete. The traffic switch remains blocked by the 20 production query shapes marked **mock-only** in [backend coverage](migration/backend-coverage.md), plus the operator-only soak and rollback rehearsal. No mock-only row may be silently accepted.
+Inventory, security, failure, build and live-query evidence are complete: every production query has a live adapter ([backend coverage](migration/backend-coverage.md): 0 mock-only). The traffic switch remains blocked by the operator-only soak on real data and the rollback rehearsal. No mock-only row may be silently accepted if one reappears.
 
 | Gate | Evidence | Status |
 |---|---|---|
 | Route-tree and direct-handler parity | `scripts/route-matrix.ts`; `src/test/route-matrix.test.ts`; [route matrix](migration/route-matrix.md) | PASS: 63/63 mapped, 0 pending |
 | Source-to-destination traceability | [traceability](migration/traceability.md), including 153 server functions and 25 components | PASS: no unexplained inventory row |
-| Live backend query coverage | `scripts/backend-coverage.ts`; [backend coverage](migration/backend-coverage.md) | **BLOCKED:** 20 mock-only query shapes |
+| Live backend query coverage | `scripts/backend-coverage.ts`; [backend coverage](migration/backend-coverage.md) | PASS: 106 live, 3 local (mock-scenario controls and the no-backend replay fallback), 0 mock-only |
 | Authorization: admin, viewer, anonymous | `src/server/authorize.test.ts`; [authorization matrix](migration/authorization-matrix.md) | PASS: 187 HTTP routes and 108 queries classified |
 | Browser acceptance | `scripts/smoke.sh`: representative lists, details, mutations, downloads, SSE, responsive shell, expired sessions, and every mock scenario | PASS in the repository gate; repeat on soak |
 | Backend unavailable/overloaded | [failure checks](migration/failure-checks.md); API, admission, proxy, and smoke tests | PASS |
