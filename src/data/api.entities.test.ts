@@ -61,6 +61,20 @@ describe('the events-derived reads', () => {
     expect(events[0]).toMatchObject({ id: fixtures.eventsIp.rows[0].id, srcIp: '203.0.113.4', timestamp: fixtures.eventsIp.rows[0].time })
   })
 
+  it('takes the event type from the row\'s kind (APIARY#3561), splitting a login by the sensor\'s own name', async () => {
+    const base = fixtures.eventsIp.rows[0]
+    const rows = [
+      { ...base, id: 'k1', kind: 'login', record: { honeypot: { eventid: 'cowrie.login.success' } } },
+      { ...base, id: 'k2', kind: 'login', record: { honeypot: { event: 'auth_attempt' } } },
+      { ...base, id: 'k3', kind: 'download', record: { honeypot: { eventid: 'cowrie.session.file_download' } } },
+      { ...base, id: 'k4', kind: 'http', record: { honeypot: {} } },
+      { ...base, id: 'k5', record: { honeypot: { eventid: 'cowrie.command.input' } } },
+    ]
+    stub({ '/api/v1/events': { ...fixtures.eventsIp, rows } })
+    const events = await live('getSourceEvents')('203.0.113.4', '24h')
+    expect(events.map((e) => e.type)).toEqual(['login.success', 'login.failed', 'file.download', 'http.request', 'command.input'])
+  })
+
   it('maps the page range "all" to a year, and an absent range to the 24-hour default', async () => {
     const calls = stub({ '/api/v1/events': fixtures.eventsIp })
     await live('getSourceEvents')('203.0.113.4', 'all')
@@ -91,16 +105,61 @@ describe('the events-derived reads', () => {
     expect(session).not.toHaveProperty('recordingShasum')
   })
 
-  it('derives a source\'s sessions from its events, and reports none when the rows carry no session', async () => {
-    stub({ '/api/v1/events': fixtures.eventsIp })
-    expect(await live('getSourceSessions')('203.0.113.4', '24h')).toEqual([])
+  it('reads a source\'s sessions from the server-side aggregation (APIARY#3557), with exact per-kind counts only when the events hold the whole session', async () => {
+    const calls = stub({
+      '/api/v1/events': fixtures.eventsSession,
+      '/api/v1/sources/203.0.113.4/sessions': {
+        total: 2,
+        rows: [
+          { session: 'ca4616fbf9f0', events: 3, first: '2026-09-30T19:25:00.000Z', last: '2026-09-30T19:25:19.795Z' },
+          { session: 'older-session', events: 40, first: '2026-09-29T10:00:00.000Z', last: '2026-09-29T10:05:00.000Z' },
+        ],
+      },
+    })
+    const sessions = await live('getSourceSessions')('203.0.113.4', '7d')
+    const aggregation = calls.find((url) => url.includes('/sessions'))!
+    expect(params(aggregation)).toEqual({ range: '7d' })
+    expect(sessions.map((s) => s.id)).toEqual(['ca4616fbf9f0', 'older-session'])
+    // All three events of the first session are in the rows: exact counts.
+    expect(sessions[0]).toMatchObject({ srcIp: '203.0.113.4', events: 3, sensors: ['cowrie'], first: '2026-09-30T19:25:00.000Z' })
+    expect(typeof sessions[0].commands).toBe('number')
+    // The second is past the event window: it is listed with its real event
+    // count, and its per-kind counts are absent rather than a placeholder 0.
+    expect(sessions[1]).toMatchObject({ events: 40, sensors: [] })
+    expect(sessions[1]).not.toHaveProperty('logins')
+    expect(sessions[1]).not.toHaveProperty('commands')
   })
 
-  it('derives a payload\'s delivery from the events that carry its hash', async () => {
+  it('derives a source\'s sessions from its events for the range "all", which the aggregation does not take', async () => {
     const calls = stub({ '/api/v1/events': fixtures.eventsIp })
+    expect(await live('getSourceSessions')('203.0.113.4', 'all')).toEqual([])
+    expect(calls.map((url) => new URL(url).pathname)).toEqual(['/api/v1/events'])
+  })
+
+  it('reads a payload\'s sessions and sources from the delivery aggregation, and its events from the events list', async () => {
+    const calls = stub({
+      '/api/v1/events': fixtures.eventsIp,
+      '/api/v1/payloads/': {
+        total: 120,
+        events: [{ '@timestamp': '2026-10-01T00:00:00Z' }],
+        sessions: [{ session: 's1', events: 7, first: '2026-10-01T00:00:00Z', last: '2026-10-01T00:01:00Z' }],
+        sources: [{ key: '203.0.113.4', count: 100 }, { key: '198.51.100.7', count: 20 }],
+      },
+    })
     const delivery = await live('getPayloadDelivery')('d41d8cd98f00b204e9800998ecf8427e')
-    expect(params(calls[0])).toEqual({ offset: '0', size: '100', shasum: 'd41d8cd98f00b204e9800998ecf8427e', since: '365d' })
+    expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/events', '/api/v1/payloads/d41d8cd98f00b204e9800998ecf8427e/delivery'])
+    expect(params(calls.find((url) => url.includes('/events'))!)).toEqual({ offset: '0', size: '100', shasum: 'd41d8cd98f00b204e9800998ecf8427e', since: '365d' })
     expect(delivery.events).toHaveLength(2)
+    expect(delivery.sources).toEqual([
+      { id: '203.0.113.4', label: '203.0.113.4', count: 100 },
+      { id: '198.51.100.7', label: '198.51.100.7', count: 20 },
+    ])
+    expect(delivery.sessions).toEqual([{ id: 's1', srcIp: '', sensors: [], first: '2026-10-01T00:00:00Z', last: '2026-10-01T00:01:00Z', events: 7 }])
+  })
+
+  it('derives a payload\'s delivery from the events when the delivery document 404s', async () => {
+    stub({ '/api/v1/events': fixtures.eventsIp, '/api/v1/payloads/': { status: 404 } })
+    const delivery = await live('getPayloadDelivery')('d41d8cd98f00b204e9800998ecf8427e')
     expect(delivery.sources).toEqual([{ id: '203.0.113.4', label: '203.0.113.4', count: 2 }])
     expect(delivery.sessions).toEqual([])
   })
@@ -120,24 +179,64 @@ describe('the single-entity reads', () => {
     expect(await live('getSourceIdentity')('203.0.113.9')).toBeNull()
   })
 
-  it('reads a source\'s network: organization and country from the ip profile, neighbours from the source list', async () => {
+  it('reads a source\'s network document (APIARY#3557): the AS number, organization and country', async () => {
     const calls = stub({
+      '/api/v1/sources/203.0.113.4/network': { ip: '203.0.113.4', asn: 64496, organization: 'Example Net', provider: 'hosting', country: 'NL', events: 12 },
+      '/api/v1/sources': fixtures.sources,
+      '/api/v1/campaigns': fixtures.campaignsEmpty,
+    })
+    const network = await live('getSourceNetwork')('203.0.113.4')
+    expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/campaigns', '/api/v1/sources', '/api/v1/sources/203.0.113.4/network'])
+    expect(network).toMatchObject({ cidr: '203.0.113.0/24', asn: 'AS64496', org: 'Example Net', country: 'NL' })
+    expect(network!.neighbours.map((n) => n.ip)).toEqual(['203.0.113.5'])
+  })
+
+  it('falls back to the ip profile for a source\'s network when the network document 404s', async () => {
+    const calls = stub({
+      '/api/v1/sources/203.0.113.4/network': { status: 404 },
       '/api/v1/investigate/ip/': fixtures.ipProfile,
       '/api/v1/sources': fixtures.sources,
       '/api/v1/campaigns': fixtures.campaignsEmpty,
     })
     const network = await live('getSourceNetwork')('203.0.113.4')
-    expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/campaigns', '/api/v1/investigate/ip/203.0.113.4', '/api/v1/sources'])
+    expect(calls.map((url) => new URL(url).pathname).sort()).toEqual(['/api/v1/campaigns', '/api/v1/investigate/ip/203.0.113.4', '/api/v1/sources', '/api/v1/sources/203.0.113.4/network'])
     expect(params(calls.find((url) => url.includes('/sources?'))!)).toEqual({ offset: '0', size: '1000' })
     expect(network).toMatchObject({ cidr: '203.0.113.0/24', org: fixtures.ipProfile.asn, country: fixtures.ipProfile.country })
     expect(network!.neighbours.map((n) => n.ip)).toEqual(['203.0.113.5'])
     expect(network).not.toHaveProperty('campaign')
-    expect(network).not.toHaveProperty('asn')
+    // The profile's `as_number` (APIARY#3696) names the AS.
+    expect(network).toMatchObject({ asn: 'AS8560' })
   })
 
   it('answers null for a network whose address has no events', async () => {
-    stub({ '/api/v1/investigate/ip/': { status: 404 }, '/api/v1/sources': fixtures.sources, '/api/v1/campaigns': fixtures.campaignsEmpty })
+    stub({ '/api/v1/sources/203.0.113.9/network': { status: 404 }, '/api/v1/investigate/ip/': { status: 404 }, '/api/v1/sources': fixtures.sources, '/api/v1/campaigns': fixtures.campaignsEmpty })
     expect(await live('getSourceNetwork')('203.0.113.9')).toBeNull()
+  })
+
+  it('reads an AS from its aggregation (APIARY#3557): organization, members, the AS\'s own events and first/last seen', async () => {
+    const calls = stub({
+      '/api/v1/investigate/asn/': { asn: 64496, organization: 'Example Net', provider: 'hosting', events: 512, sources_total: 2, first: '2026-09-01T00:00:00Z', last: '2026-10-01T00:00:00Z', sources: [{ key: '203.0.113.4', count: 500 }, { key: '203.0.113.5', count: 12 }] },
+      '/api/v1/events': fixtures.eventsIp,
+      '/api/v1/sources': fixtures.sources,
+    })
+    const asn = await live('getAsn')('64496')
+    expect(new URL(calls[0]).pathname).toBe('/api/v1/investigate/asn/AS64496')
+    expect(params(calls.find((url) => url.includes('/events'))!)).toMatchObject({ asn: '64496', since: '365d' })
+    expect(asn).toMatchObject({ asn: 'AS64496', orgs: ['Example Net'] })
+    expect(asn!.group.members.map((m) => m.ip).sort()).toEqual(['203.0.113.4', '203.0.113.5'])
+    expect(asn!.group).toMatchObject({ totalMatches: 512, first: '2026-09-01T00:00:00Z', last: '2026-10-01T00:00:00Z' })
+  })
+
+  it('answers null for an AS with no events, and for an id that is not an AS number, without calling the backend for the latter', async () => {
+    const calls = stub({ '/api/v1/investigate/asn/': { status: 404 } })
+    expect(await live('getAsn')('AS64511')).toBeNull()
+    expect(await live('getAsn')('Example Net')).toBeNull()
+    expect(calls).toHaveLength(1)
+  })
+
+  it('reads a session summary from its aggregation', async () => {
+    stub({ '/api/v1/investigate/session/': { id: 's1', events: 9, first: '2026-10-01T00:00:00Z', last: '2026-10-01T00:02:00Z', sensors: [{ key: 'cowrie', count: 9 }], commands: [{ key: 'uname -a', count: 2 }], sources: [{ key: '203.0.113.4', count: 9 }] } })
+    expect(await live('getSessionSummary')('s1')).toEqual({ id: 's1', srcIp: '203.0.113.4', sensors: ['cowrie'], first: '2026-10-01T00:00:00Z', last: '2026-10-01T00:02:00Z', events: 9 })
   })
 })
 
@@ -244,22 +343,99 @@ describe('a list read that fails throws, and never answers empty', () => {
   })
 })
 
-describe('the queries no backend route serves yet', () => {
-  const UNAVAILABLE: Array<[string, unknown[], string]> = [
-    ['getAsn', ['AS64496'], 'Xore/APIARY#3554'],
-    ['getIoc', ['cve', 'CVE-1999-0001'], 'Xore/APIARY#3554'],
-    ['getIocCatalog', [], 'Xore/APIARY#3554'],
-    ['getEntityTimeline', ['asn', 'AS64496', 'all'], 'Xore/APIARY#3554'],
-    ['getRelated', ['identity', 'c5fd0398517e4871b8fc47e0f4aa0d99'], 'Xore/APIARY#3554'],
-    ['getFacets', ['events', {}], 'Xore/APIARY#3524'],
-  ]
+describe('the IOC and entity reads (APIARY#3572)', () => {
+  const iocDetail = {
+    id: 'command:uname -a', kind: 'command', value: 'uname -a', range: '30d', events: 240, first_seen: '2026-09-10T00:00:00Z', last_seen: '2026-10-08T00:00:00Z',
+    sources_total: 3, sessions_total: 90,
+    sensors: [{ key: 'cowrie', count: 240 }],
+    sources: [{ key: '203.0.113.4', count: 200 }],
+    sessions: [{ session: 'ca4616fbf9f0', events: 3, first: '2026-10-08T00:00:00Z', last: '2026-10-08T00:00:05Z' }],
+    payloads: [{ key: 'd41d8cd98f00b204e9800998ecf8427e', count: 2 }],
+    recent_events: [{ id: 'ev1', time: '2026-10-08T00:00:05Z', sensor: 'cowrie', src_ip: '203.0.113.4', country: 'DE', kind: 'command', proto: 'ssh', detail: 'uname -a', session: 'ca4616fbf9f0' }],
+  }
 
-  it.each(UNAVAILABLE)('%s throws unavailable without calling the backend', async (name, args, gap) => {
-    const calls = stub({ '/': fixtures.campaignsEmpty })
-    const error = await liveNamed(name)(...args).catch((caught: unknown) => caught)
-    expect(error).toBeInstanceOf(ApiError)
-    expect(error).toMatchObject({ kind: 'unavailable', endpoint: name })
-    expect((error as ApiError).detail).toContain(gap)
-    expect(calls).toHaveLength(0)
+  it('reads one indicator: exact totals, its events, sessions, payloads and profiled sources', async () => {
+    const calls = stub({ '/api/v1/ioc/': iocDetail, '/api/v1/sources': fixtures.sources })
+    const ioc = await live('getIoc')('command', 'uname -a')
+    expect(new URL(calls[0]).pathname).toBe('/api/v1/ioc/command/uname%20-a')
+    expect(params(calls[0])).toEqual({ range: '30d' })
+    expect(ioc!.events).toHaveLength(1)
+    expect(ioc!.events[0]).toMatchObject({ id: 'ev1', type: 'command.input', srcIp: '203.0.113.4', sessionId: 'ca4616fbf9f0' })
+    expect(ioc!.group).toMatchObject({ totalMatches: 240, first: '2026-09-10T00:00:00Z', last: '2026-10-08T00:00:00Z' })
+    expect(ioc!.group.members.map((m) => m.ip)).toEqual(['203.0.113.4'])
+    expect(ioc!.sessions).toEqual([expect.objectContaining({ id: 'ca4616fbf9f0', events: 3 })])
+    expect(ioc!.payloads).toEqual([{ id: 'd41d8cd98f00b204e9800998ecf8427e', label: 'd41d8cd98f00b204e9800998ecf8427e', count: 2 }])
+  })
+
+  it('answers null for an indicator not seen, and for a kind the backend has no such thing as, without asking', async () => {
+    const calls = stub({ '/api/v1/ioc/': { status: 404 } })
+    expect(await live('getIoc')('command', 'never-seen')).toBeNull()
+    expect(await live('getIoc')('persona', 'x')).toBeNull()
+    expect(calls).toHaveLength(1)
+  })
+
+  it('reads the IOC catalog: every kind, last seen when known', async () => {
+    const empty = { hash: [], domain: [], url: [], credential: [], command: [], fingerprint: [], cve: [], signature: [], username: [], password: [] }
+    const calls = stub({
+      '/api/v1/ioc/catalog': { range: '30d', size: 100, truncated: [], kinds: { ...empty, cve: [{ id: 'cve:CVE-2026-24061', kind: 'cve', value: 'CVE-2026-24061', events: 9, sources: 2, sessions: 3, first_seen: null, last_seen: '2026-10-08T00:00:00Z' }] } },
+    })
+    const catalog = await live('getIocCatalog')()
+    expect(params(calls[0])).toEqual({ size: '100', range: '30d' })
+    expect(Object.keys(catalog)).toHaveLength(10)
+    expect(catalog.cve).toEqual([{ id: 'cve:CVE-2026-24061', kind: 'cve', value: 'CVE-2026-24061', events: 9, sources: 2, sessions: 3, last: '2026-10-08T00:00:00Z' }])
+    expect(catalog.hash).toEqual([])
+  })
+
+  it.each([
+    ['source', '203.0.113.4', 'ip:203.0.113.4'],
+    ['network', '203.0.113.0/24', 'cidr:203.0.113.0/24'],
+    ['asn', 'AS64496', 'asn:64496'],
+    ['cluster', 'fingerprint:abc', 'cluster:fingerprint:abc'],
+    ['ioc', 'command:uname -a', 'ioc:command:uname -a'],
+  ] as const)('reads a %s timeline under the backend entity id', async (kind, id, entity) => {
+    const calls = stub({
+      '/api/v1/entities/': { id: entity, entity: { kind, value: id }, range: '30d', total: 2, items: [
+        { id: 'a1', at: '2026-10-08T00:00:05Z', kind: 'alert', title: 'ET SCAN', detail: '203.0.113.4 · suricata', severity: 'high', href: '/events/a1' },
+        { id: 'e1', at: '2026-10-08T00:00:00Z', kind: 'event', title: 'login', detail: '', severity: null, href: '/events/e1' },
+      ] },
+    })
+    const items = await live('getEntityTimeline')(kind, id, 'all')
+    expect(decodeURIComponent(new URL(calls[0]).pathname)).toBe(`/api/v1/entities/${entity}/timeline`)
+    expect(params(calls[0])).toEqual({ range: '30d', limit: '500' })
+    expect(items[0]).toEqual({ id: 'a1', at: '2026-10-08T00:00:05Z', kind: 'alert', title: 'ET SCAN', detail: '203.0.113.4 · suricata', severity: 'high', href: '/events/a1' })
+    // Unrated, empty detail: absent, never `info` or ''.
+    expect(items[1]).not.toHaveProperty('severity')
+    expect(items[1]).not.toHaveProperty('detail')
+  })
+
+  it('reads related entities, keeping the reason as the note when the backend gives no note', async () => {
+    stub({
+      '/api/v1/entities/': { id: 'ip:203.0.113.4', entity: { kind: 'ip', value: '203.0.113.4' }, range: '30d', groups: [
+        { kind: 'payload', label: 'Payloads', items: [{ id: 'd41d8', label: 'd41d8…', note: null, count: 2, reason: 'downloaded by this source' }] },
+        { kind: 'session', label: 'Sessions', items: [] },
+      ] },
+    })
+    expect(await live('getRelated')('source', '203.0.113.4')).toEqual([{ kind: 'payload', label: 'Payloads', items: [{ id: 'd41d8', label: 'd41d8…', note: 'downloaded by this source' }] }])
+  })
+
+  it('relates an event through its own source, session and sensor, then what its source relates to', async () => {
+    const calls = stub({
+      '/api/v1/event/': { id: 'ev1', time: '2026-10-08T00:00:00Z', sensor: 'cowrie', src_ip: '203.0.113.4', session: 'ca4616fbf9f0', record: {} },
+      '/api/v1/entities/': { id: 'ip:203.0.113.4', entity: { kind: 'ip', value: '203.0.113.4' }, range: '30d', groups: [{ kind: 'asn', label: 'Autonomous system', items: [{ id: '64496', label: 'AS64496', note: null, count: 9, reason: '' }] }] },
+    })
+    const related = await live('getRelated')('event', 'ev1')
+    expect(related.map((g) => g.kind)).toEqual(['source', 'session', 'sensor', 'asn'])
+    expect(decodeURIComponent(new URL(calls[1]).pathname)).toBe('/api/v1/entities/ip:203.0.113.4/related')
+  })
+
+  it('reads the event facets over the explorer\'s own filters', async () => {
+    const list = (value: string) => [{ value, count: 3 }]
+    const calls = stub({
+      '/api/v1/facets/events': { kind: 'events', total: 3, sensors: list('cowrie'), sources: list('203.0.113.4'), countries: list('DE'), protocols: list('ssh'), ports: list('22'), signatures: [], kinds: list('login'), personas: [], providers: list('hosting'), cities: list('Berlin') },
+    })
+    const facets = await live('getFacets')('events', { sensor: 'cowrie' })
+    expect(params(calls[0])).toMatchObject({ sensor: 'cowrie' })
+    expect(facets.sensors).toEqual([{ value: 'cowrie', count: 3 }])
+    expect(facets.signatures).toEqual([])
   })
 })

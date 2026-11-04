@@ -16,7 +16,7 @@
 // which is the default. The token is never logged, never in a URL, and
 // never in an error message — it only ever rides as a request header.
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { ApiError, NOT_YET } from './errors'
+import { ApiError } from './errors'
 import { ACTOR_ASSERTION_HEADER, actorOf as sessionIdentityOf, mintActorAssertion } from '#/server/actorAssertion'
 import {
   commandsQuery,
@@ -47,6 +47,8 @@ import {
   toModelHealth,
   toOpenBacklog,
   toOverviewKpis,
+  toProtocolTimeline,
+  toTopProtocols,
   toOverviewViews,
   toPayloadCount,
   toSemanticSearch,
@@ -76,6 +78,9 @@ import {
   profileMember,
   sharedSignals,
   sessionSummaries,
+  sessionBuckets,
+  keyCounts,
+  asLabel,
   setIpBlockBody,
   sourceCounts,
   sourceProfiles,
@@ -137,7 +142,9 @@ import {
 } from './adapters/evidence'
 import type { ApiErrorKind } from './errors'
 import type { EventPageWire, EventsQueryWire, FilterValuesWire, RecordingsPageWire, ReplayWire, SearchResultWire, SessionDetailWire } from './contracts/explorer'
-import type { EventRow, EventsPage as EventsPageWire } from './contracts/events'
+import type { EventKindWire, EventRow, EventsPage as EventsPageWire } from './contracts/events'
+import type { EntityRelatedWire, EntityTimelineWire, FacetsWire, IocCatalogWire, IocDetailWire, ReportPreviewWire } from './contracts/entities'
+import { IOC_KINDS, entityId, entityRange, entityRelated, entityTimeline, facets, iocCatalog, reportPreview, summaryRow } from './adapters/entities'
 import type { ChartName, Charts, FlowGraph, Series as SeriesWire } from './contracts/charts'
 import type {
   CanaryFiredPageWire,
@@ -226,12 +233,17 @@ import type {
   FusionWire,
   IpBlockWire,
   IpProfileWire,
+  AsnWire,
+  PayloadDeliveryWire,
+  SessionSummaryWire,
+  SourceNetworkWire,
+  SourceSessionsWire,
   MapPointsWire,
   SankeyWire,
   SourcesPageWire,
 } from './contracts/sources'
 import type { Backend, Caller } from './backend'
-import type { ClusterEntity, CountRow, EventType, HoneypotEvent, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
+import type { ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
 
 /** A dashboard that hangs forever is worse than one that errors. */
 const TIMEOUT_MS = envInt('BACKEND_TIMEOUT_MS', 30_000)
@@ -595,33 +607,49 @@ function eventNameOf(row: EventRow): string {
   return typeof name === 'string' ? name : ''
 }
 
-/** The seven page fields `toHoneypotEvent` deliberately omits (EventRowGap),
+/** The row's normalized `kind` (APIARY#3561) → the page's event type. A
+ * login is the one kind the page splits further: the sensor's own name says
+ * whether it succeeded, and a login it does not name as a success is read as
+ * failed, as the legacy mapping did. */
+function typeOfKind(kind: EventKindWire, name: string): EventType {
+  switch (kind) {
+    case 'login': {
+      const named = TYPE_OF_EVENT[name]
+      return named === 'login.success' || /\.success$|^login_success$/.test(name) ? 'login.success' : 'login.failed'
+    }
+    case 'command':
+      return 'command.input'
+    case 'download':
+      return 'file.download'
+    case 'http':
+      return 'http.request'
+    case 'alert':
+      return 'ids.alert'
+    case 'connection':
+      return 'connection'
+  }
+}
+
+/** The three page fields `toHoneypotEvent` deliberately omits (EventRowGap),
  * because the row carries no value for them. They are filled here, at the
  * seam, because the seam's signatures are the page types:
  *
- * - `type` — classified off the sensor's own event name above, or `ids.alert`
- *   when the row carries a Suricata alert. A name outside `TYPE_OF_EVENT`
- *   falls to `connection`: every row is a connection to a sensor, and that
- *   is the one kind it is certain of. `protocol.request` would claim a
- *   non-HTTP application request, and `http.request` a web one, neither of
- *   which the row shows.
+ * - `type` — the backend's own `kind` when the row carries one (APIARY#3561),
+ *   refined by the event name for a login. Without a kind (an older backend,
+ *   or a name the backend does not map) it is classified off the sensor's
+ *   own event name above, or `ids.alert` when the row carries a Suricata
+ *   alert. A name outside `TYPE_OF_EVENT` falls to `connection`: every row
+ *   is a connection to a sensor, and that is the one kind it is certain of.
  * - `eventName` — the sensor's own event name, verbatim.
- * - `techniques` — empty, meaning none assigned. The ATT&CK mapping is a
- *   pipeline result, not a field of the row.
- * - `srcPort`, `city`, `organization` — not on the row, so not set. Absent,
- *   never `0` or `''`.
- *
- * `severity` is not set here. `toHoneypotEvent` sets it from
- * `ics_severity` when the row carries one, and leaves it absent otherwise.
+ * - `organization` — not on the row, so not set. Absent, never `''`.
  */
 function pageEvent(row: EventRow): HoneypotEvent {
   const name = eventNameOf(row)
   // Typed as exactly the gap the row cannot fill, so a renamed page field
   // fails the compiler here rather than reaching a page undefined.
-  const gap: Pick<HoneypotEvent, EventRowGap> = {
-    type: row.pivots.alert ? 'ids.alert' : (TYPE_OF_EVENT[name] ?? 'connection'),
+  const gap: Omit<Pick<HoneypotEvent, EventRowGap>, 'organization'> = {
+    type: row.kind ? typeOfKind(row.kind, name) : row.pivots.alert ? 'ids.alert' : (TYPE_OF_EVENT[name] ?? 'connection'),
     eventName: name,
-    techniques: [],
   }
   // The one cast in this module, and the compiler forces it:
   // `Omit<HoneypotEvent, EventRowGap>` is structurally vacuous, because
@@ -629,8 +657,8 @@ function pageEvent(row: EventRow): HoneypotEvent {
   // `keyof` is `string | number`, `Omit` has nothing to subtract, and the
   // spread above typechecks as a bag of unknowns rather than an event. The
   // fields are genuinely all present; only the omission's promise of which
-  // ones cannot be expressed. `organization` is the seventh gap field and
-  // is left off: absent, not empty, as toHoneypotEvent does throughout.
+  // ones cannot be expressed. `organization` is left off: absent, not
+  // empty, as toHoneypotEvent does throughout.
   return { ...toHoneypotEvent(row), ...gap } as HoneypotEvent
 }
 
@@ -1285,23 +1313,53 @@ const getIdentity: Backend['getIdentity'] = async (id) => {
   const ips = doc.ips.slice(0, MEMBER_LIMIT)
   const identity = attacker(doc)
   if (!ips.length) return { identity, group: membersGroup([], [], 0), shared: [] }
-  const [events, sources] = await Promise.all([
-    eventsWire('getIdentity', { ips: ips.join(','), since: '365d' }),
-    get<SourcesPageWire>('getIdentity', '/api/v1/sources', { offset: 0, size: 1000 }),
-  ])
-  const listed = new Map(sourceProfiles(listOf('getIdentity', sources)).map((row) => [row.ip, row]))
-  const members = (
-    await Promise.all(
-      ips.map(async (ip) => {
-        const row = listed.get(ip)
-        if (row) return row
-        const profile = await get<IpProfileWire>('getIdentity', `/api/v1/investigate/ip/${encodeURIComponent(ip)}`)
-        return profile ? profileMember(profile) : null
-      }),
-    )
-  ).filter((row): row is SourceProfile => row !== null)
+  const [events, members] = await Promise.all([eventsWire('getIdentity', { ips: ips.join(','), since: '365d' }), memberProfiles('getIdentity', ips)])
   const rows = paged(events).rows
   return { identity, group: membersGroup(members, rows, events.total), shared: sharedSignals(rows) }
+}
+
+/** Each address's profile, from GET /api/v1/sources (the top 1000) or
+ * GET /api/v1/investigate/ip/{ip} for one that list does not hold. An
+ * address with no events in the 10-day window has no profile and is left
+ * out. */
+async function memberProfiles(endpoint: string, ips: string[]): Promise<SourceProfile[]> {
+  const sources = await get<SourcesPageWire>(endpoint, '/api/v1/sources', { offset: 0, size: 1000 })
+  const listed = new Map(sourceProfiles(listOf(endpoint, sources)).map((row) => [row.ip, row]))
+  const members = await Promise.all(
+    ips.map(async (ip) => {
+      const row = listed.get(ip)
+      if (row) return row
+      const profile = await get<IpProfileWire>(endpoint, `/api/v1/investigate/ip/${encodeURIComponent(ip)}`)
+      return profile ? profileMember(profile) : null
+    }),
+  )
+  return members.filter((row): row is SourceProfile => row !== null)
+}
+
+/** GET /api/v1/investigate/asn/{id} (APIARY#3557) — the AS aggregated over
+ * every event: organization, the top 50 source addresses, first and last
+ * seen. Its group is built as the identity page's is: the top 50 addresses
+ * profiled, and their newest events from GET /api/v1/events?asn= (the AS
+ * itself, not the 50 addresses, so an address past the top 50 still shows
+ * in the event list). `first`/`last` are the aggregation's own, over every
+ * event rather than the newest 100. A 404 (no event from the AS) or a 400
+ * (not an AS number) is the page's not-found. */
+const getAsn: Backend['getAsn'] = async (id) => {
+  const label = asLabel(id)
+  if (!label) return null
+  const wire = await get<AsnWire>('getAsn', `/api/v1/investigate/asn/${encodeURIComponent(label)}`)
+  if (!wire) return null
+  const ips = wire.sources.map((row) => String(row.key)).filter((ip) => ip !== '').slice(0, MEMBER_LIMIT)
+  const [events, members] = await Promise.all([
+    eventsWire('getAsn', { asn: String(wire.asn), since: '365d' }),
+    ips.length ? memberProfiles('getAsn', ips) : Promise.resolve([]),
+  ])
+  const group = membersGroup(members, paged(events).rows, wire.events)
+  return {
+    asn: label,
+    orgs: wire.organization ? [wire.organization] : [],
+    group: { ...group, ...(wire.first ? { first: wire.first } : {}), ...(wire.last ? { last: wire.last } : {}) },
+  }
 }
 
 /** GET /api/v1/investigate/campaign/{id} (the campaigns-v1 document, id the
@@ -2007,12 +2065,10 @@ const getAnalysisResults: Backend['getAnalysisResults'] = async () => {
 
 /** GET /api/v1/overview/kpis (overview.rs `kpis`, L115) — the five KPI tiles.
  *
- * Only three have a counterpart here and `toOverviewKpis` is a Pick of three.
- * The other two are a real GAP, named in the tests rather than invented:
+ * Four have a counterpart here: events, unique sources, sessions
+ * (`sessions_24h`, APIARY#3558, an upper bound) and logins. The fifth is
+ * read elsewhere:
  *
- * - **sessions** — no endpoint counts sessions. A session is an event
- *   correlation the events slice's own endpoint builds per row; there is no
- *   aggregation over them anywhere in the Rust tier.
  * - **payloads** — overview.rs's own module doc says it is not here: "captured
  *   payloads stay on the store listing the frontend already reads; their
  *   count is a doc count over captured artifacts, not an event aggregation".
@@ -2045,12 +2101,10 @@ const getOverview: Backend['getOverview'] = async () => {
     // A missing leg is a broken endpoint, not an empty fleet: its tiles are
     // null (not available), and the other legs still fill the overview.
     kpis: (kpis ? toOverviewKpis(kpis) : KPI_GAPS).concat(payloads ? kpiTile('payloads', 'Payloads captured', toPayloadCount(payloads)) : kpiGap('payloads', 'Payloads captured')),
-    // GAP (APIARY#3556): there is no 24 h hourly rollup on the wire. The
-    // timeline used to be built from the first 18 events, which is not a 24 h
-    // figure, so it is unavailable rather than approximated.
-    timeline: null,
-    // GAP: derived from the same 18 events as the timeline, so not a 24 h figure.
-    topProtocols: null,
+    // The 24 h rollup split by protocol (APIARY#3558); null on an older
+    // backend, which has no such field, rather than approximated.
+    timeline: kpis ? toProtocolTimeline(kpis) : null,
+    topProtocols: kpis ? toTopProtocols(kpis) : null,
     // `/api/v1/sources` ranks by events (sources.rs), so the first rows are the top sources.
     topSources: sources ? overviewSources(sources, TOP_SOURCES) : null,
     topCountries: countries ? toCountRows(countries.countries) : null,
@@ -2077,7 +2131,7 @@ const kpiTile = (id: string, label: string, value: number): Kpi => ({ id, label,
 const kpiGap = (id: string, label: string): Kpi => ({ id, label, value: null, previous: null, trend: [] })
 
 /** The three tiles `/overview/kpis` fills, when that endpoint is missing. */
-const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique sources'), kpiGap('logins', 'Successful logins')]
+const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique sources'), kpiGap('sessions', 'Sessions'), kpiGap('logins', 'Successful logins')]
 
 /** GET /api/v1/overview/dashboard — the four of the eighteen views tabs.
  *
@@ -2373,11 +2427,6 @@ const getAuthEvents: Backend['getAuthEvents'] = async () => {
   }
 }
 
-/** A query no backend route serves yet. It throws rather than answering
- * empty, so the page's unavailable state names the gap instead of showing a
- * calm empty list. `gap` is the issue that tracks the missing route. */
-const unavailable = (endpoint: string, gap: string): ApiError => new ApiError('unavailable', endpoint, { detail: `${NOT_YET} (${gap})` })
-
 /** A list read's answer, or an error when there is none. A 404 on a list is a
  * route this tier calls that the backend does not register; it must never
  * read as an empty list. */
@@ -2408,50 +2457,96 @@ const getSourceEvents: Backend['getSourceEvents'] = async (ip, range) => paged(a
  * backend does not serve for a source yet. */
 const getSourceTimeline: Backend['getSourceTimeline'] = async (ip, range) => sourceTimeline((await eventsWire('getSourceTimeline', { ip, ...sinceOf(range) })).rows)
 
-/** The source's sessions, derived from the same events read. A session is
- * counted only from the events this read returns, so a session whose other
- * events fall past the 100-row ceiling is under-counted. */
-const getSourceSessions: Backend['getSourceSessions'] = async (ip, range) => sessionSummaries(paged(await eventsWire('getSourceSessions', { ip, ...sinceOf(range) })).rows)
+/** GET /api/v1/sources/{ip}/sessions (APIARY#3557) — the server-side session
+ * aggregation, so a session whose events fall past the 100-row event window
+ * is neither lost nor under-counted — joined with the same events read for
+ * the per-kind detail the buckets do not carry (`sessionBuckets`).
+ *
+ * The aggregation takes the five page ranges only (1h…30d). For `all` the
+ * page falls back to the sessions of the newest 100 events, the one read
+ * that spans the year, and says so by the same per-kind counts. */
+const getSourceSessions: Backend['getSourceSessions'] = async (ip, range) => {
+  const window = sinceOf(range)
+  const events = eventsWire('getSourceSessions', { ip, ...window })
+  if (!RANGES.has(window.since)) return sessionSummaries(paged(await events).rows)
+  const [buckets, rows] = await Promise.all([
+    get<SourceSessionsWire>('getSourceSessions', `/api/v1/sources/${encodeURIComponent(ip)}/sessions`, { range: window.since }),
+    events,
+  ])
+  return sessionBuckets(listOf('getSourceSessions', buckets).rows, paged(rows).rows, ip)
+}
+
+/** GET /api/v1/investigate/session/{id}/summary (APIARY#3557) — one session's
+ * aggregation. No page reads it today (the session page reads the session
+ * document); it is wired so the query answers real data rather than none.
+ * The summary counts events, sensors and distinct commands, not event kinds,
+ * so the per-kind counts are absent. 404 is "no such session". */
+const getSessionSummary: Backend['getSessionSummary'] = async (id) => {
+  const wire = await get<SessionSummaryWire>('getSessionSummary', `/api/v1/investigate/session/${encodeURIComponent(id)}/summary`)
+  if (!wire) return null
+  return {
+    id: wire.id,
+    srcIp: wire.sources[0] ? String(wire.sources[0].key) : '',
+    sensors: wire.sensors.map((row) => String(row.key)),
+    first: wire.first ?? '',
+    last: wire.last ?? '',
+    events: wire.events,
+  }
+}
 
 /** GET /api/v1/events?session= — one session's events. */
 const getSessionEvents: Backend['getSessionEvents'] = async (sessionId) => paged(await eventsWire('getSessionEvents', { session: sessionId, since: '365d' })).rows
 
-/** GET /api/v1/events?shasum= — the download events that carried a payload,
- * and the sessions and addresses behind them. All three are derived from
- * those download rows: the sessions are the ones that downloaded it, not the
- * wider sessions they belong to. */
+/** GET /api/v1/payloads/{id}/delivery (APIARY#3557) — the exact sessions and
+ * sources that carried a payload, aggregated server-side — and
+ * GET /api/v1/events?shasum= for the event list itself: the delivery
+ * document's `events` are raw `_source` documents, not event rows. The
+ * sessions are the ones that downloaded it, not the wider sessions they
+ * belong to. A 404 on the delivery document (no event carries the hash)
+ * falls back to the rows, which are then empty too. */
 const getPayloadDelivery: Backend['getPayloadDelivery'] = async (hash) => {
-  const events = paged(await eventsWire('getPayloadDelivery', { shasum: hash, since: '365d' })).rows
-  return { events, sessions: sessionSummaries(events), sources: sourceCounts(events) }
+  const [delivery, page] = await Promise.all([
+    get<PayloadDeliveryWire>('getPayloadDelivery', `/api/v1/payloads/${encodeURIComponent(hash)}/delivery`),
+    eventsWire('getPayloadDelivery', { shasum: hash, since: '365d' }),
+  ])
+  const events = paged(page).rows
+  if (!delivery) return { events, sessions: sessionSummaries(events), sources: sourceCounts(events) }
+  return { events, sessions: sessionBuckets(delivery.sessions, events), sources: keyCounts(delivery.sources) }
 }
 
 /** The /24 an IPv4 address belongs to, named as the correlator names its
  * campaigns (correlator.rs `ip_prefix` at 24). Null for anything else. */
 const cidr24 = (ip: string): string | null => (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) ? `${ip.split('.').slice(0, 3).join('.')}.0/24` : null)
 
-/** GET /api/v1/investigate/ip/{ip} (organization and country), GET /api/v1/sources
- * (the addresses in the same /24) and GET /api/v1/campaigns (the correlator's
- * campaign for that /24). Three reads, one page.
+/** GET /api/v1/sources/{ip}/network (APIARY#3557: AS number, organization,
+ * country), GET /api/v1/sources (the addresses in the same /24) and
+ * GET /api/v1/campaigns (the correlator's campaign for that /24).
  *
- * Two gaps are named here, not hidden. `asn` is the AS number, which the
- * ip profile does not carry (only the organization), so it is left absent and
- * the page shows the organization without a link. The network-v1 document this
- * would otherwise read (`/sources/{ip}/network`) is not served on real data
- * (Xore/APIARY#3554). The neighbours come from the top 1000 addresses by
- * events, so a neighbour outside that list is not shown. */
+ * The network document is the one answer that carries the AS number. On a
+ * backend that 404s it (no event from the address, or a backend older than
+ * #3557) the page falls back to the ip profile, whose organization and
+ * `as_number` (APIARY#3696) it reads instead; a number neither names is left
+ * absent and the page shows the organization without a link. The
+ * neighbours come from the top 1000 addresses by events, so a neighbour
+ * outside that list is not shown. */
 const getSourceNetwork: Backend['getSourceNetwork'] = async (ip) => {
-  const [profile, sources, campaigns] = await Promise.all([
-    get<IpProfileWire>('getSourceNetwork', `/api/v1/investigate/ip/${encodeURIComponent(ip)}`),
+  const cidr = cidr24(ip)
+  if (!cidr) return null
+  const path = encodeURIComponent(ip)
+  const [network, sources, campaigns] = await Promise.all([
+    get<SourceNetworkWire>('getSourceNetwork', `/api/v1/sources/${path}/network`),
     get<SourcesPageWire>('getSourceNetwork', '/api/v1/sources', { offset: 0, size: 1000 }),
     get<CampaignPageWire>('getSourceNetwork', '/api/v1/campaigns', { size: 100 }),
   ])
-  const cidr = cidr24(ip)
-  if (!profile || !cidr) return null
+  const profile = network ? null : await get<IpProfileWire>('getSourceNetwork', `/api/v1/investigate/ip/${path}`)
+  if (!network && !profile) return null
+  const asn = network ? asLabel(network.asn) : asLabel(profile?.as_number)
+  const org = network ? network.organization : (profile?.as_organization ?? profile?.asn)
+  const country = network ? network.country : profile?.country
   const neighbours = sourceProfiles(listOf('getSourceNetwork', sources)).filter((p) => p.ip !== ip && cidr24(p.ip) === cidr)
   const campaign = networkCampaigns(listOf('getSourceNetwork', campaigns)).find((c) => c.cidr === cidr)
-  // The ip profile names the organization, not the AS number, so `asn` is
-  // absent rather than a placeholder.
-  return { cidr, ...(profile.asn ? { org: profile.asn } : {}), ...(profile.country ? { country: profile.country } : {}), neighbours, ...(campaign ? { campaign } : {}) }
+  // Absent attributes are left out, never carried as '' or a placeholder.
+  return { cidr, ...(asn ? { asn } : {}), ...(org ? { org } : {}), ...(country ? { country } : {}), neighbours, ...(campaign ? { campaign } : {}) }
 }
 
 /** GET /api/v1/sources/{ip}/identities — the attacker document the address
@@ -2466,31 +2561,92 @@ const getBlockedIps: Backend['getBlockedIps'] = async () => activeBlockIps(listO
 
 // ---- queries with no backend route yet: they throw, they never answer empty ----
 
-const getAsn: Backend['getAsn'] = async () => {
-  throw unavailable('getAsn', 'Xore/APIARY#3554')
-}
-const getEntityTimeline: Backend['getEntityTimeline'] = async () => {
-  throw unavailable('getEntityTimeline', 'Xore/APIARY#3554')
-}
-const getRelated: Backend['getRelated'] = async () => {
-  throw unavailable('getRelated', 'Xore/APIARY#3554')
-}
-const getIoc: Backend['getIoc'] = async () => {
-  throw unavailable('getIoc', 'Xore/APIARY#3554')
-}
-const getIocCatalog: Backend['getIocCatalog'] = async () => {
-  throw unavailable('getIocCatalog', 'Xore/APIARY#3554')
-}
-const getFacets: Backend['getFacets'] = async () => {
-  throw unavailable('getFacets', 'Xore/APIARY#3524')
+/** GET /api/v1/entities/{id}/timeline (APIARY#3572) — the entity's events,
+ * alerts, captures, canary triggers, ML anomalies and LLM analyses, newest
+ * first, as the backend already merges them. 500 items, the handler's cap.
+ * A 404 (an identity or campaign that does not exist) is an empty timeline:
+ * the entity page itself answers not-found for it. */
+const getEntityTimeline: Backend['getEntityTimeline'] = async (kind, id, range) => {
+  const wire = await get<EntityTimelineWire>('getEntityTimeline', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/timeline`, { ...entityRange(range), limit: 500 })
+  return wire ? entityTimeline(wire) : []
 }
 
-/** There is no preview route (APIARY#3524): the backend renders a stored
- * report (`reports_api::render_definition_to_stored`) but does not render a
- * draft without saving it. So a live deployment has no preview and answers
- * `null` without a request. The wizard runs its checks without counts and
- * shows the document's structure only, and the mock keeps its preview. */
-const previewReport: Backend['previewReport'] = async () => null
+/** GET /api/v1/entities/{id}/related (APIARY#3572), over the backend's widest
+ * window (30d). An event is not a backend entity, so its related panel is
+ * the event's own source, session and sensor, then what is related to its
+ * source address (GET /api/v1/event/{id} names both). */
+const getRelated: Backend['getRelated'] = async (kind, id) => {
+  if (kind === 'event') {
+    const event = await get<EventPageWire>('getRelated', `/api/v1/event/${encodeURIComponent(id)}`)
+    if (!event) return []
+    const own: RelatedGroup[] = [
+      { kind: 'source', label: 'Source IP', items: event.src_ip ? [{ id: event.src_ip }] : [] },
+      { kind: 'session', label: 'Session', items: event.session ? [{ id: event.session }] : [] },
+      { kind: 'sensor', label: 'Sensor', items: event.sensor ? [{ id: event.sensor }] : [] },
+    ].filter((group) => group.items.length > 0)
+    return event.src_ip ? [...own, ...(await relatedOf('source', event.src_ip)).filter((group) => group.kind !== 'sensor')] : own
+  }
+  return relatedOf(kind, id)
+}
+
+const relatedOf = async (kind: TimelineEntity, id: string): Promise<RelatedGroup[]> => {
+  const wire = await get<EntityRelatedWire>('getRelated', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/related`, { range: '30d' })
+  return wire ? entityRelated(wire) : []
+}
+
+/** GET /api/v1/ioc/{kind}/{value} (APIARY#3572) — one indicator over the
+ * backend's widest window (30d): its exact counts, its newest 20 events and
+ * sessions, the payloads seen with it and its top 20 sources, which are
+ * profiled into the page's group as the identity page's members are. The
+ * group's totals and first/last are the aggregation's own. 404 (not seen)
+ * is the page's not-found. */
+const getIoc: Backend['getIoc'] = async (kind, value) => {
+  if (!IOC_KINDS.includes(kind as IocHubKind)) return null
+  const wire = await get<IocDetailWire>('getIoc', `/api/v1/ioc/${encodeURIComponent(kind)}/${encodeURIComponent(value)}`, { range: '30d' })
+  if (!wire) return null
+  const events = wire.recent_events.map((row) => pageEvent(summaryRow(row)))
+  const ips = wire.sources.map((row) => String(row.key)).filter((ip) => ip !== '')
+  const members = ips.length ? await memberProfiles('getIoc', ips) : []
+  const group = membersGroup(members, events, wire.events)
+  return {
+    kind: wire.kind,
+    value: wire.value,
+    events,
+    group: { ...group, ...(wire.first_seen ? { first: wire.first_seen } : {}), ...(wire.last_seen ? { last: wire.last_seen } : {}) },
+    sessions: sessionBuckets(wire.sessions, events),
+    payloads: keyCounts(wire.payloads),
+  }
+}
+
+/** GET /api/v1/ioc/catalog (APIARY#3572) — every kind, the 100 busiest values
+ * of each (the handler's cap) over 30 days. */
+const getIocCatalog: Backend['getIocCatalog'] = async () => {
+  const wire = await get<IocCatalogWire>('getIocCatalog', '/api/v1/ioc/catalog', { size: 100, range: '30d' })
+  if (!wire) throw new ApiError('unavailable', 'getIocCatalog')
+  return iocCatalog(wire)
+}
+
+/** GET /api/v1/facets/events (APIARY#3569) — every value each filter can
+ * take, over the same filters and window /api/v1/events lists. */
+const getFacets: Backend['getFacets'] = async (kind = 'events', filters = {}) => {
+  const wire = await get<FacetsWire>('getFacets', `/api/v1/facets/${encodeURIComponent(kind)}`, eventsQuery(filters))
+  if (!wire) throw new ApiError('unavailable', 'getFacets')
+  return facets(wire)
+}
+
+/** POST /api/v1/reports/preview (APIARY#3569) — what a draft definition would
+ * cover, rendered without saving it. The body is the one the save sends. An
+ * artifact template has no telemetry to preview and is a 422; the wizard
+ * reads that as no preview (`null`) and shows the structure only. */
+const previewReport: Backend['previewReport'] = async (definition) => {
+  try {
+    const wire = await post<ReportPreviewWire | null>('previewReport', '/api/v1/reports/preview', reportDefinitionBody(definition))
+    return wire ? reportPreview(wire) : null
+  } catch (error) {
+    if (error instanceof ApiError && error.kind === 'invalid') return null
+    throw error
+  }
+}
 
 /** This slice's queries, and nothing else. Each keeps the mock
  * implementation's signature exactly — `queries.ts` is generated from it and
@@ -2565,6 +2721,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   getSourceProfiles,
   getSourceEvents,
   getSourceSessions,
+  getSessionSummary,
   getSourceTimeline,
   getSourceNetwork,
   getSourceIdentity,

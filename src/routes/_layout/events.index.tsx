@@ -1,3 +1,5 @@
+import { CredentialStateToken } from '#/components/CredentialStateToken'
+import { credentialStateOf } from '#/lib/credentialState'
 import { VisuallyHidden } from '@astryxdesign/core/VisuallyHidden'
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
@@ -143,7 +145,18 @@ const columns: TableColumn<HoneypotEvent>[] = [
     ),
   },
   { key: 'dstPort', header: 'Port', width: pixel(120), renderCell: (row) => (row.protocol ? `${row.dstPort}/${row.protocol}` : `${row.dstPort}`) },
-  { key: 'summary', header: 'Detail', width: proportional(3), renderCell: (row) => <Text type="code">{row.summary ?? '—'}</Text> },
+  {
+    key: 'summary',
+    header: 'Detail',
+    width: proportional(3),
+    // The #3213 credential facts, for the two decoys that carry them (#271).
+    renderCell: (row) => (
+      <VStack gap={0.5}>
+        <Text type="code">{row.summary ?? '—'}</Text>
+        {credentialStateOf(row) && <CredentialStateToken event={row} />}
+      </VStack>
+    ),
+  },
   { key: 'openIn', header: <VisuallyHidden>Open in</VisuallyHidden>, width: pixel(96), align: 'end', renderCell: (row) => <EventOpenIn event={row} /> },
 ]
 

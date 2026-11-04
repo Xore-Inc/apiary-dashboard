@@ -179,6 +179,7 @@ describe('which queries the real backend answers', () => {
         'getSourceNetwork',
         'getSourceProfiles',
         'getSourceSessions',
+        'getSessionSummary',
         'getSourceTimeline',
         'resolveHash',
         'setIpBlocked',
@@ -1875,16 +1876,30 @@ describe('the reports slice gaps, each one where it belongs', () => {
     expect(made).toMatchObject({ id: 'gr_a', title: 'Payload aaa', definitionId: '' })
   })
 
-  it('GAP 6: previewReport has no endpoint, so it answers null without a request', async () => {
-    // Verified in the Rust router: lib.rs registers templates, the three
-    // definition routes, generate, delete_generated and generate_payload_report,
-    // and nothing else under /api/v1/reports. There is no preview route, so the
-    // live tier answers null (APIARY#3524) and must not reach the backend.
-    const calls = stub(reportsFixtures())
-    expect(liveQueryNames()).toContain('previewReport')
+  it('previewReport posts the draft to /api/v1/reports/preview (APIARY#3569) with the save body', async () => {
+    const wire = {
+      period: { from: '2026-10-01T00:00:00Z', to: '2026-10-08T00:00:00Z' },
+      events: 1200, sources: 40, sensors: 6, sessions: 300,
+      sections: [{ id: 'top_sources', label: 'Top sources', rows: 10, pages: 1, columns: ['Source', 'Events'], sample: [['203.0.113.42', '900']] }],
+      pages: 4,
+      empty_filter: { field: 'country', message: 'No event from that country.' },
+    }
+    const calls = stub(reportsFixtures({ '/api/v1/reports/preview': wire }))
     const preview = await live('previewReport')({ ...savedDefinition, id: '' })
-    expect(preview).toBeNull()
-    expect(calls).toEqual([])
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls.at(-1)!
+    expect(new URL(String(url)).pathname).toBe('/api/v1/reports/preview')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body)).template).toBe(savedDefinition.template)
+    expect(calls).toHaveLength(1)
+    expect(preview).toEqual({
+      events: 1200, sources: 40, sensors: 6, sessions: 300, sections: wire.sections, pages: 4, period: wire.period,
+      emptyFilter: { field: 'country', message: 'No event from that country.' },
+    })
+  })
+
+  it('previewReport answers null when the backend cannot preview the draft (422: an artifact template)', async () => {
+    stub(reportsFixtures({ '/api/v1/reports/preview': fail(422, 'preview is only available for the telemetry templates') }))
+    expect(await live('previewReport')({ ...savedDefinition, id: '' })).toBeNull()
   })
 
   it('GAP 7: both deletes answer { deleted: id } and the page type is void, so nothing adapts', async () => {
@@ -2273,9 +2288,12 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     expect(out.kpis.map((kpi) => [kpi.id, kpi.value])).toEqual([
       ['events', null],
       ['sources', null],
+      ['sessions', null],
       ['logins', null],
       ['payloads', 37],
     ])
+    expect(out.timeline).toBeNull()
+    expect(out.topProtocols).toBeNull()
     expect(out.kpis[0]).toMatchObject({ previous: null, trend: [] })
     expect(out.topSources).toHaveLength(3)
     expect(out.topCountries).toEqual([{ id: 'NL', label: 'NL', count: 611 }])

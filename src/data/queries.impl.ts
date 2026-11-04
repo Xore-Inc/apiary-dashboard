@@ -778,8 +778,9 @@ async function draftPreview(definition: ReportDefinition): Promise<ReportPreview
   }
 }
 
-/** The mock always has a preview. The live tier has none (APIARY#3524), so
- * the signature admits null and the wizard must work without one. */
+/** The mock always has a preview. The live tier has none for an artifact
+ * template (a 422 upstream), so the signature admits null and the wizard
+ * must work without one. */
 export async function previewReport(definition: ReportDefinition): Promise<ReportPreview | null> {
   return draftPreview(definition)
 }

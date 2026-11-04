@@ -5,7 +5,7 @@
  * the rows the scope actually matched, so a wrong filter or a missing section
  * shows here, not in the PDF.
  *
- * With no preview (the live tier, APIARY#3524) it shows the document's
+ * With no preview (an artifact template, which the backend cannot preview) it shows the document's
  * structure from the draft alone: no counts, samples or page numbers.
  */
 import { Banner } from '@astryxdesign/core/Banner'

@@ -115,10 +115,10 @@ const sessionColumns: TableColumn<SessionSummary>[] = [
   { key: 'id', header: 'Session', width: pixel(152), renderCell: (row) => <EntityLink kind="session" id={row.id} /> },
   { key: 'first', header: 'Started', width: pixel(184), renderCell: (row) => <Text type="supporting">{formatDateTime(row.first)}</Text> },
   { key: 'events', header: 'Events', width: pixel(72), align: 'end' },
-  { key: 'logins', header: 'Logins', width: pixel(72), align: 'end' },
-  { key: 'commands', header: 'Commands', width: pixel(88), align: 'end' },
-  { key: 'downloads', header: 'Downloads', width: pixel(96), align: 'end' },
-  { key: 'sensors', header: 'Sensors', width: proportional(2), renderCell: (row) => row.sensors.join(' ') },
+  { key: 'logins', header: 'Logins', width: pixel(72), align: 'end', renderCell: (row) => (row.logins === undefined ? '—' : formatNumber(row.logins)) },
+  { key: 'commands', header: 'Commands', width: pixel(88), align: 'end', renderCell: (row) => (row.commands === undefined ? '—' : formatNumber(row.commands)) },
+  { key: 'downloads', header: 'Downloads', width: pixel(96), align: 'end', renderCell: (row) => (row.downloads === undefined ? '—' : formatNumber(row.downloads)) },
+  { key: 'sensors', header: 'Sensors', width: proportional(2), renderCell: (row) => (row.sensors.length ? row.sensors.join(' ') : '—') },
   { key: 'recordingShasum', header: 'Recording', width: pixel(96), renderCell: (row) => (row.recordingShasum ? <EntityLink kind="recording" id={row.recordingShasum}>replay</EntityLink> : '—') },
 ]
 
@@ -202,7 +202,7 @@ const sourceColumns: TableColumn<SourceProfile>[] = [
   { key: 'org', header: 'Provider', width: proportional(1) },
   { key: 'events', header: 'Events', width: pixel(80), align: 'end' },
   { key: 'sessions', header: 'Sessions', width: pixel(88), align: 'end' },
-  { key: 'sensors', header: 'Sensors', width: proportional(2), renderCell: (row) => row.sensors.join(' ') },
+  { key: 'sensors', header: 'Sensors', width: proportional(2), renderCell: (row) => (row.sensors.length ? row.sensors.join(' ') : '—') },
   { key: 'last', header: 'Last seen', width: pixel(184), renderCell: (row) => <Text type="supporting">{formatDateTime(row.last)}</Text> },
 ]
 

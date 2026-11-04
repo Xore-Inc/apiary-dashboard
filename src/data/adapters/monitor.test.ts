@@ -34,6 +34,8 @@ import {
   toModelHealth,
   toOpenBacklog,
   toOverviewKpis,
+  toProtocolTimeline,
+  toTopProtocols,
   toOverviewViews,
   toPayloadCount,
   toPresentation,
@@ -200,11 +202,32 @@ describe('monitor adapters', () => {
   })
 
   it('maps GET /overview/kpis, previous figures only where the wire has them', () => {
-    const [events, sources, logins] = toOverviewKpis(kpis)
+    const [events, sources, sessions, logins] = toOverviewKpis(kpis)
+    expect(sessions).toEqual({ id: 'sessions', label: 'Sessions', value: 312, previous: 280, trend: [] })
     expect(events).toEqual({ id: 'events', label: 'Events', value: 18_402, previous: 15_110, trend: [812, 690, 741, 1204] })
     // unique_ips has no previous-period figure on the wire, so the tile shows no change.
     expect(sources).toEqual({ id: 'sources', label: 'Unique sources', value: 4_118, previous: 4_118, trend: [] })
     expect(logins).toMatchObject({ id: 'logins', value: 96 })
+  })
+
+  it('builds the 24 h protocol timeline and top protocols from hourly_by_protocol (APIARY#3558)', () => {
+    const wire = { ...kpis, hourly_by_protocol: [
+      { hour: '2026-10-13T10:00:00.000Z', total: 812, counts: { ssh: 700, http: 12, other: 100 } },
+      { hour: '2026-10-13T11:00:00.000Z', total: 90, counts: { ssh: 20, http: 50, other: 20 } },
+    ] }
+    expect(toProtocolTimeline(wire)).toEqual([
+      { time: '2026-10-13T10:00:00.000Z', total: 812, byProtocol: { ssh: 700, http: 12, other: 100 } },
+      { time: '2026-10-13T11:00:00.000Z', total: 90, byProtocol: { ssh: 20, http: 50, other: 20 } },
+    ])
+    expect(toTopProtocols(wire)).toEqual(['ssh', 'http'])
+  })
+
+  it('leaves the sessions tile and the timeline out on a backend older than APIARY#3558', () => {
+    const { sessions_24h: _s, sessions_previous24h: _p, hourly_by_protocol: _h, ...old } = kpis
+    const legacy = old as unknown as typeof kpis
+    expect(toOverviewKpis(legacy).map((kpi) => kpi.id)).toEqual(['events', 'sources', 'logins'])
+    expect(toProtocolTimeline(legacy)).toBeNull()
+    expect(toTopProtocols(legacy)).toBeNull()
   })
 
   it('maps GET /overview/dashboard, dropping the heat intensity and the drill-down links', () => {

@@ -58,6 +58,12 @@ export interface EventPivots {
   ics_severity: string
 }
 
+/** events.rs `severity_from_source`'s closed set. */
+export type EventSeverityWire = 'critical' | 'high' | 'medium' | 'low'
+
+/** events.rs `kind_from_source`'s closed set. */
+export type EventKindWire = 'connection' | 'login' | 'command' | 'download' | 'http' | 'alert'
+
 /** events.rs `EventRow`. `port` is a string even when the port is numeric
  * (`destination.port`, falling back to `honeypot.port` then
  * `honeypot.dst_port` for the sensors that write only those). */
@@ -76,6 +82,20 @@ export interface EventRow {
   /** `source.geo.country_iso_code`. */
   country: string
   port: string
+  /** events.rs `src_port_from_source` (APIARY#3561): `source.port`, or the
+   * Suricata alert's own `src_port`. `skip_serializing_if` none, so absent
+   * when no document carries one — and on a backend older than #3561. */
+  src_port?: number
+  /** `source.geo.city_name`. Absent when the address resolved to no city. */
+  city?: string
+  /** events.rs `severity_from_source`: Suricata 1/2/3 → high/medium/low,
+   * DNP3 critical/high. Absent on an unrated event, never defaulted. */
+  severity?: EventSeverityWire
+  /** events.rs `kind_from_source`: the producer's event name normalized.
+   * Absent when the name maps onto none of these. */
+  kind?: EventKindWire
+  /** ATT&CK technique ids the Suricata rule assigned. Omitted when empty. */
+  techniques?: string[]
   proto: string
   detail: string
   session: string
