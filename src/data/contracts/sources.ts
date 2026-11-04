@@ -486,3 +486,80 @@ export interface BlockedIpsWire {
   total: number
   rows: BlockedIpRowWire[]
 }
+
+// ---- APIARY#3557: entity aggregations (entity_details.rs) ------------------
+//
+// Each of these is an Elasticsearch aggregation over EVENT_INDICES shaped by
+// hand with `json!`, so the OpenAPI document types them as a bare object; the
+// shapes below are the handlers' own literals. A `top_key` value is the first
+// bucket's key or `null`; `first`/`last` are `value_as_string` of a min/max
+// aggregation, which is absent (`null`) on an empty aggregation.
+
+/** `{key, count}` — entity_details.rs `key_counts`. `key` is whatever the
+ * terms aggregation bucketed: a string, or a number for a numeric field. */
+export interface KeyCountWire {
+  key: string | number
+  count: number
+}
+
+/** One session bucket — entity_details.rs `session_list`. */
+export interface SessionBucketWire {
+  session: string
+  events: number
+  first: string | null
+  last: string | null
+}
+
+/** GET /api/v1/sources/{ip}/sessions — `{total, rows}`, newest session
+ * first, at most 100 buckets; `total` is the distinct-session cardinality. */
+export interface SourceSessionsWire {
+  total: number
+  rows: SessionBucketWire[]
+}
+
+/** GET /api/v1/sources/{ip}/network. `asn` is the AS NUMBER here
+ * (`source.as.asn`, numeric in the index), unlike the ip profile's
+ * deprecated `asn`. 404 when no event carries the address. */
+export interface SourceNetworkWire {
+  ip: string
+  asn: number | string | null
+  organization: string | null
+  provider: string | null
+  country: string | null
+  events: number
+}
+
+/** GET /api/v1/investigate/asn/{id}. `asn` is the parsed number; `sources`
+ * the top 50 addresses by events. 404 when no event carries the AS. */
+export interface AsnWire {
+  asn: number
+  organization: string | null
+  provider: string | null
+  events: number
+  sources_total: number | null
+  first: string | null
+  last: string | null
+  sources: KeyCountWire[]
+}
+
+/** GET /api/v1/investigate/session/{id}/summary. 404 for no such session. */
+export interface SessionSummaryWire {
+  id: string
+  events: number
+  first: string | null
+  last: string | null
+  sensors: KeyCountWire[]
+  commands: KeyCountWire[]
+  sources: KeyCountWire[]
+}
+
+/** GET /api/v1/payloads/{id}/delivery. `events` are raw `_source` documents
+ * (not EventRows), so the dashboard reads its event list from
+ * /api/v1/events?shasum= and takes the exact aggregations from here. 404
+ * when no event carries the hash. */
+export interface PayloadDeliveryWire {
+  total: number
+  events: unknown[]
+  sessions: SessionBucketWire[]
+  sources: KeyCountWire[]
+}

@@ -1,5 +1,7 @@
+import { CredentialStateToken } from '#/components/CredentialStateToken'
+import { credentialStateOf } from '#/lib/credentialState'
 import { SkeletonTable } from './SkeletonTable'
-import { HStack } from '@astryxdesign/core/Stack'
+import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Table, pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
@@ -18,7 +20,17 @@ const eventColumns = (showSource: boolean): TableColumn<HoneypotEvent>[] => [
   ...(showSource
     ? [{ key: 'srcIp', header: 'Source', width: pixel(136), renderCell: (row: HoneypotEvent) => <EntityLink kind="source" id={row.srcIp} /> }]
     : []),
-  { key: 'summary', header: 'Detail', width: proportional(3), renderCell: (row) => <EntityLink kind="event" id={row.id}><Text type="code">{row.summary ?? '—'}</Text></EntityLink> },
+  {
+    key: 'summary',
+    header: 'Detail',
+    width: proportional(3),
+    renderCell: (row) => (
+      <VStack gap={0.5}>
+        <EntityLink kind="event" id={row.id}><Text type="code">{row.summary ?? '—'}</Text></EntityLink>
+        {credentialStateOf(row) && <CredentialStateToken event={row} />}
+      </VStack>
+    ),
+  },
 ]
 
 /** Events around a subject, each linking to its full event page. */

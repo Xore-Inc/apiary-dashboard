@@ -79,7 +79,7 @@ describe('production request routing', () => {
   })
 
   it('returns an explicit not-available error for an unwired query', async () => {
-    const error = await runForRequest('getSessionSummary', [], undefined).catch((caught: unknown) => caught)
+    const error = await runForRequest('getReplay', [], undefined).catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(ApiError)
     expect((error as ApiError).message).toContain('not available on live backend')

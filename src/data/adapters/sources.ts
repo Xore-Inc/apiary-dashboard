@@ -37,7 +37,9 @@ import type {
   CredEdgeWire,
   IpBlockWire,
   IpProfileWire,
+  KeyCountWire,
   KvWire,
+  SessionBucketWire,
   MapPointsWire,
   SetIpBlockBody,
   SourcesPageWire,
@@ -424,6 +426,49 @@ export const sessionSummaries = (events: HoneypotEvent[]): SessionSummary[] => {
       }
     })
     .sort((a, b) => b.last.localeCompare(a.last))
+}
+
+/** Server-side session buckets (APIARY#3557 `session_list`) → the page's
+ * session rows, with the per-kind detail taken from the event rows the page
+ * also read.
+ *
+ * The buckets are the complete answer for which sessions exist and how many
+ * events each holds, so no session past the 100-row event window is lost and
+ * none is under-counted. The buckets count events, not kinds, so a session's
+ * sensors and login/command/download counts come from the event rows — and
+ * only when those rows hold every one of its events (their number equals the
+ * bucket's). Otherwise the counts are absent rather than a floor dressed as a
+ * total. `srcIp` is the caller's address when the read is per source, else
+ * the session's own rows' address, else absent from the rows ('' then). */
+export const sessionBuckets = (buckets: SessionBucketWire[], events: HoneypotEvent[], srcIp?: string): SessionSummary[] => {
+  const derived = new Map(sessionSummaries(events).map((row) => [row.id, row]))
+  return buckets
+    .filter((bucket) => bucket.session !== '')
+    .map((bucket): SessionSummary => {
+      const rows = derived.get(bucket.session)
+      const complete = rows !== undefined && rows.events === bucket.events
+      return {
+        id: bucket.session,
+        srcIp: srcIp ?? rows?.srcIp ?? '',
+        sensors: rows?.sensors ?? [],
+        first: bucket.first ?? rows?.first ?? '',
+        last: bucket.last ?? rows?.last ?? '',
+        events: bucket.events,
+        ...(complete ? { logins: rows.logins, commands: rows.commands, downloads: rows.downloads } : {}),
+      }
+    })
+}
+
+/** `[{key, count}]` (entity_details.rs `key_counts`) → CountRows. */
+export const keyCounts = (rows: KeyCountWire[]): CountRow[] =>
+  rows.filter((row) => row.key !== '').map((row) => ({ id: String(row.key), label: String(row.key), count: row.count }))
+
+/** An AS number as the dashboard spells it everywhere (`AS64512`), from the
+ * number or a string with or without the prefix. Null when it is no number. */
+export const asLabel = (value: number | string | null | undefined): string | null => {
+  if (value === null || value === undefined) return null
+  const digits = String(value).trim().replace(/^AS/i, '')
+  return /^\d+$/.test(digits) ? `AS${digits}` : null
 }
 
 /** Address → count, most frequent first: a payload's sources. */

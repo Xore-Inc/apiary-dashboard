@@ -179,6 +179,7 @@ describe('which queries the real backend answers', () => {
         'getSourceNetwork',
         'getSourceProfiles',
         'getSourceSessions',
+        'getSessionSummary',
         'getSourceTimeline',
         'resolveHash',
         'setIpBlocked',

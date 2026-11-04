@@ -14,6 +14,8 @@ import { backendGapOf } from '#/lib/backendGap'
 import { Panel } from '#/components/DashboardBlocks'
 import { EventsPanel, attckUrl } from '#/components/DetailBlocks'
 import { EntityLink } from '#/components/EntityLink'
+import { CredentialStateToken } from '#/components/CredentialStateToken'
+import { credentialStateOf } from '#/lib/credentialState'
 import { fieldBlock, readField } from '#/lib/sensorFields'
 
 const parent = getRouteApi('/_layout/events/$id')
@@ -52,6 +54,11 @@ function EventOverview() {
             {event.password && (
               <MetadataListItem label="Password">
                 <EntityLink kind="password" id={event.password} />
+              </MetadataListItem>
+            )}
+            {credentialStateOf(event) && (
+              <MetadataListItem label="Credentials">
+                <CredentialStateToken event={event} />
               </MetadataListItem>
             )}
             {event.command && (

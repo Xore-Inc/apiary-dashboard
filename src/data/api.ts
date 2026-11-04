@@ -76,6 +76,9 @@ import {
   profileMember,
   sharedSignals,
   sessionSummaries,
+  sessionBuckets,
+  keyCounts,
+  asLabel,
   setIpBlockBody,
   sourceCounts,
   sourceProfiles,
@@ -137,7 +140,7 @@ import {
 } from './adapters/evidence'
 import type { ApiErrorKind } from './errors'
 import type { EventPageWire, EventsQueryWire, FilterValuesWire, RecordingsPageWire, ReplayWire, SearchResultWire, SessionDetailWire } from './contracts/explorer'
-import type { EventRow, EventsPage as EventsPageWire } from './contracts/events'
+import type { EventKindWire, EventRow, EventsPage as EventsPageWire } from './contracts/events'
 import type { ChartName, Charts, FlowGraph, Series as SeriesWire } from './contracts/charts'
 import type {
   CanaryFiredPageWire,
@@ -226,6 +229,11 @@ import type {
   FusionWire,
   IpBlockWire,
   IpProfileWire,
+  AsnWire,
+  PayloadDeliveryWire,
+  SessionSummaryWire,
+  SourceNetworkWire,
+  SourceSessionsWire,
   MapPointsWire,
   SankeyWire,
   SourcesPageWire,
@@ -595,33 +603,49 @@ function eventNameOf(row: EventRow): string {
   return typeof name === 'string' ? name : ''
 }
 
-/** The seven page fields `toHoneypotEvent` deliberately omits (EventRowGap),
+/** The row's normalized `kind` (APIARY#3561) → the page's event type. A
+ * login is the one kind the page splits further: the sensor's own name says
+ * whether it succeeded, and a login it does not name as a success is read as
+ * failed, as the legacy mapping did. */
+function typeOfKind(kind: EventKindWire, name: string): EventType {
+  switch (kind) {
+    case 'login': {
+      const named = TYPE_OF_EVENT[name]
+      return named === 'login.success' || /\.success$|^login_success$/.test(name) ? 'login.success' : 'login.failed'
+    }
+    case 'command':
+      return 'command.input'
+    case 'download':
+      return 'file.download'
+    case 'http':
+      return 'http.request'
+    case 'alert':
+      return 'ids.alert'
+    case 'connection':
+      return 'connection'
+  }
+}
+
+/** The three page fields `toHoneypotEvent` deliberately omits (EventRowGap),
  * because the row carries no value for them. They are filled here, at the
  * seam, because the seam's signatures are the page types:
  *
- * - `type` — classified off the sensor's own event name above, or `ids.alert`
- *   when the row carries a Suricata alert. A name outside `TYPE_OF_EVENT`
- *   falls to `connection`: every row is a connection to a sensor, and that
- *   is the one kind it is certain of. `protocol.request` would claim a
- *   non-HTTP application request, and `http.request` a web one, neither of
- *   which the row shows.
+ * - `type` — the backend's own `kind` when the row carries one (APIARY#3561),
+ *   refined by the event name for a login. Without a kind (an older backend,
+ *   or a name the backend does not map) it is classified off the sensor's
+ *   own event name above, or `ids.alert` when the row carries a Suricata
+ *   alert. A name outside `TYPE_OF_EVENT` falls to `connection`: every row
+ *   is a connection to a sensor, and that is the one kind it is certain of.
  * - `eventName` — the sensor's own event name, verbatim.
- * - `techniques` — empty, meaning none assigned. The ATT&CK mapping is a
- *   pipeline result, not a field of the row.
- * - `srcPort`, `city`, `organization` — not on the row, so not set. Absent,
- *   never `0` or `''`.
- *
- * `severity` is not set here. `toHoneypotEvent` sets it from
- * `ics_severity` when the row carries one, and leaves it absent otherwise.
+ * - `organization` — not on the row, so not set. Absent, never `''`.
  */
 function pageEvent(row: EventRow): HoneypotEvent {
   const name = eventNameOf(row)
   // Typed as exactly the gap the row cannot fill, so a renamed page field
   // fails the compiler here rather than reaching a page undefined.
-  const gap: Pick<HoneypotEvent, EventRowGap> = {
-    type: row.pivots.alert ? 'ids.alert' : (TYPE_OF_EVENT[name] ?? 'connection'),
+  const gap: Omit<Pick<HoneypotEvent, EventRowGap>, 'organization'> = {
+    type: row.kind ? typeOfKind(row.kind, name) : row.pivots.alert ? 'ids.alert' : (TYPE_OF_EVENT[name] ?? 'connection'),
     eventName: name,
-    techniques: [],
   }
   // The one cast in this module, and the compiler forces it:
   // `Omit<HoneypotEvent, EventRowGap>` is structurally vacuous, because
@@ -629,8 +653,8 @@ function pageEvent(row: EventRow): HoneypotEvent {
   // `keyof` is `string | number`, `Omit` has nothing to subtract, and the
   // spread above typechecks as a bag of unknowns rather than an event. The
   // fields are genuinely all present; only the omission's promise of which
-  // ones cannot be expressed. `organization` is the seventh gap field and
-  // is left off: absent, not empty, as toHoneypotEvent does throughout.
+  // ones cannot be expressed. `organization` is left off: absent, not
+  // empty, as toHoneypotEvent does throughout.
   return { ...toHoneypotEvent(row), ...gap } as HoneypotEvent
 }
 
@@ -1285,23 +1309,53 @@ const getIdentity: Backend['getIdentity'] = async (id) => {
   const ips = doc.ips.slice(0, MEMBER_LIMIT)
   const identity = attacker(doc)
   if (!ips.length) return { identity, group: membersGroup([], [], 0), shared: [] }
-  const [events, sources] = await Promise.all([
-    eventsWire('getIdentity', { ips: ips.join(','), since: '365d' }),
-    get<SourcesPageWire>('getIdentity', '/api/v1/sources', { offset: 0, size: 1000 }),
-  ])
-  const listed = new Map(sourceProfiles(listOf('getIdentity', sources)).map((row) => [row.ip, row]))
-  const members = (
-    await Promise.all(
-      ips.map(async (ip) => {
-        const row = listed.get(ip)
-        if (row) return row
-        const profile = await get<IpProfileWire>('getIdentity', `/api/v1/investigate/ip/${encodeURIComponent(ip)}`)
-        return profile ? profileMember(profile) : null
-      }),
-    )
-  ).filter((row): row is SourceProfile => row !== null)
+  const [events, members] = await Promise.all([eventsWire('getIdentity', { ips: ips.join(','), since: '365d' }), memberProfiles('getIdentity', ips)])
   const rows = paged(events).rows
   return { identity, group: membersGroup(members, rows, events.total), shared: sharedSignals(rows) }
+}
+
+/** Each address's profile, from GET /api/v1/sources (the top 1000) or
+ * GET /api/v1/investigate/ip/{ip} for one that list does not hold. An
+ * address with no events in the 10-day window has no profile and is left
+ * out. */
+async function memberProfiles(endpoint: string, ips: string[]): Promise<SourceProfile[]> {
+  const sources = await get<SourcesPageWire>(endpoint, '/api/v1/sources', { offset: 0, size: 1000 })
+  const listed = new Map(sourceProfiles(listOf(endpoint, sources)).map((row) => [row.ip, row]))
+  const members = await Promise.all(
+    ips.map(async (ip) => {
+      const row = listed.get(ip)
+      if (row) return row
+      const profile = await get<IpProfileWire>(endpoint, `/api/v1/investigate/ip/${encodeURIComponent(ip)}`)
+      return profile ? profileMember(profile) : null
+    }),
+  )
+  return members.filter((row): row is SourceProfile => row !== null)
+}
+
+/** GET /api/v1/investigate/asn/{id} (APIARY#3557) — the AS aggregated over
+ * every event: organization, the top 50 source addresses, first and last
+ * seen. Its group is built as the identity page's is: the top 50 addresses
+ * profiled, and their newest events from GET /api/v1/events?asn= (the AS
+ * itself, not the 50 addresses, so an address past the top 50 still shows
+ * in the event list). `first`/`last` are the aggregation's own, over every
+ * event rather than the newest 100. A 404 (no event from the AS) or a 400
+ * (not an AS number) is the page's not-found. */
+const getAsn: Backend['getAsn'] = async (id) => {
+  const label = asLabel(id)
+  if (!label) return null
+  const wire = await get<AsnWire>('getAsn', `/api/v1/investigate/asn/${encodeURIComponent(label)}`)
+  if (!wire) return null
+  const ips = wire.sources.map((row) => String(row.key)).filter((ip) => ip !== '').slice(0, MEMBER_LIMIT)
+  const [events, members] = await Promise.all([
+    eventsWire('getAsn', { asn: String(wire.asn), since: '365d' }),
+    ips.length ? memberProfiles('getAsn', ips) : Promise.resolve([]),
+  ])
+  const group = membersGroup(members, paged(events).rows, wire.events)
+  return {
+    asn: label,
+    orgs: wire.organization ? [wire.organization] : [],
+    group: { ...group, ...(wire.first ? { first: wire.first } : {}), ...(wire.last ? { last: wire.last } : {}) },
+  }
 }
 
 /** GET /api/v1/investigate/campaign/{id} (the campaigns-v1 document, id the
@@ -2408,50 +2462,96 @@ const getSourceEvents: Backend['getSourceEvents'] = async (ip, range) => paged(a
  * backend does not serve for a source yet. */
 const getSourceTimeline: Backend['getSourceTimeline'] = async (ip, range) => sourceTimeline((await eventsWire('getSourceTimeline', { ip, ...sinceOf(range) })).rows)
 
-/** The source's sessions, derived from the same events read. A session is
- * counted only from the events this read returns, so a session whose other
- * events fall past the 100-row ceiling is under-counted. */
-const getSourceSessions: Backend['getSourceSessions'] = async (ip, range) => sessionSummaries(paged(await eventsWire('getSourceSessions', { ip, ...sinceOf(range) })).rows)
+/** GET /api/v1/sources/{ip}/sessions (APIARY#3557) — the server-side session
+ * aggregation, so a session whose events fall past the 100-row event window
+ * is neither lost nor under-counted — joined with the same events read for
+ * the per-kind detail the buckets do not carry (`sessionBuckets`).
+ *
+ * The aggregation takes the five page ranges only (1h…30d). For `all` the
+ * page falls back to the sessions of the newest 100 events, the one read
+ * that spans the year, and says so by the same per-kind counts. */
+const getSourceSessions: Backend['getSourceSessions'] = async (ip, range) => {
+  const window = sinceOf(range)
+  const events = eventsWire('getSourceSessions', { ip, ...window })
+  if (!RANGES.has(window.since)) return sessionSummaries(paged(await events).rows)
+  const [buckets, rows] = await Promise.all([
+    get<SourceSessionsWire>('getSourceSessions', `/api/v1/sources/${encodeURIComponent(ip)}/sessions`, { range: window.since }),
+    events,
+  ])
+  return sessionBuckets(listOf('getSourceSessions', buckets).rows, paged(rows).rows, ip)
+}
+
+/** GET /api/v1/investigate/session/{id}/summary (APIARY#3557) — one session's
+ * aggregation. No page reads it today (the session page reads the session
+ * document); it is wired so the query answers real data rather than none.
+ * The summary counts events, sensors and distinct commands, not event kinds,
+ * so the per-kind counts are absent. 404 is "no such session". */
+const getSessionSummary: Backend['getSessionSummary'] = async (id) => {
+  const wire = await get<SessionSummaryWire>('getSessionSummary', `/api/v1/investigate/session/${encodeURIComponent(id)}/summary`)
+  if (!wire) return null
+  return {
+    id: wire.id,
+    srcIp: wire.sources[0] ? String(wire.sources[0].key) : '',
+    sensors: wire.sensors.map((row) => String(row.key)),
+    first: wire.first ?? '',
+    last: wire.last ?? '',
+    events: wire.events,
+  }
+}
 
 /** GET /api/v1/events?session= — one session's events. */
 const getSessionEvents: Backend['getSessionEvents'] = async (sessionId) => paged(await eventsWire('getSessionEvents', { session: sessionId, since: '365d' })).rows
 
-/** GET /api/v1/events?shasum= — the download events that carried a payload,
- * and the sessions and addresses behind them. All three are derived from
- * those download rows: the sessions are the ones that downloaded it, not the
- * wider sessions they belong to. */
+/** GET /api/v1/payloads/{id}/delivery (APIARY#3557) — the exact sessions and
+ * sources that carried a payload, aggregated server-side — and
+ * GET /api/v1/events?shasum= for the event list itself: the delivery
+ * document's `events` are raw `_source` documents, not event rows. The
+ * sessions are the ones that downloaded it, not the wider sessions they
+ * belong to. A 404 on the delivery document (no event carries the hash)
+ * falls back to the rows, which are then empty too. */
 const getPayloadDelivery: Backend['getPayloadDelivery'] = async (hash) => {
-  const events = paged(await eventsWire('getPayloadDelivery', { shasum: hash, since: '365d' })).rows
-  return { events, sessions: sessionSummaries(events), sources: sourceCounts(events) }
+  const [delivery, page] = await Promise.all([
+    get<PayloadDeliveryWire>('getPayloadDelivery', `/api/v1/payloads/${encodeURIComponent(hash)}/delivery`),
+    eventsWire('getPayloadDelivery', { shasum: hash, since: '365d' }),
+  ])
+  const events = paged(page).rows
+  if (!delivery) return { events, sessions: sessionSummaries(events), sources: sourceCounts(events) }
+  return { events, sessions: sessionBuckets(delivery.sessions, events), sources: keyCounts(delivery.sources) }
 }
 
 /** The /24 an IPv4 address belongs to, named as the correlator names its
  * campaigns (correlator.rs `ip_prefix` at 24). Null for anything else. */
 const cidr24 = (ip: string): string | null => (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip) ? `${ip.split('.').slice(0, 3).join('.')}.0/24` : null)
 
-/** GET /api/v1/investigate/ip/{ip} (organization and country), GET /api/v1/sources
- * (the addresses in the same /24) and GET /api/v1/campaigns (the correlator's
- * campaign for that /24). Three reads, one page.
+/** GET /api/v1/sources/{ip}/network (APIARY#3557: AS number, organization,
+ * country), GET /api/v1/sources (the addresses in the same /24) and
+ * GET /api/v1/campaigns (the correlator's campaign for that /24).
  *
- * Two gaps are named here, not hidden. `asn` is the AS number, which the
- * ip profile does not carry (only the organization), so it is left absent and
- * the page shows the organization without a link. The network-v1 document this
- * would otherwise read (`/sources/{ip}/network`) is not served on real data
- * (Xore/APIARY#3554). The neighbours come from the top 1000 addresses by
- * events, so a neighbour outside that list is not shown. */
+ * The network document is the one answer that carries the AS number. On a
+ * backend that 404s it (no event from the address, or a backend older than
+ * #3557) the page falls back to the ip profile, whose organization and
+ * `as_number` (APIARY#3696) it reads instead; a number neither names is left
+ * absent and the page shows the organization without a link. The
+ * neighbours come from the top 1000 addresses by events, so a neighbour
+ * outside that list is not shown. */
 const getSourceNetwork: Backend['getSourceNetwork'] = async (ip) => {
-  const [profile, sources, campaigns] = await Promise.all([
-    get<IpProfileWire>('getSourceNetwork', `/api/v1/investigate/ip/${encodeURIComponent(ip)}`),
+  const cidr = cidr24(ip)
+  if (!cidr) return null
+  const path = encodeURIComponent(ip)
+  const [network, sources, campaigns] = await Promise.all([
+    get<SourceNetworkWire>('getSourceNetwork', `/api/v1/sources/${path}/network`),
     get<SourcesPageWire>('getSourceNetwork', '/api/v1/sources', { offset: 0, size: 1000 }),
     get<CampaignPageWire>('getSourceNetwork', '/api/v1/campaigns', { size: 100 }),
   ])
-  const cidr = cidr24(ip)
-  if (!profile || !cidr) return null
+  const profile = network ? null : await get<IpProfileWire>('getSourceNetwork', `/api/v1/investigate/ip/${path}`)
+  if (!network && !profile) return null
+  const asn = network ? asLabel(network.asn) : asLabel(profile?.as_number)
+  const org = network ? network.organization : (profile?.as_organization ?? profile?.asn)
+  const country = network ? network.country : profile?.country
   const neighbours = sourceProfiles(listOf('getSourceNetwork', sources)).filter((p) => p.ip !== ip && cidr24(p.ip) === cidr)
   const campaign = networkCampaigns(listOf('getSourceNetwork', campaigns)).find((c) => c.cidr === cidr)
-  // The ip profile names the organization, not the AS number, so `asn` is
-  // absent rather than a placeholder.
-  return { cidr, ...(profile.asn ? { org: profile.asn } : {}), ...(profile.country ? { country: profile.country } : {}), neighbours, ...(campaign ? { campaign } : {}) }
+  // Absent attributes are left out, never carried as '' or a placeholder.
+  return { cidr, ...(asn ? { asn } : {}), ...(org ? { org } : {}), ...(country ? { country } : {}), neighbours, ...(campaign ? { campaign } : {}) }
 }
 
 /** GET /api/v1/sources/{ip}/identities — the attacker document the address
@@ -2466,9 +2566,6 @@ const getBlockedIps: Backend['getBlockedIps'] = async () => activeBlockIps(listO
 
 // ---- queries with no backend route yet: they throw, they never answer empty ----
 
-const getAsn: Backend['getAsn'] = async () => {
-  throw unavailable('getAsn', 'Xore/APIARY#3554')
-}
 const getEntityTimeline: Backend['getEntityTimeline'] = async () => {
   throw unavailable('getEntityTimeline', 'Xore/APIARY#3554')
 }
@@ -2565,6 +2662,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   getSourceProfiles,
   getSourceEvents,
   getSourceSessions,
+  getSessionSummary,
   getSourceTimeline,
   getSourceNetwork,
   getSourceIdentity,

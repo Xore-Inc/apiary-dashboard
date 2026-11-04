@@ -1575,9 +1575,12 @@ export interface SessionSummary extends Record<string, unknown> {
   first: string
   last: string
   events: number
-  logins: number
-  commands: number
-  downloads: number
+  /** Per-kind counts, absent when the backend's session aggregation (which
+   * counts events, not kinds) is the only answer for this session. Absent,
+   * never a placeholder 0. */
+  logins?: number
+  commands?: number
+  downloads?: number
   recordingShasum?: string
 }
 

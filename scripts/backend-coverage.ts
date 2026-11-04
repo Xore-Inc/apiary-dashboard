@@ -17,10 +17,6 @@ export const BACKEND_EXCEPTIONS: Record<string, Exception> = {
     reason:
       'Production replay pages and downloads use getReplayDetail and raw download handlers; this is the no-backend mock fallback.',
   },
-  getSessionSummary: {
-    status: 'unused',
-    reason: 'No rewrite route or component calls this legacy query.',
-  },
   resolveIncidents: {
     status: 'local',
     reason:

@@ -10,25 +10,22 @@ import type { HoneypotEvent, ProviderClass } from '../types'
 
 /** HoneypotEvent fields the event row never sets, and why:
  *
- * - `type` — the row has no event kind of its own; `detail` is the sensor's
- *   rendered sentence, not a classification. The seam derives it from the
- *   event name (`pageEvent`).
+ * - `type` — the page's event type is finer than the row's `kind` (it
+ *   splits a login into failed and succeeded), so the seam derives it from
+ *   `kind` and the sensor's own event name (`pageEvent`).
  * - `eventName` — the sensor's own event name (`cowrie.login.failed`,
  *   `NEW_CONNECTION`, …) is inside `record.honeypot` under whatever key
  *   that sensor writes it as, not lifted to the row.
- * - `srcPort` — the row carries only the destination port. The source port
- *   lives in the source document, not in `EventRow`.
- * - `techniques` — the ATT&CK mapping is a pipeline result; `pivots.alert`
- *   carries the alert string, not a technique list.
- * - `city` — the row has `source.geo.country_iso_code` only.
  * - `organization` — the decoy org. `pivots.org` is the ATTACKER's
  *   network org (`source.as.org`), a different value that the row does
  *   carry as `org`.
  *
- * `severity` is not in this list: it is set when `pivots.ics_severity` says
- * so, and omitted otherwise. Nothing on the wire classifies a generic row.
+ * `srcPort`, `city`, `severity` and `techniques` are on the row since
+ * APIARY#3561, each only when present. A backend older than that sends none
+ * of them: the port and city stay absent, the technique list is empty (none
+ * assigned), and the severity falls back to `pivots.ics_severity`.
  */
-export type EventRowGap = 'type' | 'eventName' | 'srcPort' | 'techniques' | 'city' | 'organization'
+export type EventRowGap = 'type' | 'eventName' | 'organization'
 
 const PROVIDERS: readonly ProviderClass[] = ['network', 'hosting', 'cloud', 'scanner', 'blocklist:spamhaus']
 
@@ -46,7 +43,10 @@ export function toHoneypotEvent(row: EventRow): Omit<HoneypotEvent, EventRowGap>
     srcIp: row.src_ip,
     srcIpClaimed: opt(row.src_ip_claimed ?? ''),
     dstPort: Number(row.port) || 0,
+    // 0 is not a port (events.rs drops it too); absent, never 0.
+    ...(typeof row.src_port === 'number' && row.src_port > 0 ? { srcPort: row.src_port } : {}),
     country: opt(row.country),
+    city: opt(row.city ?? ''),
     asn: opt(p.asn),
     sessionId: opt(row.session),
     username: opt(p.user),
@@ -69,9 +69,11 @@ export function toHoneypotEvent(row: EventRow): Omit<HoneypotEvent, EventRowGap>
     payloadClass: opt(p.payload_class),
     // Only DNP3 sets this, and only to those two values (ics_severity.rs).
     icsSeverity: ics === 'critical' || ics === 'high' ? ics : undefined,
-    // The same two values, read as the row's severity. Absent on every
-    // other row: an unclassified event has no severity, not `info`.
-    severity: ics === 'critical' || ics === 'high' ? ics : undefined,
+    // The backend's normalized rating (APIARY#3561), or on an older backend
+    // the DNP3 rating it already sent. Absent on every other row: an
+    // unclassified event has no severity, not `info`.
+    severity: row.severity ?? (ics === 'critical' || ics === 'high' ? ics : undefined),
+    techniques: (row.techniques ?? []).filter((t) => t !== ''),
     communityId: opt(row.record.network?.community_id ?? ''),
   }
 }
