@@ -11,6 +11,7 @@ Owner: deployment operator. Reviewers: dashboard, backend, identity, and platfor
 | `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key that signs the operator identity on backend calls (`ACTOR_ASSERTION_PRIVATE_KEY` is the inline form; set one, not both). Required before the backend runs `ACTOR_ASSERTION_MODE=enforce`; unset signs nothing. A bad key refuses to boot with `E-ACTOR-ASSERTION-KEY`. |
 | `BACKEND_URL` | backend-service base URL. Required for production data. |
 | `BACKEND_MOUNTED_URL` | Mounted backend instance for spool-backed operations; omit only when `BACKEND_URL` reaches the same mounts. |
+| `NODE_EXTRA_CA_CERTS` | Optional PEM bundle Bun trusts in addition to the system store, for an `https://` backend whose certificate a private CA signed. The Compose stack sets it from `BACKEND_CA_BUNDLE_FILE`. TLS verification is never disabled; a wrong or missing bundle fails the backend call (`/readyz` reports `backend unreachable`). |
 | `OIDC_ISSUER_URL` | Keycloak realm URL. Required outside development. |
 | `OIDC_CLIENT_ID` | Dashboard client; default `apiary-dashboard`. |
 | `OIDC_CLIENT_SECRET_FILE` | Preferred client-secret input. `OIDC_CLIENT_SECRET` is supported when file secrets are unavailable. |
@@ -24,6 +25,17 @@ Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`
 `BFF_IDLE_TIMEOUT_S` is how long the Bun server keeps a connection open while no bytes flow. It defaults to four backend timeouts (120 s with the default `BACKEND_TIMEOUT_MS`), capped at Bun's 255 s. A value shorter than one backend timeout plus 5 s refuses to boot (`E-IDLE-TIMEOUT`). Bun's own default is 10 s. Before this setting existed, every server function that waited longer than that on the backend got an empty response, and a cold page stayed on its skeleton until a reload found the shared read cache warm.
 
 Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset. The server refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, `E-DEV-HTTP-COOKIE`, `E-EXPORT-TOKEN`, or `E-ACTOR-ASSERTION-KEY`.
+
+## Names carried over from the legacy frontend
+
+The legacy `frontend-next` service (APIARY `arcane/home/honeypot-dashboard/compose.yml`) used some different names. When moving a host's configuration across:
+
+| Legacy variable | Here | Notes |
+|---|---|---|
+| `OIDC_EXTERNAL_URL` (compose: `DASHBOARD_NEXT_OIDC_EXTERNAL_URL`) | `EXTERNAL_URL` | The public origin. It also drives the same-origin checks here, not only the OIDC redirect. |
+| `SERVE_MODE` (compose: `DASHBOARD_SERVE_MODE`, `all` / `frontend` / `bff`) | none | The rewrite is one tier. The page server calls the backend itself through server functions; there is no separate BFF to split off. Leave it unset. |
+| `BFF_INTERNAL_URL` | none | Only used with `SERVE_MODE=frontend` to reach a remote BFF. Here the dashboard reaches backend-service directly at `BACKEND_URL`, so a dashboard on another host sets `BACKEND_URL` (and `BACKEND_MOUNTED_URL`) to the backend's reachable address instead. |
+| `BACKEND_URL` | `BACKEND_URL` | Same meaning. The standalone stack has no Docker-DNS default: set it per host. |
 
 ## Provisioning
 

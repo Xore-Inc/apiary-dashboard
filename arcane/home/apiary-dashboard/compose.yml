@@ -68,6 +68,11 @@ services:
       - PORT=3000
       - BACKEND_URL=${BACKEND_URL:?set BACKEND_URL}
       - BACKEND_MOUNTED_URL=${BACKEND_MOUNTED_URL:?set BACKEND_MOUNTED_URL}
+      # Extra CA certificates (PEM) Bun trusts on top of the system store,
+      # for an https:// backend signed by a private CA. Put the bundle in the
+      # secrets dir and set e.g. /run/dashboard-secrets/backend-ca.pem; empty
+      # trusts the system store only. Verification is never turned off.
+      - NODE_EXTRA_CA_CERTS=${BACKEND_CA_BUNDLE_FILE:-}
       # The dashboard also reads SERVICE_TOKEN_FILE / EXPORT_TOKEN_FILE (a
       # secret file, exactly one of file or value); this stack uses the value.
       - SERVICE_TOKEN=${SERVICE_TOKEN:?set SERVICE_TOKEN}
