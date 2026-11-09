@@ -71,3 +71,33 @@ export function formatChange(value: number, previous: number): string {
 /** An autonomous system as one label: `AS64512 · Example Hosting`. Either
  * half may be missing (no number known, no organization); both missing is ''. */
 export const formatAs = (asn: string, org: string) => [asn, org].filter(Boolean).join(' · ')
+
+/** A span of milliseconds as its two largest units: "37 d 9 h", "3 m 6 s",
+ * "12.5 s", "450 ms". A zero lower unit is dropped ("2 d", "1 m"). */
+export function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return '0 ms'
+  if (ms < 1000) return `${Math.round(ms)} ms`
+  if (ms < 60_000) return `${Number((ms / 1000).toFixed(1))} s`
+  const units: Array<[string, number]> = [['d', 86_400_000], ['h', 3_600_000], ['m', 60_000], ['s', 1000]]
+  const at = units.findIndex(([, size]) => ms >= size)
+  const [big, bigSize] = units[at]
+  const whole = Math.floor(ms / bigSize)
+  const rest = units[at + 1] ? Math.floor((ms - whole * bigSize) / units[at + 1][1]) : 0
+  return rest > 0 ? `${whole} ${big} ${rest} ${units[at + 1][0]}` : `${whole} ${big}`
+}
+
+/** A byte count in the unit a person reads: "512 B", "1.5 KB", "5 MB". */
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = Math.max(0, bytes)
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  return `${unit === 0 ? Math.round(value) : Number(value.toFixed(1))} ${units[unit]}`
+}
+
+/** A sensor measure's value or peak, read by its unit (#288). */
+export const formatMeasure = (value: number, unit: 'count' | 'bytes' | 'duration' | undefined): string =>
+  unit === 'duration' ? formatDurationMs(value) : unit === 'bytes' ? formatBytes(value) : formatNumber(value)

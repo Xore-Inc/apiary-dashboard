@@ -9,7 +9,8 @@ import { Heading, Text } from '@astryxdesign/core/Text'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { ProtocolTimeline } from '#/components/charts'
 import { CountTable, Panel } from '#/components/DashboardBlocks'
-import { formatDateTime, formatNumber } from '#/lib/format'
+import { formatDateTime, formatMeasure } from '#/lib/format'
+import { sensorSummary } from '#/lib/sensorText'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
@@ -23,16 +24,16 @@ function SensorOverview() {
   return (
     <VStack gap={5}>
       <Panel title="What this sensor did">
-        <Text color="secondary">{`${detail.reading.what}. The quantities this sensor exists to produce, not an event count, which says the same thing about every sensor.`}</Text>
+        <Text color="secondary">{sensorSummary(detail.reading.what, 'The quantities this sensor exists to produce, not an event count, which says the same thing about every sensor.')}</Text>
         <Grid columns={{ minWidth: 180, repeat: 'fit' }} gap={3}>
           {detail.measures.map((m) => (
             <Card key={m.label} variant="muted">
               <VStack gap={1}>
-                <Heading level={3}>{formatNumber(m.value)}</Heading>
+                <Heading level={3}>{formatMeasure(m.value, m.unit)}</Heading>
                 <Text type="label" color="secondary">
                   {m.label}
                 </Text>
-                <Text type="supporting">busiest source: {m.peak}</Text>
+                <Text type="supporting">{m.peak}</Text>
               </VStack>
             </Card>
           ))}

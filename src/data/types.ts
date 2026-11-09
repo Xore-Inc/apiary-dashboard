@@ -482,7 +482,11 @@ export interface SensorSummary {
 export interface SensorMeasure {
   label: string
   value: number
-  /** The busiest single source for this measure, e.g. "12 from 198.51.100.7". */
+  /** How `value` reads: a `duration` is in milliseconds, `bytes` and `count`
+   * as they are. Absent: a plain count. */
+  unit?: 'count' | 'bytes' | 'duration'
+  /** The headline beside the value, in words: "busiest source: 12 from
+   * 198.51.100.7" from the mock, "largest single value 3 m 6 s" from the wire. */
   peak: string
 }
 

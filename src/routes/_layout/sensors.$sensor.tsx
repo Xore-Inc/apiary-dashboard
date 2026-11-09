@@ -13,6 +13,7 @@ import { NotFound } from '#/components/NotFound'
 import { getSensorCatalog, getSensorDetail, getSourceHealth, getTopology } from '#/data/queries'
 import type { SensorStatus } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { sensorSubtitle } from '#/lib/sensorText'
 
 export const Route = createFileRoute('/_layout/sensors/$sensor')({
   ssr: pageSsr,
@@ -64,7 +65,7 @@ function SensorLayout() {
     <EntityFrame
       kind="Sensor"
       title={sensor?.name ?? id}
-      description={sensor && `${sensor.kind} · ${sensor.location} · ${sensor.protocols.join(', ')}`}
+      description={sensor && sensorSubtitle(sensor)}
       basePath={`/sensors/${encodeURIComponent(id)}`}
       tokens={
         sensor && (

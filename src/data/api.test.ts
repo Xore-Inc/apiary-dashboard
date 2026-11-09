@@ -1406,7 +1406,7 @@ describe('sensors', () => {
     ])
     expect(detail).toMatchObject({ uniqueSources: 40, firstSeen: '2026-10-04T08:00:00Z', topSources: [{ label: '203.0.113.42', count: 7 }], topLists: [{ label: 'commands' }] })
     expect(detail.timeline.map((b) => b.total)).toEqual([4, 9])
-    expect(detail.measures).toEqual([{ label: 'commands', value: 120, peak: '9 max' }])
+    expect(detail.measures).toEqual([{ label: 'commands', value: 120, unit: 'count', peak: 'largest single value 9' }])
     expect(detail.recentEvents).toHaveLength(1)
   })
 
