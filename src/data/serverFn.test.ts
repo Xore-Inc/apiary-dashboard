@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { backendGapOf, isBackendGap } from '#/lib/backendGap'
+import { resetReauth } from '#/lib/reauth'
+import { CSRF_HEADER, crossOriginResponse, isSameOriginRequest } from '#/server/origin'
 import { ApiError } from './errors'
 import { announced, clockFor, guardedFetch } from './serverFn'
 
@@ -56,5 +58,59 @@ describe('announced (#284)', () => {
       return {}
     })()
     expect(typeof seen).toBe('function')
+  })
+})
+
+// #291: Start's client fetcher uses a call's own `fetch` in place of the
+// Start instance's `serverFns.fetch` (start.ts), so the fetch `announced`
+// hands every query is the one every browser call goes through. It has to
+// be the dashboard's own fetch (lib/reauth.ts), or no call carries the CSRF
+// header and every POST is refused by the same-origin rule.
+describe('the fetch every server function call goes through (#291)', () => {
+  const page = 'https://dash.example.test'
+  // What reaches the server: the request the browser builds from the
+  // fetch's arguments, with the Origin a same-origin page always sends.
+  let received: Request[] = []
+
+  beforeEach(() => {
+    received = []
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(new URL(String(input), page), init)
+      request.headers.set('origin', page)
+      received.push(request)
+      return isSameOriginRequest(request) ? new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }) : crossOriginResponse()
+    })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    resetReauth()
+  })
+
+  // The call as Start makes it: through the fetch the call carries.
+  const post = (name: string) => announced(name, async (options) => (await options.fetch!('/_serverFn/abc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })).status)()
+
+  it('carries the CSRF header, so the same-origin rule lets a POST through', async () => {
+    expect(await post('savePreferences')).toBe(200)
+    expect(received[0].headers.get(CSRF_HEADER)).toBe('1')
+  })
+
+  it('is refused without the header: the rule itself is unchanged', async () => {
+    const bare = new Request(`${page}/_serverFn/abc`, { method: 'POST', headers: { origin: page } })
+    expect(isSameOriginRequest(bare)).toBe(false)
+    expect(crossOriginResponse().status).toBe(403)
+  })
+
+  it('still raises a gateway 5xx as unavailable (#284)', async () => {
+    vi.stubGlobal('fetch', async () => new Response('<html>bad gateway</html>', { status: 502, headers: { 'content-type': 'text/html' } }))
+    await expect(post('savePreferences')).rejects.toMatchObject({ kind: 'unavailable', endpoint: 'savePreferences' })
+  })
+
+  it('sends an expired session to sign in again', async () => {
+    const assign = vi.fn()
+    vi.stubGlobal('window', { location: { pathname: '/events', search: '', hash: '', assign }, dispatchEvent: () => true })
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 401 }))
+    expect(await post('acknowledgeAlert')).toBe(401)
+    expect(assign).toHaveBeenCalledWith('/auth/login?return_to=%2Fevents')
   })
 })
