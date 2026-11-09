@@ -772,10 +772,9 @@ describe('getAnalysisResults, a composite with no results endpoint of its own', 
   const admin = { name: 'alice', email: 'a@example.test', roles: ['admin'] }
   const empty = { total: 0, rows: [] }
 
-  it('fans out to the five endpoints that do exist', async () => {
+  it('fans out to the four endpoints that answer without a payload', async () => {
     const calls = stub({
       '/api/v1/gpu-queue': [{ job_id: 'gj-1', job_type: 'decompile', ref: 'a'.repeat(64), model: 'qwen', estimated_vram_mib: 18_000, status: 'running', requested_at: '2026-10-01T14:00:00Z', started_at: '', finished_at: '', abort_requested: false, error: '', attempts: 1, result: null }],
-      '/api/v1/workbench/analyzers': [{ classification: { code: 'c', label: 'Executable', platform: 'PE', category: 'executable', analysis_path: 'x', dynamic: false }, analyzers: [] }],
       '/api/v1/workbench/runs': { runs: [] },
       '/api/v1/workbench/recipes': { recipes: [] },
       '/api/v1/store/yara': empty,
@@ -786,15 +785,33 @@ describe('getAnalysisResults, a composite with no results endpoint of its own', 
     // #3110: identity is the actor header alone. An `owner` query param here
     // would read as if it scoped the list, and it is not deserialized at all.
     expect(calls.some((url) => url.includes('owner='))).toBe(false)
-    expect(calls.filter((url) => url.includes('/api/v1/workbench/'))).toHaveLength(3)
+    expect(calls.filter((url) => url.includes('/api/v1/workbench/'))).toHaveLength(2)
+  })
+
+  // #290: the analyzer catalog is per payload (workbench_api.rs `analyzers`
+  // takes a required `hash`, classifies that payload and answers its
+  // registry). Asked without one, the backend answers 400, and that refusal
+  // failed the whole composite, the recipes the analysis dialog reads with it.
+  it('never asks for the analyzer catalog without a payload', async () => {
+    const recipe = { schema_version: 1, id: 'rc-1', revision: 1, name: 'Quick look', description: '', owner: 'alice', scope: 'personal', created_at: '', analyzers: [{ analyzer_id: 'static', options: {} }] }
+    const calls = stub({
+      '/api/v1/gpu-queue': [],
+      '/api/v1/workbench/analyzers': fail(400, 'Failed to deserialize query string: missing field `hash`'),
+      '/api/v1/workbench/runs': { runs: [] },
+      '/api/v1/workbench/recipes': { recipes: [recipe] },
+      '/api/v1/store/yara': empty,
+    })
+    const data = (await liveQuery('getAnalysisResults', admin)!()) as Awaited<ReturnType<Backend['getAnalysisResults']>>
+    expect(data.recipes).toHaveLength(1)
+    expect(calls.some((url) => new URL(url).pathname === '/api/v1/workbench/analyzers')).toBe(false)
   })
 
   it('routes the workbench half to the mounted base', async () => {
     process.env.BACKEND_MOUNTED_URL = 'http://mounted.test'
-    const calls = stub({ '/api/v1/gpu-queue': [], '/api/v1/workbench/analyzers': [], '/api/v1/workbench/runs': { runs: [] }, '/api/v1/workbench/recipes': { recipes: [] }, '/api/v1/store/yara': { total: 0, rows: [] } })
+    const calls = stub({ '/api/v1/gpu-queue': [], '/api/v1/workbench/runs': { runs: [] }, '/api/v1/workbench/recipes': { recipes: [] }, '/api/v1/store/yara': { total: 0, rows: [] } })
     await liveQuery('getAnalysisResults', admin)!()
     const workbench = calls.filter((url) => url.includes('/api/v1/workbench/'))
-    expect(workbench).toHaveLength(3)
+    expect(workbench).toHaveLength(2)
     expect(workbench.every((url) => new URL(url).origin === 'http://mounted.test')).toBe(true)
   })
 })

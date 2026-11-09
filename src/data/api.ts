@@ -119,7 +119,6 @@ import { recordShed } from '#/server/obs'
 import { isRead, READ_ONLY_EXEMPT } from './readOnly'
 import {
   analyzerCatalog,
-  analyzerInfos,
   artifactRows,
   capeRun,
   capeRuns,
@@ -2029,9 +2028,16 @@ const queuePayloadAction: Backend['queuePayloadAction'] = async (hash, action) =
 /** There is no `GET /api/v1/results` in the Rust router and no canonical
  * `fetchResults` in docs/migration/server-functions.json — the brief's
  * mapping for it does not exist upstream. The page's `AnalysisResultsData`
- * is a composite, so it is answered from the five endpoints that do exist
- * rather than left on the mock, which would show an operator fabricated
- * runs.
+ * is a composite, so it is answered from the four endpoints that answer
+ * without a payload rather than left on the mock, which would show an
+ * operator fabricated runs.
+ *
+ * `analyzers` stays empty: there is no registry-wide catalog. The one
+ * catalog endpoint (workbench_api.rs `analyzers`) is per payload, with a
+ * required `hash` it classifies, and asked without one it answers 400,
+ * which failed this whole composite on every /payloads load (#290). A
+ * payload's catalog is `getAnalyzerCatalog(hash)`, which the analysis
+ * dialog reads for the sample it is about.
  *
  * The `range` argument is NOT honoured: the one endpoint that could filter
  * by it (`/store/yara`) pages by offset, not by time, and the other four
@@ -2045,9 +2051,8 @@ const getAnalysisResults: Backend['getAnalysisResults'] = async () => {
   // check ("it isn't deserialized at all, so no handler can make an access
   // decision out of request data"), so no owner is sent here.
   const mounted = { mounted: true, user: callerOf() }
-  const [queue, catalog, runs, recipes] = await Promise.all([
+  const [queue, runs, recipes] = await Promise.all([
     get<GpuQueueWire>('getAnalysisResults', '/api/v1/gpu-queue'),
-    get<AnalyzerCatalogWire[]>('getAnalysisResults', '/api/v1/workbench/analyzers', {}, mounted),
     get<WorkbenchRunListWire>('getAnalysisResults', '/api/v1/workbench/runs', { limit: 25 }, mounted),
     get<WorkbenchRecipeListWire>('getAnalysisResults', '/api/v1/workbench/recipes', {}, mounted),
   ])
@@ -2055,7 +2060,7 @@ const getAnalysisResults: Backend['getAnalysisResults'] = async () => {
   return {
     results,
     gpuQueue: gpuQueueOf(queue ?? []),
-    analyzers: analyzerInfos(catalog ?? []),
+    analyzers: [],
     runs: workbenchRuns(runs ?? { runs: [] }),
     recipes: savedWorkbenchRecipes(recipes ?? { recipes: [] }),
   }

@@ -543,12 +543,6 @@ export function analyzerCatalog(wire: AnalyzerCatalogWire): AnalyzerCatalog {
   }
 }
 
-/** The whole registry's analyzer rows, for the results page's catalog. The
- * `applicable`/`reason` pair is per-payload and not on the bare registry. */
-export function analyzerInfos(wire: AnalyzerCatalogWire[]): AnalyzerInfo[] {
-  return wire.flatMap((catalog) => catalog.analyzers.map(analyzerInfo))
-}
-
 const runState = (state: string): WorkbenchRun['state'] => (['queued', 'running', 'succeeded', 'failed', 'cancelled', 'skipped'].includes(state) ? (state as WorkbenchRun['state']) : 'queued')
 
 /** GET /api/v1/workbench/runs/{id} and POST .../children/{id}/{action}. */
