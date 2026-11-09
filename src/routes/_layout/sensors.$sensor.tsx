@@ -76,7 +76,7 @@ function SensorLayout() {
       }
       actions={<SensorPicker current={id} sensors={loaded?.catalog.map((c) => c.sensor) ?? [id]} />}
       facts={[
-        { label: 'Events / 24h', value: sensor && formatNumber(sensor.eventsLast24h) },
+        { label: `Events / ${(detail?.window ?? '24 h').replace(' ', '')}`, value: sensor && formatNumber(sensor.eventsLast24h) },
         { label: 'Unique sources', value: detail && formatNumber(detail.uniqueSources) },
         { label: 'First seen', value: detail && formatDateTime(detail.firstSeen) },
         { label: 'Last event', value: sensor && formatDateTime(sensor.lastSeen) },

@@ -39,7 +39,7 @@ function SensorOverview() {
         </Grid>
       </Panel>
       <Panel title="Activity" action={<ActionLink href={`/events?sensor=${sensor.id}`}>All events</ActionLink>}>
-        <Text type="supporting">Events per hour over the last 24 hours. First seen {formatDateTime(detail.firstSeen)}.</Text>
+        <Text type="supporting">{`Events per hour over the last ${detail.window ?? '24 h'}. First seen ${formatDateTime(detail.firstSeen)}.`}</Text>
         <ProtocolTimeline buckets={detail.timeline} />
       </Panel>
       <Panel title="Event types">

@@ -499,6 +499,9 @@ export interface SensorDetail {
   uniqueSources: number
   firstSeen: string
   timeline: TimeBucket[]
+  /** The span `timeline` and the sensor's event count cover, as the wire
+   * names it ("7 d", "24 h"). Absent: the mock's 24 hours. */
+  window?: string
   /** The quantities this sensor type exists to produce. */
   measures: SensorMeasure[]
   topSources: CountRow[]
