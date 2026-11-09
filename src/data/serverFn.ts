@@ -74,13 +74,46 @@ function announce(record: ApiCallRecord) {
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent<ApiCallRecord>(API_CALL, { detail: record }))
 }
 
+type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
+
+/** The fetch a server function's browser call goes through (#284).
+ *
+ * The BFF answers a refusal as a serialized `ApiError` with its HTTP status
+ * (a 502 for `unavailable`). The Cloudflare zone in front of production
+ * replaces a 502 or 504 body with its own JSON document, and Start's client
+ * returns any JSON body without the `x-tss-serialized` marker as the call's
+ * result, so the page received Cloudflare's document as if it were data and
+ * crashed on it. A 5xx the BFF did not serialize is the same refusal as the
+ * BFF's own `unavailable`, wherever it was produced (Cloudflare, Traefik, a
+ * restarting container), so it is raised as that: the loaders' gap handling
+ * and the error boundary already know what to do with it. A BFF answer
+ * (marked) passes through untouched, and so does an abort. */
+export function guardedFetch(name: string, fetchImpl: Fetcher = (input, init) => fetch(input, init)): Fetcher {
+  return async (input, init) => {
+    let response: Response
+    try {
+      response = await fetchImpl(input, init)
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') throw error
+      if (error instanceof TypeError) throw new ApiError('unavailable', name, { detail: 'The dashboard server did not answer.', backendUnreachable: true })
+      throw error
+    }
+    if (response.status >= 500 && !response.headers.get('x-tss-serialized') && !response.headers.get('x-tss-raw')) {
+      void response.body?.cancel().catch(() => {})
+      throw new ApiError('unavailable', name, { detail: `The gateway answered ${response.status} without the backend's response.` })
+    }
+    return response
+  }
+}
+
 /** A server function called with the query's own arguments, timed and
  * announced, so pages keep calling `getEvents(filters)`. */
-export function announced(name: string, fn: (options: { data: unknown[] }) => Promise<unknown>) {
+export function announced(name: string, fn: (options: { data: unknown[]; fetch?: Fetcher }) => Promise<unknown>) {
+  const guarded = guardedFetch(name)
   return async (...args: unknown[]) => {
     const started = Date.now()
     try {
-      const result = await fn({ data: args })
+      const result = await fn({ data: args, fetch: guarded })
       announce({ name, ok: true, status: 200, ms: Date.now() - started })
       return result
     } catch (error) {

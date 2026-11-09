@@ -28,6 +28,7 @@ import {
   sensorState,
   sourceHealth,
   topology,
+  windowLabel,
 } from './operations'
 
 const alerts: AlertPageWire = {
@@ -189,6 +190,16 @@ describe('operations adapters', () => {
       // duration_s is scaled to the page's ms convention; peak has no per-source answer.
       expect(detail.measures[0]).toEqual({ label: 'session duration', value: 12_500, peak: '3.2 max' })
       expect(detail.byType).toEqual([])
+      // The wire's window is the span the count and the series cover (#286).
+      expect(detail.window).toBe('7 d')
+    })
+
+    it('names the window the overview counts', () => {
+      expect(windowLabel('now-7d', 168)).toBe('7 d')
+      expect(windowLabel('now-24h', 24)).toBe('24 h')
+      expect(windowLabel('now-2w', 336)).toBe('14 d')
+      expect(windowLabel('weird', 48)).toBe('2 d')
+      expect(windowLabel('weird', 12)).toBe('12 h')
     })
 
     it('keeps a sensor event as the sensor wrote it', () => {

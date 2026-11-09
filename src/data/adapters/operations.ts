@@ -150,6 +150,18 @@ export function sourceHealth(wire: SourceHealthWire): SourceHealth {
  * end backwards — a graph point, not a measurement. The page's `measures`
  * wants {label, value, peak}; the wire gives {label, total, max, unit}, and
  * nothing per-source, so `peak` is the formatted total (see gaps). */
+/** The overview's window as a label: `now-7d` is "7 d", `now-24h` "24 h". The
+ * wire names it, and the hourly series is the same span, so a window this
+ * does not recognise falls back to the series' own length. */
+export function windowLabel(window: string, hours: number): string {
+  const match = /^now-(\d+)([hdw])$/.exec(window)
+  if (match) {
+    const n = Number(match[1])
+    return match[2] === 'h' ? `${n} h` : `${match[2] === 'w' ? n * 7 : n} d`
+  }
+  return hours % 24 === 0 && hours > 24 ? `${hours / 24} d` : `${hours} h`
+}
+
 export function sensorOverview(wire: SensorOverviewWire, sensor: Sensor, recentEvents: HoneypotEvent[]): SensorDetail {
   const timeline: TimeBucket[] = wire.hourly.map((total, i) => ({ time: new Date(Date.parse(wire.last_seen) - (wire.hourly.length - 1 - i) * 3600_000).toISOString(), total, byProtocol: {} }))
   return {
@@ -157,6 +169,7 @@ export function sensorOverview(wire: SensorOverviewWire, sensor: Sensor, recentE
     uniqueSources: wire.unique_sources,
     firstSeen: wire.first_seen,
     timeline,
+    window: windowLabel(wire.window, wire.hourly.length),
     measures: wire.measures.map((m) => measure(m)),
     topSources: countRows(wire.top_sources),
     topCountries: countRows(wire.top_countries),

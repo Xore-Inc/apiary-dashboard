@@ -87,17 +87,39 @@ const GRID_STROKE = 'var(--color-border)'
 
 type TimelineRow = { time: string } & Record<string, number | string>
 
-function toRows(buckets: TimeBucket[], series: Series[]): TimelineRow[] {
+/** The rows the stacked bars draw. A bucket's `total` is the truth; its
+ * protocol split may be partial or absent (the sensor overview carries only
+ * a count per hour), and the part no protocol claims is drawn as "other", so
+ * a bucket with a total and no split is a bar, not an empty slot (#286). */
+export function toRows(buckets: TimeBucket[], series: Series[]): TimelineRow[] {
   const named = new Set(series.map((s) => s.key))
   return buckets.map((bucket) => {
     const row: TimelineRow = { time: bucket.time, other: 0 }
+    let split = 0
     for (const [protocol, count] of Object.entries(bucket.byProtocol)) {
+      split += count
       if (protocol !== 'other' && named.has(protocol)) row[protocol] = count
       else row.other = (row.other as number) + count
     }
+    row.other = (row.other as number) + Math.max(0, bucket.total - split)
     return row
   })
 }
+
+const HOUR = 3600_000
+
+/** How the x-axis labels a run of hourly buckets: clock times for a day or
+ * less, every fourth hour; dates for a longer window, about eight labels
+ * across it, never one per bucket. */
+export function timelineAxis(buckets: TimeBucket[]): { interval: number; label: (iso: string) => string } {
+  const hours = buckets.length > 1 ? (Date.parse(buckets[buckets.length - 1].time) - Date.parse(buckets[0].time)) / HOUR + 1 : buckets.length
+  if (hours <= 36) return { interval: 3, label: (iso) => formatTime(iso).slice(0, 5) }
+  return { interval: Math.max(0, Math.ceil(buckets.length / 8) - 1), label: formatDay }
+}
+
+/** The legend's series: those a bar uses, so a chart of unsplit counts
+ * shows one entry, not five empty ones. */
+const drawn = (series: Series[], rows: TimelineRow[]) => series.filter((s) => rows.some((r) => Number(r[s.key] ?? 0) > 0))
 
 /** A chart with nothing to draw: the space it would take, saying so,
  * instead of axes around nothing (or an SVG sized by Infinity). */
@@ -150,6 +172,7 @@ export function ProtocolTimeline({ buckets }: { buckets: TimeBucket[] }) {
   if (!buckets.some((b) => b.total > 0)) return <ChartEmpty height={260} label="No events in this window." />
   const series = seriesFor(buckets)
   const rows = toRows(buckets, series)
+  const axis = timelineAxis(buckets)
   return (
     <VStack gap={3}>
       <ChartBox height={260}>
@@ -157,11 +180,11 @@ export function ProtocolTimeline({ buckets }: { buckets: TimeBucket[] }) {
           <CartesianGrid vertical={false} stroke={GRID_STROKE} />
           <XAxis
             dataKey="time"
-            tickFormatter={(value: string) => formatTime(value).slice(0, 5)}
+            tickFormatter={axis.label}
             tick={AXIS_TICK}
             axisLine={false}
             tickLine={false}
-            interval={3}
+            interval={axis.interval}
           />
           <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
           <Tooltip content={<TimelineTooltip />} cursor={{ fill: 'var(--color-background-muted)' }} />
@@ -181,7 +204,7 @@ export function ProtocolTimeline({ buckets }: { buckets: TimeBucket[] }) {
         </BarChart>
       </ChartBox>
       <HStack gap={4} wrap="wrap">
-        {series.map((s) => (
+        {drawn(series, rows).map((s) => (
           <HStack key={s.key} gap={1.5} vAlign="center">
             <Swatch color={s.color} />
             <Text type="supporting">{s.label}</Text>
