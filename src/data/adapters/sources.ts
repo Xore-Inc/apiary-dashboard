@@ -55,7 +55,7 @@ const counts = (rows: KvWire[]): CountRow[] => rows.map((row) => ({ id: row.key,
 
 const techniques = (rows: TechniqueWire[]): Technique[] => rows.map((row) => ({ id: row.id, name: row.name, tactic: row.domain, events: row.count }))
 
-const scanOf = (scan: string): 'horizontal' | 'vertical' | undefined => (scan === 'horizontal' || scan === 'vertical' ? scan : undefined)
+const scanOf = (scan: string | undefined): 'horizontal' | 'vertical' | undefined => (scan === 'horizontal' || scan === 'vertical' ? scan : undefined)
 
 // ---- GET /api/v1/sources ----------------------------------------------------
 
@@ -99,8 +99,9 @@ export const attacker = (row: AttackerEntityWire): AttackerEntity => {
     first: row.first,
     last: row.last,
     updated: row.updated,
-    verdicts: row.verdicts,
-    techniques: row.techniques,
+    // Skipped by the writer when empty (#283).
+    verdicts: row.verdicts ?? [],
+    techniques: row.techniques ?? [],
     destIps: row.dest_ips,
     portsTouched: row.ports_touched,
   }

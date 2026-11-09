@@ -114,6 +114,14 @@ describe('sources adapters', () => {
     expect(out).not.toHaveProperty('protocols_touched')
   })
 
+  it('reads a doc the writer stored without verdicts, techniques or scan (#283)', () => {
+    const { verdicts: _v, techniques: _t, scan: _s, ...bare } = entity
+    const [out] = attackers({ total: 1, rows: [{ ...bare, _doc_id: entity.id }] })
+    expect(out.verdicts).toEqual([])
+    expect(out.techniques).toEqual([])
+    expect(out).not.toHaveProperty('scan')
+  })
+
   it('omits scan when the correlator labelled neither window', () => {
     const [out] = attackers({ total: 1, rows: [{ ...entity, scan: '', _doc_id: entity.id }] })
     expect(out).not.toHaveProperty('scan')

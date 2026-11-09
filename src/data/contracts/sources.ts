@@ -20,7 +20,9 @@ import type { EventRow } from './events'
  * `serde_json::to_value` writes it. `window_events`, `verdicts_pending`,
  * `evidence`, `sensor_counts`, `protocols_touched` and `ports_touched` carry
  * `skip_serializing_if`, so a doc written before its first touched cycle
- * omits them. `scan` is "" when neither scan window applied.
+ * omits them. `verdicts` and `techniques` are skipped when empty and `scan`
+ * when "" (neither scan window applied), so most live docs carry none of
+ * the three (#283: 100 of the first 100 rows had no `verdicts`).
  * `EvidencePointerWire` is `{id, ts}` with `ts` in millis since epoch. */
 export interface AttackerEntityWire {
   id: string
@@ -33,12 +35,12 @@ export interface AttackerEntityWire {
   first: string
   last: string
   updated: string
-  verdicts: string[]
-  techniques: string[]
+  verdicts?: string[]
+  techniques?: string[]
   ports_touched: number
   dest_ips: number
   protocols_touched: number
-  scan: string
+  scan?: string
   window_events?: number
   verdicts_pending?: boolean
   evidence?: Array<{ id: string; ts?: number }>
