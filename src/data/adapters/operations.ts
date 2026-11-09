@@ -10,6 +10,7 @@ import type {
   AlertGroup,
   AlertRecord,
   ContainerState,
+  SensorMeasure,
   CountRow,
   DeadLetter,
   FeedState,
@@ -41,6 +42,7 @@ import type {
   TopologyWire,
 } from '../contracts/operations'
 import type { ServicesWire } from '../contracts/settings'
+import { formatMeasure } from '#/lib/format'
 
 const countRows = (rows: Array<{ key: string; count: number }>): CountRow[] => rows.map((r) => ({ id: r.key, label: r.key, count: r.count }))
 
@@ -182,7 +184,16 @@ export function sensorOverview(wire: SensorOverviewWire, sensor: Sensor, recentE
 
 const UNIT_SCALE: Record<string, number> = { duration_ms: 1, duration_s: 1000, bytes: 1, count: 1 }
 
-const measure = (m: SensorMeasureWire) => ({ label: m.label, value: m.total * (UNIT_SCALE[m.unit] ?? 1), peak: `${m.max} max` })
+/** The wire's `unit` as the page's: durations are carried in milliseconds. */
+const unitOf = (unit: string): NonNullable<SensorMeasure['unit']> => (unit === 'duration_ms' || unit === 'duration_s' ? 'duration' : unit === 'bytes' ? 'bytes' : 'count')
+
+/** `max` is the largest single value the aggregation saw, not a per-source
+ * figure (the wire has none), so it is worded as exactly that (#288). */
+const measure = (m: SensorMeasureWire): SensorMeasure => {
+  const unit = unitOf(m.unit)
+  const scale = UNIT_SCALE[m.unit] ?? 1
+  return { label: m.label, value: m.total * scale, unit, peak: `largest single value ${formatMeasure(m.max * scale, unit)}` }
+}
 
 /** GET /api/v1/sensors/{sensor}/events?limit=200. Not the shared event row:
  * these are sensors.rs SensorEvent — the sensor's own fields, no pivots, no

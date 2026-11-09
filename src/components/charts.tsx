@@ -22,7 +22,7 @@ import {
 } from 'recharts'
 import type { ReactElement } from 'react'
 import type { CountRow, HeatmapRow, KillChainData, SeriesPoint, TimeBucket } from '#/data/types'
-import { formatDateTime, formatDay, formatNumber, formatTime } from '#/lib/format'
+import { formatDateTime, formatCompact, formatDay, formatNumber, formatTime } from '#/lib/format'
 import { useMeasuredWidth } from '#/lib/useMeasuredWidth'
 
 // Colors follow the protocol, never its rank, so filtering never repaints a
@@ -167,6 +167,19 @@ function TimelineTooltip({
   )
 }
 
+/** A y-axis tick as short text: 25000 reads "25K". */
+export const yAxisLabel = (value: number): string => formatCompact(value)
+
+/** The y axis's width: the widest label the scale can print, at the tick font,
+ * plus padding. The stacked total's scale rounds up past the tallest bar, so
+ * one more digit than the tallest bar's is allowed for (#288: the fixed 36 px
+ * cut "20000" to "0000"). */
+export function yAxisWidth(buckets: TimeBucket[]): number {
+  const tallest = Math.max(0, ...buckets.map((b) => b.total))
+  const chars = yAxisLabel(tallest * 1.25).length
+  return Math.max(36, Math.ceil(chars * AXIS_TICK.fontSize * 0.62) + 12)
+}
+
 /** Hourly events stacked by protocol. */
 export function ProtocolTimeline({ buckets }: { buckets: TimeBucket[] }) {
   if (!buckets.some((b) => b.total > 0)) return <ChartEmpty height={260} label="No events in this window." />
@@ -186,7 +199,7 @@ export function ProtocolTimeline({ buckets }: { buckets: TimeBucket[] }) {
             tickLine={false}
             interval={axis.interval}
           />
-          <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={36} />
+          <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} width={yAxisWidth(buckets)} tickFormatter={yAxisLabel} />
           <Tooltip content={<TimelineTooltip />} cursor={{ fill: 'var(--color-background-muted)' }} />
           {series.map((s, index) => (
             <Bar

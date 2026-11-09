@@ -187,11 +187,20 @@ describe('operations adapters', () => {
       expect(detail.timeline[2].time).toBe('2026-10-04T21:02:00.000Z')
       expect(detail.topSources[0]).toEqual({ id: '198.51.100.13', label: '198.51.100.13', count: 90 })
       expect(detail.topLists[0].label).toBe('commands issued')
-      // duration_s is scaled to the page's ms convention; peak has no per-source answer.
-      expect(detail.measures[0]).toEqual({ label: 'session duration', value: 12_500, peak: '3.2 max' })
+      // duration_s is scaled to the page's ms convention; the wire's max is one value, not a source, and is worded as a duration (#288).
+      expect(detail.measures[0]).toEqual({ label: 'session duration', value: 12_500, unit: 'duration', peak: 'largest single value 3.2 s' })
       expect(detail.byType).toEqual([])
       // The wire's window is the span the count and the series cover (#286).
       expect(detail.window).toBe('7 d')
+    })
+
+    it('reads a duration_ms measure in milliseconds and words both numbers as durations (#288)', () => {
+      const wire = { sensor: 'cowrie', window: 'now-7d', events: 1, unique_sources: 1, first_seen: '2026-11-02T00:00:00Z', last_seen: '2026-11-09T00:00:00Z', hourly: [1], top_sources: [], top_countries: [], top_lists: [], measures: [{ label: 'session time', total: 3_229_815_628, max: 186_022, unit: 'duration_ms' }, { label: 'payload', total: 2048, max: 1024, unit: 'bytes' }, { label: 'commands', total: 120, max: 9, unit: 'count' }] } as SensorOverviewWire
+      expect(sensorOverview(wire, sensor, []).measures).toEqual([
+        { label: 'session time', value: 3_229_815_628, unit: 'duration', peak: 'largest single value 3 m 6 s' },
+        { label: 'payload', value: 2048, unit: 'bytes', peak: 'largest single value 1 KB' },
+        { label: 'commands', value: 120, unit: 'count', peak: 'largest single value 9' },
+      ])
     })
 
     it('names the window the overview counts', () => {

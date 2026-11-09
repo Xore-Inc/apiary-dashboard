@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TimeBucket } from '#/data/types'
-import { timelineAxis, toRows } from './charts'
+import { timelineAxis, toRows, yAxisLabel, yAxisWidth } from './charts'
 
 const hourly = (totals: number[], byProtocol: Record<string, number> = {}): TimeBucket[] =>
   totals.map((total, i) => ({ time: new Date(Date.UTC(2026, 10, 2, 0) + i * 3600_000).toISOString(), total, byProtocol }))
@@ -38,5 +38,22 @@ describe('timelineAxis', () => {
     const axis = timelineAxis(hourly(Array(168).fill(1)))
     expect(Math.ceil(168 / (axis.interval + 1))).toBeLessThanOrEqual(9)
     expect(axis.label('2026-11-02T00:00:00Z')).not.toMatch(/\d\d:\d\d/)
+  })
+})
+
+// #288: the weekly chart's tick labels (20000, 25000) were cut at the left edge.
+describe('y axis', () => {
+  it('abbreviates large tick values', () => {
+    expect(yAxisLabel(0)).toBe('0')
+    expect(yAxisLabel(25_000)).toBe('25K')
+    expect(yAxisLabel(1_500_000)).toBe('1.5M')
+  })
+
+  it('makes room for the widest label the scale can print', () => {
+    const wide = yAxisWidth(hourly([9_000, 31_000]))
+    const narrow = yAxisWidth(hourly([3, 8]))
+    expect(wide).toBeGreaterThan(narrow)
+    // "38.8K" at 12 px does not fit the old fixed 36 px.
+    expect(wide).toBeGreaterThan(36)
   })
 })

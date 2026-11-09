@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { configureTime, formatChange, formatRelative, now, zoneLabel, formatClock, formatCompact, formatDateTime, formatDay, formatNumber, formatTime, formatAs } from './format'
+import { configureTime, formatChange, formatRelative, now, zoneLabel, formatClock, formatCompact, formatDateTime, formatDay, formatNumber, formatTime, formatAs, formatDurationMs, formatBytes } from './format'
 import { inRange } from '#/data/shared'
 
 describe('formatters', () => {
@@ -76,5 +76,30 @@ describe('formatAs', () => {
     expect(formatAs('', 'Example Hosting')).toBe('Example Hosting')
     expect(formatAs('AS64512', '')).toBe('AS64512')
     expect(formatAs('', '')).toBe('')
+  })
+})
+
+// #288: the sensor overview's "session time" showed 3,229,815,628, milliseconds.
+describe('formatDurationMs', () => {
+  it('names the two largest units', () => {
+    expect(formatDurationMs(3_229_815_628)).toBe('37 d 9 h')
+    expect(formatDurationMs(186_022)).toBe('3 m 6 s')
+    expect(formatDurationMs(5 * 3600_000 + 12 * 60_000 + 40_000)).toBe('5 h 12 m')
+  })
+
+  it('keeps short spans precise and drops a zero remainder', () => {
+    expect(formatDurationMs(0)).toBe('0 ms')
+    expect(formatDurationMs(450)).toBe('450 ms')
+    expect(formatDurationMs(12_500)).toBe('12.5 s')
+    expect(formatDurationMs(60_000)).toBe('1 m')
+    expect(formatDurationMs(2 * 86_400_000)).toBe('2 d')
+  })
+})
+
+describe('formatBytes', () => {
+  it('scales to the unit a person reads', () => {
+    expect(formatBytes(512)).toBe('512 B')
+    expect(formatBytes(1536)).toBe('1.5 KB')
+    expect(formatBytes(5 * 1024 * 1024)).toBe('5 MB')
   })
 })

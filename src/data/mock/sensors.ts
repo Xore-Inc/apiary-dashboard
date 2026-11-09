@@ -22,7 +22,7 @@ function countBy(values: string[], limit = 8): CountRow[] {
 /** "12 from 198.51.100.7": the busiest single source for a measure. */
 function busiestSource(events: HoneypotEvent[]): string {
   const top = countBy(events.map((e) => e.srcIp), 1).at(0)
-  return top ? `${top.count} from ${top.label}` : 'none'
+  return top ? `busiest source: ${top.count} from ${top.label}` : 'busiest source: none'
 }
 
 export function sensorReading(sensor: Sensor, events: HoneypotEvent[]): { measures: SensorMeasure[]; topLists: Array<{ label: string; rows: CountRow[] }>; reading: SensorReading } {
