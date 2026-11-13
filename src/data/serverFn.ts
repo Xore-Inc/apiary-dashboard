@@ -7,6 +7,7 @@ import { ApiError, asApiError } from './errors'
 import { API_CALL, isScenario } from './scenarios'
 import type { ApiCallRecord, MockScenario } from './scenarios'
 import { mockScenariosAllowed } from '#/server/policy'
+import { sessionAwareFetch } from '#/lib/reauth'
 
 // The browser's scenario for the navigation in progress: the layout sets it
 // before any loader runs, because the address bar only changes once the
@@ -76,7 +77,14 @@ function announce(record: ApiCallRecord) {
 
 type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>
 
-/** The fetch a server function's browser call goes through (#284).
+/** The fetch a server function's browser call goes through (#284, #291).
+ *
+ * It wraps the dashboard's own fetch (lib/reauth.ts), the same one start.ts
+ * registers as `serverFns.fetch`: Start's client uses a call's own `fetch`
+ * in place of that one, not around it, so whatever this wraps is what every
+ * query reaches the server through. Wrapping plain `fetch` here dropped the
+ * CSRF header from every call (the same-origin rule, server/origin.ts,
+ * refused every POST with a 403) and the 401 → sign-in handling with it.
  *
  * The BFF answers a refusal as a serialized `ApiError` with its HTTP status
  * (a 502 for `unavailable`). The Cloudflare zone in front of production
@@ -88,7 +96,7 @@ type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respons
  * restarting container), so it is raised as that: the loaders' gap handling
  * and the error boundary already know what to do with it. A BFF answer
  * (marked) passes through untouched, and so does an abort. */
-export function guardedFetch(name: string, fetchImpl: Fetcher = (input, init) => fetch(input, init)): Fetcher {
+export function guardedFetch(name: string, fetchImpl: Fetcher = sessionAwareFetch): Fetcher {
   return async (input, init) => {
     let response: Response
     try {

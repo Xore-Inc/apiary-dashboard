@@ -256,6 +256,11 @@ step "every page loads skeleton first in a browser, then its data"
 bun scripts/skeletons.ts "http://localhost:$PORT" "$WORK/samples.json"
 case $? in 0 | 2) ;; *) failed=1 ;; esac
 
+step "a state-changing server function from a hydrated page carries the CSRF header (#291)"
+# Needs a browser; exit 2 means none was found and the check is skipped.
+bun scripts/csrf.ts "http://localhost:$PORT"
+case $? in 0 | 2) ;; *) failed=1 ;; esac
+
 step "every route shape under every mock scenario"
 bun scripts/crawl.ts "http://localhost:$PORT" 1 --scenarios || failed=1
 
