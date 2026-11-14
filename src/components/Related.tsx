@@ -127,25 +127,29 @@ function RelationGraph({ center, groups }: { center: string; groups: RelatedGrou
   )
 }
 
+/** The live backend relates over its default 7-day window (data/api.ts
+ * `RELATED_RANGE`). */
+const RELATED_TITLE = 'Related, last 7 days'
+
 /** Everything else this entity touches, as a list or a graph. */
 export function RelatedPanel({ center, groups }: { center: string; groups: RelatedGroup[] | BackendGap | undefined }) {
   const [view, setView] = useState<'list' | 'graph'>('list')
   if (isBackendGap(groups))
     return (
-      <Panel title="Related">
+      <Panel title={RELATED_TITLE}>
         <PanelBackendGap detail={groups.gap} />
       </Panel>
     )
   if (!groups)
     return (
-      <Panel title="Related">
+      <Panel title={RELATED_TITLE}>
         <Skeleton height={160} />
       </Panel>
     )
   if (groups.length === 0) return null
   return (
     <Panel
-      title="Related"
+      title={RELATED_TITLE}
       action={
         <SegmentedControl label="Related view" size="sm" value={view} onChange={(value) => setView(value as 'list' | 'graph')}>
           <SegmentedControlItem value="list" label="List" />
