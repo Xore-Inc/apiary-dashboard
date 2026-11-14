@@ -1196,10 +1196,30 @@ export interface DeploymentLinks {
   accountConsole?: string
 }
 
+/** One tile source for the attack map, as Leaflet takes it. */
+export interface MapTileProvider {
+  /** Leaflet URL template: {z}/{x}/{y}, {s} for a subdomain, {r} for retina, {apikey}. */
+  url: string
+  /** The provider's required credit (HTML, from the deployment's own environment). */
+  attribution: string
+  subdomains?: string
+  /** Fills {apikey}. A tile key reaches the browser by design; it should be
+   * restricted to the dashboard's domain at the provider. */
+  apiKey?: string
+  /** A CSS filter over the tiles: how light tiles serve dark mode. */
+  filter?: string
+}
+
+/** The attack map's tiles for each mode, from the environment (data/mapTiles.ts). */
+export interface MapTiles {
+  light: MapTileProvider
+  dark: MapTileProvider
+}
+
 /** What the shell itself needs of the configuration: labels, the banner,
- * notices, and the switches that change every page; and where the
- * deployment's other tools are. */
-export type ShellConfig = Pick<DashboardConfig, 'presentation' | 'behavior'> & { links: DeploymentLinks }
+ * notices, and the switches that change every page; where the deployment's
+ * other tools are; and the map's tile provider. */
+export type ShellConfig = Pick<DashboardConfig, 'presentation' | 'behavior'> & { links: DeploymentLinks; map?: MapTiles }
 
 /** What validation found wrong, field name → message. Empty when valid. */
 export type ConfigProblems = Record<string, string>

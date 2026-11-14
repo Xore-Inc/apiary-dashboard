@@ -4,6 +4,7 @@
 // scripts/gen-queries.ts), run in the page's scenario by ./backend.ts.
 // Wiring the real backend replaces what answers behind those functions;
 // the signatures here are the contract.
+import { mapTiles } from './mapTiles'
 import { ApiError } from './errors'
 import { ghidraArtifacts, sandboxArtifacts, sizeOf } from './mock/artifacts'
 import type { ArtifactFile } from './mock/artifacts'
@@ -1324,7 +1325,7 @@ export async function getPreferences(): Promise<Preferences> {
 /** The configuration the shell renders with on every page. */
 export async function getShellConfig(): Promise<ShellConfig> {
   await mockDelay({ canFail: false })
-  return { presentation: { ...CONFIG.presentation }, behavior: { ...CONFIG.behavior }, links: { ...DEPLOYMENT_LINKS } }
+  return { presentation: { ...CONFIG.presentation }, behavior: { ...CONFIG.behavior }, links: { ...DEPLOYMENT_LINKS }, map: mapTiles() }
 }
 
 
