@@ -424,6 +424,12 @@ describe('the IOC and entity reads (APIARY#3572)', () => {
     expect(await live('getRelated')('source', '203.0.113.4')).toEqual([{ kind: 'payload', label: 'Payloads', items: [{ id: 'd41d8', label: 'd41d8…', note: 'downloaded by this source' }] }])
   })
 
+  it('reads related entities over the backend default 7-day window, which stays under the gateway timeout', async () => {
+    const calls = stub({ '/api/v1/entities/': { id: 'asn:21859', entity: { kind: 'asn', value: '21859' }, range: '7d', groups: [] } })
+    await live('getRelated')('asn', 'AS21859')
+    expect(params(calls[0])).toEqual({ range: '7d' })
+  })
+
   it('relates an event through its own source, session and sensor, then what its source relates to', async () => {
     const calls = stub({
       '/api/v1/event/': { id: 'ev1', time: '2026-10-08T00:00:00Z', sensor: 'cowrie', src_ip: '203.0.113.4', session: 'ca4616fbf9f0', record: {} },

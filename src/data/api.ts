@@ -2665,8 +2665,10 @@ const getEntityTimeline: Backend['getEntityTimeline'] = async (kind, id, range) 
   return wire ? entityTimeline(wire) : []
 }
 
-/** GET /api/v1/entities/{id}/related (APIARY#3572), over the backend's widest
- * window (30d). An event is not a backend entity, so its related panel is
+/** GET /api/v1/entities/{id}/related (APIARY#3572), over the backend's own
+ * default window (7d). The widest one (30d) took 6-13 s cold and reached the
+ * 30 s backend timeout under load on production (2026-11-14: AS21859 at
+ * 29.2 s and 30.0 s, a 502); 7d answers in 2-7 s cold. An event is not a backend entity, so its related panel is
  * the event's own source, session and sensor, then what is related to its
  * source address (GET /api/v1/event/{id} names both). */
 const getRelated: Backend['getRelated'] = async (kind, id) => {
@@ -2683,8 +2685,11 @@ const getRelated: Backend['getRelated'] = async (kind, id) => {
   return relatedOf(kind, id)
 }
 
+/** The related panel's window; the panel names it (components/Related.tsx `RELATED_TITLE`). */
+const RELATED_RANGE = '7d'
+
 const relatedOf = async (kind: TimelineEntity, id: string): Promise<RelatedGroup[]> => {
-  const wire = await get<EntityRelatedWire>('getRelated', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/related`, { range: '30d' })
+  const wire = await get<EntityRelatedWire>('getRelated', `/api/v1/entities/${encodeURIComponent(entityId(kind, id))}/related`, { range: RELATED_RANGE })
   return wire ? entityRelated(wire) : []
 }
 
