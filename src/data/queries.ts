@@ -196,6 +196,12 @@ const getCredentialsFn = createServerFn({ method: 'GET' })
   .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getCredentials', data, context.mock)) as Json)
 export const getCredentials = announced('getCredentials', getCredentialsFn) as Rpc<typeof impl.getCredentials>
 
+const getDeadLetterFn = createServerFn({ method: 'GET' })
+  .middleware([mockScenarioMiddleware])
+  .validator((args: unknown[]) => args)
+  .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getDeadLetter', data, context.mock)) as Json)
+export const getDeadLetter = announced('getDeadLetter', getDeadLetterFn) as Rpc<typeof impl.getDeadLetter>
+
 const getDeadLettersFn = createServerFn({ method: 'GET' })
   .middleware([mockScenarioMiddleware])
   .validator((args: unknown[]) => args)

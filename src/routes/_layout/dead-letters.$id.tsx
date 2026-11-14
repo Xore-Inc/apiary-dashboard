@@ -4,7 +4,7 @@ import { Pending } from '#/components/Pending'
 import { orPending } from '#/lib/pending'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { DeadLetterDetail } from '#/components/details/DeadLetter'
-import { getDeadLetters } from '#/data/queries'
+import { getDeadLetter } from '#/data/queries'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
 import { formatDateTime } from '#/lib/format'
@@ -12,7 +12,8 @@ import { formatDateTime } from '#/lib/format'
 export const Route = createFileRoute('/_layout/dead-letters/$id')({
   ssr: pageSsr,
   loader: async ({ params }) => {
-    const row = (await getDeadLetters('')).find((r) => r.id === params.id)
+    // The whole document: the list's rows cut the rejected event to a preview.
+    const row = await getDeadLetter(params.id)
     if (!row) throw notFound()
     return row
   },

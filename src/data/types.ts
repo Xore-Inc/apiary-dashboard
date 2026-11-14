@@ -1034,6 +1034,10 @@ export interface DeadLetter extends Record<string, unknown> {
   reason: string
   source: string
   index: string
+  /** The log file the rejected event was read from, when known. */
+  path?: string
+  /** Fields the list cut to a preview; the detail page reads the whole document. */
+  truncated?: string[]
   document: Record<string, unknown>
 }
 

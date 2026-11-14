@@ -1214,6 +1214,12 @@ export async function getDeadLetters(query: string): Promise<DeadLetter[]> {
   return q ? DEAD_LETTERS.filter((d) => JSON.stringify(d).toLowerCase().includes(q)) : [...DEAD_LETTERS]
 }
 
+/** One dead letter, whole. */
+export async function getDeadLetter(id: string): Promise<DeadLetter | null> {
+  await mockDelay()
+  return DEAD_LETTERS.find((d) => d.id === id) ?? null
+}
+
 /** Mock write: purges exactly the documents the query box shows — the same
  * `q` the list above it was loaded with, never a silently broader set. */
 export async function purgeDeadLetters(query: string): Promise<number> {
