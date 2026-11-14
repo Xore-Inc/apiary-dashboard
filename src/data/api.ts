@@ -1935,10 +1935,9 @@ const getReplayDetail: Backend['getReplayDetail'] = async (shasum) => {
     get<RecordingsPageWire>('getReplayDetail', '/api/v1/recordings', { offset: 0, size: 100 }),
   ])
   // One recording is shared by every session that produced the same bytes,
-  // so the sessions are the rows carrying this shasum. `ttylog_base64` has
-  // no page field and the adapter drops it rather than adding one to reach
-  // it; the attacker block needs /api/v1/investigate/ip/{ip}, which is the
-  // sources slice's seam, so it stays null.
+  // so the sessions are the rows carrying this shasum. The attacker block
+  // needs /api/v1/investigate/ip/{ip}, which is the sources slice's seam, so
+  // it stays null.
   return replayDetail(wire, recordingRows(page ?? { total: 0, rows: [] }).filter((row) => row.shasum === shasum))
 }
 
@@ -2030,6 +2029,16 @@ const getSandboxRun: Backend['getSandboxRun'] = async (job) => {
 const getSandboxLiveStatus: Backend['getSandboxLiveStatus'] = async () => {
   const wire = await get<SandboxVncStatusWire>('getSandboxLiveStatus', '/api/v1/sandbox/vnc', {}, { mounted: true })
   return wire ? { running: true, job: wire.sha256 } : { running: false }
+}
+
+/** The same endpoint's bridge WebSocket, for the noVNC viewer (dash#305).
+ * Admin-only (authorize.ts): watching a live detonation is at least as
+ * sensitive as downloading the sample, so only an admin's page learns where
+ * the bridge is. The bridge itself drops keyboard, pointer and clipboard
+ * messages; the viewer is view-only on top. */
+const getSandboxVncBridge: Backend['getSandboxVncBridge'] = async () => {
+  const wire = await get<SandboxVncStatusWire>('getSandboxVncBridge', '/api/v1/sandbox/vnc', {}, { mounted: true })
+  return wire?.bridge_ws ? { job: wire.sha256, bridge: wire.bridge_ws } : null
 }
 
 const getGhidraAnalysis: Backend['getGhidraAnalysis'] = async (sha) => {
@@ -2810,6 +2819,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   abortGpuJob,
   getSandboxRun,
   getSandboxLiveStatus,
+  getSandboxVncBridge,
   getGhidraAnalysis,
   getCapeRuns,
   getCapeRun,

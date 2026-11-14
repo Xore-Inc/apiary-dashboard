@@ -197,7 +197,7 @@ Effective access for every generated HTTP route and every server query. “Viewe
 
 The two canonical catch-all BFF routes are intentionally absent: browser-selected upstream paths were removed. `src/data/api.ts` owns fixed server-side backend calls and sends the service token. Static assets are served by `server.ts` and contain no protected data.
 
-## Server queries (111)
+## Server queries (112)
 
 Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced in `src/data/backend.ts` for both mock and live adapters.
 
@@ -272,6 +272,7 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `getRevDeckRuns` | 401 | allow | allow |
 | `getSandboxLiveStatus` | 401 | allow | allow |
 | `getSandboxRun` | 401 | allow | allow |
+| `getSandboxVncBridge` | 401 | 403 | allow |
 | `getSensorCatalog` | 401 | allow | allow |
 | `getSensorDetail` | 401 | allow | allow |
 | `getServiceLogs` | 401 | allow | allow |

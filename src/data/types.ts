@@ -537,6 +537,9 @@ export interface Replay {
   frames: number
   durationSeconds: number
   transcript: string
+  /** The raw Cowrie ttylog, base64: the timed frames the xterm player plays.
+   * Absent: the player steps through the transcript instead. */
+  ttylog?: string
 }
 
 // ---- Operations ------------------------------------------------------------

@@ -154,6 +154,7 @@ describe('which queries the real backend answers', () => {
         'getRevDeckRuns',
         'getSandboxLiveStatus',
         'getSandboxRun',
+        'getSandboxVncBridge',
         'queuePayloadAction',
         'setRunChild',
         'startAnalysisRun',

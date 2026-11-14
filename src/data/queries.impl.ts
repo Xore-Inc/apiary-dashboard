@@ -1427,10 +1427,24 @@ export async function getSandboxRun(job: string): Promise<SandboxRun | null> {
   return payload && payload.dynamic ? buildSandboxRun(payload) : null
 }
 
-/** Whether a Windows-sandbox detonation is live right now (mock: none is). */
+/** A local VNC bridge to show the mock's live view against
+ * (`APIARY_MOCK_VNC_BRIDGE=ws://127.0.0.1:5959`); unset, nothing runs. */
+const mockVncBridge = () => process.env.APIARY_MOCK_VNC_BRIDGE?.trim() || undefined
+const MOCK_DETONATION = '320cbb5e902f6bc9d8ea8edd7974b7829b1e4f08f477b7e3aadb240c18e9cc37'
+
+/** Whether a Windows-sandbox detonation is live right now (mock: none is,
+ * unless a local bridge is configured). */
 export async function getSandboxLiveStatus(): Promise<{ running: boolean; job?: string; since?: string }> {
   await mockDelay()
-  return { running: false }
+  return mockVncBridge() ? { running: true, job: MOCK_DETONATION } : { running: false }
+}
+
+/** Where the browser's view-only VNC client connects for the live
+ * detonation, and which sample it is: admins only (mock: nothing runs). */
+export async function getSandboxVncBridge(): Promise<{ job: string; bridge: string } | null> {
+  await mockDelay()
+  const bridge = mockVncBridge()
+  return bridge ? { job: MOCK_DETONATION, bridge } : null
 }
 
 export async function getGhidraAnalysis(sha: string): Promise<GhidraAnalysis | null> {
