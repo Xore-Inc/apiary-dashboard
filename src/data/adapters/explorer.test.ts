@@ -186,10 +186,11 @@ describe('explorer adapters', () => {
     expect(unattributed.country).toBeUndefined()
   })
 
-  it('maps the recordings page and a replay, and drops the frame stream the page cannot play', () => {
+  it('maps the recordings page and a replay, keeping the frame stream for the player', () => {
     const rows = recordingRows({ total: 1, rows: [recordingWire] } satisfies RecordingsPageWire)
     expect(rows).toHaveLength(1)
-    expect(replay(replayWire)).toEqual({ shasum: 'ab12cd34', frames: 118, durationSeconds: 41.5, transcript: replayWire.transcript })
+    expect(replay(replayWire)).toEqual({ shasum: 'ab12cd34', frames: 118, durationSeconds: 41.5, transcript: replayWire.transcript, ttylog: 'AAAAAA==' })
+    expect(replay({ ...replayWire, ttylog_base64: '' })).not.toHaveProperty('ttylog')
     expect(replay(null)).toBeNull()
   })
 

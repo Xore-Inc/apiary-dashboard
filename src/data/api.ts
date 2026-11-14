@@ -1935,10 +1935,9 @@ const getReplayDetail: Backend['getReplayDetail'] = async (shasum) => {
     get<RecordingsPageWire>('getReplayDetail', '/api/v1/recordings', { offset: 0, size: 100 }),
   ])
   // One recording is shared by every session that produced the same bytes,
-  // so the sessions are the rows carrying this shasum. `ttylog_base64` has
-  // no page field and the adapter drops it rather than adding one to reach
-  // it; the attacker block needs /api/v1/investigate/ip/{ip}, which is the
-  // sources slice's seam, so it stays null.
+  // so the sessions are the rows carrying this shasum. The attacker block
+  // needs /api/v1/investigate/ip/{ip}, which is the sources slice's seam, so
+  // it stays null.
   return replayDetail(wire, recordingRows(page ?? { total: 0, rows: [] }).filter((row) => row.shasum === shasum))
 }
 

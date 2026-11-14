@@ -286,14 +286,13 @@ export const recording = (wire: RecordingWire): Recording => ({
 /** GET /api/v1/recordings?offset&size[&ip]. */
 export const recordingRows = (wire: RecordingsPageWire): Recording[] => wire.rows.map(recording)
 
-/** GET /api/v1/recordings/{shasum} → the page Replay. The wire is strictly
- * richer: `size_bytes` and `imported_at` have no page field, and
- * `ttylog_base64` — the original frame stream for a browser-side player —
- * is dropped, so the page can only render the server-decoded `transcript`.
- * A `null` argument is the 404 the handler returns, passed through as the
- * page's own "no such recording". */
+/** GET /api/v1/recordings/{shasum} → the page Replay. `size_bytes` and
+ * `imported_at` have no page field; `ttylog_base64`, the original timed
+ * frame stream, goes to the xterm player (dash#305). A `null` argument is
+ * the 404 the handler returns, passed through as the page's own "no such
+ * recording". */
 export const replay = (wire: ReplayWire | null): Replay | null =>
-  wire && { shasum: wire.shasum, frames: wire.frames, durationSeconds: wire.duration_seconds, transcript: wire.transcript }
+  wire && { shasum: wire.shasum, frames: wire.frames, durationSeconds: wire.duration_seconds, transcript: wire.transcript, ...(wire.ttylog_base64 ? { ttylog: wire.ttylog_base64 } : {}) }
 
 /** The ReplayDetail the recordings page renders: the replay itself plus the
  * sessions it covers. The attacker block behind it needs an address profile
