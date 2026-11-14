@@ -18,8 +18,8 @@ import {
   yAxisLabel,
   yAxisWidth,
 } from './chartOptions'
-import { echartsTheme, escapeHtml  } from './chartTheme'
-import type {ChartTheme} from './chartTheme';
+import { echartsTheme, escapeHtml } from './chartTheme'
+import type { ChartTheme } from './chartTheme'
 
 const hourly = (totals: number[], byProtocol: Record<string, number> = {}): TimeBucket[] =>
   totals.map((total, i) => ({ time: new Date(Date.UTC(2026, 10, 2, 0) + i * 3600_000).toISOString(), total, byProtocol }))

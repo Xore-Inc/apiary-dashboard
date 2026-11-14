@@ -12,8 +12,8 @@ import type { CountRow, HeatmapRow, KillChainData, SeriesPoint, TimeBucket } fro
 import { formatNumber } from '#/lib/format'
 import { entityHref } from '#/lib/entities'
 import { useMeasuredWidth } from '#/lib/useMeasuredWidth'
-import { DATA_INK, inkShade  } from '#/lib/chartTheme'
-import type {ChartTheme} from '#/lib/chartTheme';
+import { DATA_INK, inkShade } from '#/lib/chartTheme'
+import type { ChartTheme } from '#/lib/chartTheme'
 import {
   HEAT_LABEL_W,
   HEAT_STEPS,
@@ -33,10 +33,9 @@ import {
   sparklineOption,
   timeLinesOption,
   timelineOption,
-  toRows
-  
+  toRows,
 } from '#/lib/chartOptions'
-import type {LineSeries} from '#/lib/chartOptions';
+import type { LineSeries } from '#/lib/chartOptions'
 import { EChart } from './EChart'
 import { SkeletonBlock } from './EntityBlocks'
 import { FlowZoom, useFlowZoom } from './FlowZoom'

@@ -5,8 +5,8 @@
 import type { EChartsOption } from 'echarts'
 import type { CountRow, HeatmapRow, KillChainData, SeriesPoint, TimeBucket } from '#/data/types'
 import { formatCompact, formatDateTime, formatDay, formatNumber, formatTime } from '#/lib/format'
-import { DATA_INK, PALETTE, TOKENS, escapeHtml, inkShade, swatch  } from './chartTheme'
-import type {ChartTheme} from './chartTheme';
+import { DATA_INK, PALETTE, TOKENS, escapeHtml, inkShade, swatch } from './chartTheme'
+import type { ChartTheme } from './chartTheme'
 
 // ---- Shared ------------------------------------------------------------------
 
@@ -403,6 +403,10 @@ export function coverageOption(tactics: string[], cells: CoverageCell[], cellWid
 }
 
 export const SENSOR_HEAT = [12, 28, 46, 66, 88]
+
+/** Every colour the builders ask for beyond the theme tokens, so a chart
+ * resolves them all in one go. */
+export const CHART_COLORS = [DATA_INK, ...[...HEAT_STEPS, ...SENSOR_HEAT].map(inkShade)]
 export const HEAT_LABEL_W = 132
 
 /** Sensors × hours, one hue light→dark, an empty hour muted; the exact count

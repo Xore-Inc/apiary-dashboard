@@ -12,8 +12,9 @@ import type { EChartsOption, ECElementEvent } from 'echarts'
 import type { EChartsType } from 'echarts/core'
 import type * as EChartsLib from '#/lib/echarts'
 import { usePreferences } from '#/lib/prefs'
-import { domResolver, echartsTheme, themeKey  } from '#/lib/chartTheme'
-import type {ChartTheme} from '#/lib/chartTheme';
+import { THEME_ATTRIBUTES, domResolver, echartsTheme, themeKey } from '#/lib/chartTheme'
+import type { ChartTheme } from '#/lib/chartTheme'
+import { CHART_COLORS } from '#/lib/chartOptions'
 
 
 type EChartsModule = typeof EChartsLib
@@ -72,7 +73,7 @@ export function EChart({
       const host = hostRef.current
       if (!host) return null
       const osReduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
-      return { c: domResolver(host), fontFamily: getComputedStyle(host).fontFamily, animate: !latest.current.reduced && !osReduced }
+      return { c: domResolver(host, CHART_COLORS), fontFamily: getComputedStyle(host).fontFamily, animate: !latest.current.reduced && !osReduced }
     }
 
     /** Paints the current option; re-creates the instance when the theme's
@@ -107,15 +108,15 @@ export function EChart({
     const resize = new ResizeObserver(() => chart?.resize())
     if (boxRef.current) resize.observe(boxRef.current)
     // A theme, mode or palette change re-resolves the colours; the system
-    // colour scheme matters when the mode follows it.
+    // colour scheme matters when the mode follows it. Only the attributes
+    // that carry them: <html>'s style changes whenever a drawer opens.
     let frame = 0
     const onTheme = () => {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => void paint(true))
     }
     const mutations = new MutationObserver(onTheme)
-    mutations.observe(document.documentElement, { attributes: true })
-    mutations.observe(document.body, { attributes: true })
+    mutations.observe(document.documentElement, { attributes: true, attributeFilter: [...THEME_ATTRIBUTES, 'data-motion'] })
     const scheme = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null
     scheme?.addEventListener('change', onTheme)
     return () => {
