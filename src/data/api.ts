@@ -2188,11 +2188,10 @@ const getOverview: Backend['getOverview'] = async () => {
   }
 }
 
-/** The KPI tile a `/api/v1/payloads` doc count fills. Its `previous` is the
- * count itself: the overview's caption says "Last 24h vs. previous 24h" and a
- * store total is all-time, so the trend line is empty and the tile shows no
- * change rather than a fabricated one. */
-const kpiTile = (id: string, label: string, value: number): Kpi => ({ id, label, value, previous: value, trend: [] })
+/** The KPI tile a `/api/v1/payloads` doc count fills. A store total is
+ * all-time: captioned so, with no previous figure and no trend, rather than
+ * a "no change" the data does not say. */
+const kpiTile = (id: string, label: string, value: number): Kpi => ({ id, label, value, previous: null, trend: [], caption: 'All time' })
 
 /** A tile whose endpoint did not answer: null, rendered as not available. */
 const kpiGap = (id: string, label: string): Kpi => ({ id, label, value: null, previous: null, trend: [] })

@@ -77,13 +77,20 @@ const opt = (s: string | null | undefined): string | undefined => (s ? s : undef
 export function toOverviewKpis(k: OverviewKpis): Kpi[] {
   return [
     { id: 'events', label: 'Events', value: k.last24h, previous: k.previous24h, trend: k.hourly },
-    { id: 'sources', label: 'Unique sources', value: k.unique_ips, previous: k.unique_ips, trend: [] },
+    // APIARY#3851 splits these two into the 24h windows. An older backend
+    // has only the 48h figure: shown as that, with no trend, never as a
+    // made-up "no change".
+    typeof k.unique_ips_24h === 'number'
+      ? { id: 'sources', label: 'Unique sources', value: k.unique_ips_24h, previous: k.unique_ips_previous24h ?? null, trend: [] }
+      : { id: 'sources', label: 'Unique sources', value: k.unique_ips, previous: null, trend: [], caption: 'Last 48h' },
     // APIARY#3558. A backend older than that sends no session count: the
     // tile is then left out, and the page renders it as not available.
     ...(typeof k.sessions_24h === 'number'
-      ? [{ id: 'sessions', label: 'Sessions', value: k.sessions_24h, previous: typeof k.sessions_previous24h === 'number' ? k.sessions_previous24h : k.sessions_24h, trend: [] }]
+      ? [{ id: 'sessions', label: 'Sessions', value: k.sessions_24h, previous: typeof k.sessions_previous24h === 'number' ? k.sessions_previous24h : null, trend: [] }]
       : []),
-    { id: 'logins', label: 'Successful logins', value: k.logins, previous: k.logins, trend: [] },
+    typeof k.logins_24h === 'number'
+      ? { id: 'logins', label: 'Successful logins', value: k.logins_24h, previous: k.logins_previous24h ?? null, trend: [] }
+      : { id: 'logins', label: 'Successful logins', value: k.logins, previous: null, trend: [], caption: 'Last 48h' },
   ]
 }
 

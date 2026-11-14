@@ -205,9 +205,16 @@ describe('monitor adapters', () => {
     const [events, sources, sessions, logins] = toOverviewKpis(kpis)
     expect(sessions).toEqual({ id: 'sessions', label: 'Sessions', value: 312, previous: 280, trend: [] })
     expect(events).toEqual({ id: 'events', label: 'Events', value: 18_402, previous: 15_110, trend: [812, 690, 741, 1204] })
-    // unique_ips has no previous-period figure on the wire, so the tile shows no change.
-    expect(sources).toEqual({ id: 'sources', label: 'Unique sources', value: 4_118, previous: 4_118, trend: [] })
-    expect(logins).toMatchObject({ id: 'logins', value: 96 })
+    // Before APIARY#3851 unique_ips and logins are 48h figures with no
+    // previous window: captioned as such, and no trend, never "no change".
+    expect(sources).toEqual({ id: 'sources', label: 'Unique sources', value: 4_118, previous: null, trend: [], caption: 'Last 48h' })
+    expect(logins).toMatchObject({ id: 'logins', value: 96, previous: null, caption: 'Last 48h' })
+  })
+
+  it('reads the 24h unique sources and logins with their previous window (APIARY#3851)', () => {
+    const [, sources, , logins] = toOverviewKpis({ ...kpis, unique_ips_24h: 3_100, unique_ips_previous24h: 2_900, logins_24h: 60, logins_previous24h: 36 })
+    expect(sources).toEqual({ id: 'sources', label: 'Unique sources', value: 3_100, previous: 2_900, trend: [] })
+    expect(logins).toEqual({ id: 'logins', label: 'Successful logins', value: 60, previous: 36, trend: [] })
   })
 
   it('builds the 24 h protocol timeline and top protocols from hourly_by_protocol (APIARY#3558)', () => {
