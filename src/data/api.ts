@@ -1810,13 +1810,52 @@ const searchHistory: Backend['searchHistory'] = async (query, page) => {
 const getEventDetail: Backend['getEventDetail'] = async (id) => {
   const wire = await get<EventPageWire>('getEventDetail', `/api/v1/event/${encodeURIComponent(id)}`)
   if (!wire) return null
+  // The detail endpoint's relations are four-field samples, so the three
+  // tabs read the same relations as list rows: the event's session and flow
+  // over the event's own age, and its source over the last 24 h (the
+  // endpoint's window). The event's own list row, found by id, fills the
+  // port, protocol, detail and pivots the detail body does not carry.
+  const since = sinceEvent(wire.time)
+  const [own, session, connection, source] = await Promise.all([
+    relationRows({ q: `_id:"${luceneQuoted(id)}"`, since }, 1),
+    wire.session ? relationRows({ session: wire.session, since }) : [],
+    wire.community_id ? relationRows({ community_id: wire.community_id, since }) : [],
+    wire.src_ip ? relationRows({ ip: wire.src_ip, since: '24h' }) : [],
+  ])
+  const row = own.find((candidate) => candidate.id === id) ?? detailRow(wire)
+  const others = (rows: EventRow[]) => rows.filter((candidate) => candidate.id !== id).slice(0, RELATION_SIZE).map(pageEvent)
+  // The session's terminal recording: cowrie names it on the row that closed
+  // the session, so the event's own row or any row of its session can carry it.
+  const recording = [row, ...session].map((candidate) => candidate.pivots.tty_replay).find(Boolean)
   return {
-    ...eventDetail(wire, detailRow(wire), readingOf(wire.sensor)),
+    ...eventDetail(wire, row, readingOf(wire.sensor)),
     // `eventDetail` returns the caller's row through `toHoneypotEvent`,
     // which omits the seven gap fields; the page's own type needs them.
-    event: pageEvent(detailRow(wire)),
+    event: pageEvent(row),
+    session: others(session),
+    connection: others(connection),
+    source: others(source),
+    ...(recording ? { recordingShasum: recording } : {}),
   }
 }
+
+/** Rows per relation tab: the detail endpoint's own sample size. */
+const RELATION_SIZE = 25
+
+/** One relation as list rows, newest first. A relation that fails leaves
+ * its tab empty rather than failing the event page. */
+const relationRows = async (search: EventsQueryWire, size = RELATION_SIZE + 1): Promise<EventRow[]> =>
+  (await get<EventsPageWire>('getEventDetail', '/api/v1/events', { offset: 0, size, ...search }).catch(() => null))?.rows ?? []
+
+/** The events list's `since` that still reaches an event this old: whole
+ * days, plus one. An unreadable time reads the list's own default. */
+const sinceEvent = (time: string): string | undefined => {
+  const age = Date.now() - Date.parse(time)
+  return Number.isFinite(age) ? `${Math.max(1, Math.ceil(age / 86_400_000) + 1)}d` : undefined
+}
+
+/** A value for inside a Lucene phrase: backslash and quote escaped. */
+const luceneQuoted = (value: string): string => value.replace(/[\\"]/g, (c) => `\\${c}`)
 
 /** The row shape `toHoneypotEvent` reads, rebuilt from what
  * GET /api/v1/event/{id} actually serves.
@@ -2433,10 +2472,11 @@ const getAnomaly: Backend['getAnomaly'] = async (id) => {
   if (!row) return null
   const [acks, detail] = await Promise.all([
     get<MlAcks>('getAnomaly', '/api/v1/ml-anomalies/acks'),
-    row.source_event_id ? getEventDetail(row.source_event_id) : null,
+    // The event alone: the anomaly page shows no relation tabs.
+    row.source_event_id ? get<EventPageWire>('getAnomaly', `/api/v1/event/${encodeURIComponent(row.source_event_id)}`) : null,
   ])
   const [anomaly] = toMlAnomalies({ total: 1, rows: [{ ...row, _doc_id: id }] }, acks ?? {})
-  return { anomaly: { ...anomaly, folded: 1 } as MlAnomaly, event: detail?.event ?? null }
+  return { anomaly: { ...anomaly, folded: 1 } as MlAnomaly, event: detail ? pageEvent(detailRow(detail)) : null }
 }
 
 /** GET /api/v1/store/auth-events: the list the page shows, and the 24 h
