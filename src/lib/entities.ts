@@ -40,7 +40,7 @@ type EntityDef = {
   /** Singular noun, e.g. "source IP". */
   noun: string
   /** Page that shows this entity, if it has one yet. */
-  href?: (id: string) => string
+  href?: (id: string) => string | undefined
   /** Event-explorer / history query for "events with this value". */
   events?: (id: string) => string
   /** Values rendered in monospace (hashes, commands, credentials…). */
@@ -55,7 +55,10 @@ export const ENTITIES: Record<EntityKind, EntityDef> = {
   session: { noun: 'session', href: (id) => `/sessions/${q(id)}`, events: (id) => history(`session:${id}`), isCode: true },
   source: { noun: 'source IP', href: (id) => `/sources/${q(id)}`, events: (id) => `/events?ip=${q(id)}` },
   network: { noun: 'network', href: (id) => `/networks/${q(id)}` },
-  asn: { noun: 'autonomous system', href: (id) => `/asn/${q(id)}` },
+  // An AS page is keyed by its number. A label with no number (an older
+  // document's org name in `asn`) has no page: plain text, never a link the
+  // backend refuses.
+  asn: { noun: 'autonomous system', href: (id) => asHref(id) },
   identity: { noun: 'attacker identity', href: (id) => `/identities/${q(id)}`, isCode: true },
   campaign: { noun: 'campaign', href: (id) => `/campaigns/${q(id)}` },
   'agent-campaign': { noun: 'agent campaign', href: (id) => `/agent-campaigns/${q(id)}`, isCode: true },
@@ -93,6 +96,12 @@ export const iocHref = (kind: string, value: string) => (kind === 'hash' ? `/pay
 
 /** Infrastructure clusters live at /clusters/$kind/$value; an ASN cluster is
  * just the ASN's own page. */
-export const clusterHref = (kind: string, value: string) => (kind === 'asn' ? `/asn/${q(value)}` : `/clusters/${kind}/${q(value)}`)
+export const clusterHref = (kind: string, value: string) => (kind === 'asn' ? (asHref(value) ?? `/clusters/${kind}/${q(value)}`) : `/clusters/${kind}/${q(value)}`)
+
+/** `/asn/AS<n>` for any label that starts with an AS number. */
+export function asHref(label: string): string | undefined {
+  const n = /^\s*(?:AS)?(\d+)(?!\d)/i.exec(label)?.[1]
+  return n ? `/asn/AS${n}` : undefined
+}
 
 export const entityHref = (kind: EntityKind, id: string) => ENTITIES[kind].href?.(id)

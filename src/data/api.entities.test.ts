@@ -390,6 +390,12 @@ describe('the IOC and entity reads (APIARY#3572)', () => {
     ['source', '203.0.113.4', 'ip:203.0.113.4'],
     ['network', '203.0.113.0/24', 'cidr:203.0.113.0/24'],
     ['asn', 'AS64496', 'asn:64496'],
+    // An AS label with the org after the number (older documents' `asn`).
+    ['asn', 'AS9541 Cyber Internet Services (Pvt) Ltd.', 'asn:9541'],
+    // Payload and AS clusters are backend entities of their own.
+    ['cluster', 'payload:d41d8cd98f00b204e9800998ecf8427e', 'payload:d41d8cd98f00b204e9800998ecf8427e'],
+    ['cluster', 'asn:AS64496', 'asn:64496'],
+    ['cluster', 'provider:hosting', 'cluster:provider:hosting'],
     ['cluster', 'fingerprint:abc', 'cluster:fingerprint:abc'],
     ['ioc', 'command:uname -a', 'ioc:command:uname -a'],
   ] as const)('reads a %s timeline under the backend entity id', async (kind, id, entity) => {
