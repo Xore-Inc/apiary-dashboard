@@ -15,6 +15,7 @@
 // BACKEND_URL is also the opt-in: unset means "this tier talks to nobody",
 // which is the default. The token is never logged, never in a URL, and
 // never in an error message — it only ever rides as a request header.
+import { mapTiles } from './mapTiles'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ApiError } from './errors'
 import { ACTOR_ASSERTION_HEADER, actorOf as sessionIdentityOf, mintActorAssertion } from '#/server/actorAssertion'
@@ -952,7 +953,7 @@ const ANONYMOUS_USER: SessionUser = { name: '—', email: '', roles: [] }
  * a missing button, never a wrong one. */
 const getShellConfig: Backend['getShellConfig'] = async () => {
   const wire = await get<ConfigWire>('getShellConfig', '/api/v1/config')
-  return shellConfig(wire ?? { revision: 0, payload: {} }, deploymentLinks())
+  return { ...shellConfig(wire ?? { revision: 0, payload: {} }, deploymentLinks()), map: mapTiles() }
 }
 
 function deploymentLinks(env: NodeJS.ProcessEnv = process.env): ShellConfig['links'] {
