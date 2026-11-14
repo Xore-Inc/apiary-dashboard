@@ -384,7 +384,7 @@ function OverviewPage() {
             {overview ? (
               KPI_ORDER.map((id) => {
                 const kpi = overview.kpis.find((k) => k.id === id)
-                return kpi ? <StatTile key={id} {...kpi} href={KPI_HREF[id]} caption="Last 24h vs. previous 24h" /> : <StatTile key={id} label={KPI_LABEL[id]} value={null} href={KPI_HREF[id]} />
+                return kpi ? <StatTile key={id} {...kpi} href={KPI_HREF[id]} caption={kpi.caption ?? 'Last 24h vs. previous 24h'} /> : <StatTile key={id} label={KPI_LABEL[id]} value={null} href={KPI_HREF[id]} />
               })
             ) : (
               <SkeletonTiles count={5} />

@@ -58,6 +58,13 @@ export interface OverviewKpis {
   logins: number
   sessions_24h: number
   sessions_previous24h: number
+  /** APIARY#3851: distinct sources and login attempts per 24h window.
+   * `unique_ips`/`logins` above cover the whole 48h window. Absent on an
+   * older backend. */
+  unique_ips_24h?: number
+  unique_ips_previous24h?: number
+  logins_24h?: number
+  logins_previous24h?: number
   /** The same 24 hours as `hourly`, oldest first, split by protocol. */
   hourly_by_protocol: HourlyByProtocol[]
   ready: boolean

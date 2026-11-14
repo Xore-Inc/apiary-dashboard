@@ -135,6 +135,9 @@ export interface Kpi {
   previous: Unavailable<number>
   /** Hourly values oldest → newest, for sparklines. */
   trend: number[]
+  /** The window the figure covers, when it is not the page's own
+   * "last 24h vs. previous 24h". */
+  caption?: string
 }
 
 export interface TimeBucket extends Record<string, unknown> {
