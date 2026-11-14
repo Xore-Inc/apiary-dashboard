@@ -46,12 +46,12 @@
     "@tanstack/react-router": "1.170.41",
     "@tanstack/react-start": "1.168.60",
     "d3-geo": "^3.1.1",
+    "echarts": "^6.1.0",
     "ioredis": "^6.0.0",
     "lucide-react": "^1.52.0",
     "openid-client": "^6.8.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "recharts": "^3.10.1",
     "topojson-client": "^3.1.0"
   },
   "devDependencies": {
