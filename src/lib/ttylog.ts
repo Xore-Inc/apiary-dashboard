@@ -71,9 +71,12 @@ export function gapMs(frames: TtyFrame[], next: number, speed: number): number {
 }
 
 /** The transcript as readable text: escape sequences and control bytes out. */
+// Matching control bytes is the point here.
+/* eslint-disable no-control-regex */
 export function plainTranscript(transcript: string): string {
   return transcript
     .replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '')
     .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '')
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
 }
+/* eslint-enable no-control-regex */

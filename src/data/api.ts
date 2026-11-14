@@ -2031,6 +2031,16 @@ const getSandboxLiveStatus: Backend['getSandboxLiveStatus'] = async () => {
   return wire ? { running: true, job: wire.sha256 } : { running: false }
 }
 
+/** The same endpoint's bridge WebSocket, for the noVNC viewer (dash#305).
+ * Admin-only (authorize.ts): watching a live detonation is at least as
+ * sensitive as downloading the sample, so only an admin's page learns where
+ * the bridge is. The bridge itself drops keyboard, pointer and clipboard
+ * messages; the viewer is view-only on top. */
+const getSandboxVncBridge: Backend['getSandboxVncBridge'] = async () => {
+  const wire = await get<SandboxVncStatusWire>('getSandboxVncBridge', '/api/v1/sandbox/vnc', {}, { mounted: true })
+  return wire?.bridge_ws ? { job: wire.sha256, bridge: wire.bridge_ws } : null
+}
+
 const getGhidraAnalysis: Backend['getGhidraAnalysis'] = async (sha) => {
   const wire = await get<GhidraRunDetailWire>('getGhidraAnalysis', `/api/v1/ghidra/${encodeURIComponent(sha)}`, undefined, { mounted: true })
   return wire ? ghidraAnalysis(wire) : null
@@ -2809,6 +2819,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   abortGpuJob,
   getSandboxRun,
   getSandboxLiveStatus,
+  getSandboxVncBridge,
   getGhidraAnalysis,
   getCapeRuns,
   getCapeRun,

@@ -34,6 +34,8 @@ export const ADMIN_QUERIES: ReadonlySet<string> = new Set([
   'abortGpuJob',
   'queuePayloadAction',
   'generatePayloadReport',
+  // The live detonation's VNC bridge (dash#305)
+  'getSandboxVncBridge',
   // Bait credentials
   'provisionCredential',
   'rotateCredential',

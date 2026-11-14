@@ -430,6 +430,12 @@ const getSandboxRunFn = createServerFn({ method: 'GET' })
   .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getSandboxRun', data, context.mock)) as Json)
 export const getSandboxRun = announced('getSandboxRun', getSandboxRunFn) as Rpc<typeof impl.getSandboxRun>
 
+const getSandboxVncBridgeFn = createServerFn({ method: 'GET' })
+  .middleware([mockScenarioMiddleware])
+  .validator((args: unknown[]) => args)
+  .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getSandboxVncBridge', data, context.mock)) as Json)
+export const getSandboxVncBridge = announced('getSandboxVncBridge', getSandboxVncBridgeFn) as Rpc<typeof impl.getSandboxVncBridge>
+
 const getSensorCatalogFn = createServerFn({ method: 'GET' })
   .middleware([mockScenarioMiddleware])
   .validator((args: unknown[]) => args)

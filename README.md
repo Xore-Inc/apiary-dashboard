@@ -112,6 +112,7 @@ The server refuses to boot in an environment that would open it:
 | `EXTERNAL_URL` | The public origin, when a proxy in front changes the Host the server sees (same-origin check, Keycloak redirect URIs). |
 | `MAP_TILE_URL`, `MAP_TILE_DARK_URL`, `MAP_TILE_ATTRIBUTION`, `MAP_TILE_SUBDOMAINS`, `MAP_TILE_API_KEY` | The attack map's tile provider, read at runtime and served with the shell config, never built into the bundle. Unset: keyless OpenStreetMap, darkened by a CSS filter in dark mode (CARTO's dark tiles now require a key). The URL is a Leaflet template (`{apikey}` takes the key, https only); without a dark URL, dark mode darkens the light tiles. A tile key reaches every browser in the tile URLs by design: keep it in the environment, never the repository or logs, and restrict it to the dashboard's domain at the provider. |
 | `APIARY_MOCK_SLOW_MS` | Mock only: how long the `slow` scenario holds each call (default 2500). The smoke test sets 12000 to prove an answer slower than Bun's default 10 s idle window still arrives. |
+| `APIARY_MOCK_VNC_BRIDGE` | Mock only: a WebSocket VNC bridge (`ws://127.0.0.1:5959`) the mock reports as a running detonation, so the sandbox live view's noVNC console can be tried locally. |
 | `APIARY_MOCK_FAULTS` | Mock only: `session-store` and/or `identity-provider` (comma-separated) stop answering, to exercise the outage paths. Pages then go to sign-in, direct handlers answer 401, and the sign-in pages say sign-in is unavailable or failed; smoke checks both. |
 
 See `.env.example`.
