@@ -25,9 +25,21 @@ const ENTITY_RANGES = new Set(['1h', '6h', '24h', '7d', '30d'])
 export const entityRange = (range?: string): { range?: string } =>
   range && ENTITY_RANGES.has(range) ? { range } : range === 'all' ? { range: '30d' } : {}
 
+/** The AS number at the start of an AS label: `AS9541`, `9541` and
+ * `AS9541 Cyber Internet Services` all read 9541. Older documents carry the
+ * organisation in `asn` (APIARY#3696), so a label can be an org name with no
+ * number at all; that is `null`. */
+export const asNumberOf = (label: string): string | null => /^\s*(?:AS)?(\d+)(?!\d)/i.exec(label)?.[1] ?? null
+
 /** The page's entity (kind, id) → the backend's `kind:value` entity id
  * (entity_details.rs `parse_entity`). An AS is sent as its bare number,
- * which the parser takes with or without the `AS` prefix. */
+ * which the parser takes with or without the `AS` prefix.
+ *
+ * A cluster's page id is `kind:value`. Two of the dashboard's cluster kinds
+ * are entities of their own on the backend, not indicator clusters: a
+ * payload cluster is the payload (`payload:<hash>`) and an AS cluster is
+ * the AS (`asn:<n>`). The rest (fingerprint, credential, provider) stay
+ * `cluster:kind:value`. */
 export function entityId(kind: TimelineEntity, id: string): string {
   switch (kind) {
     case 'source':
@@ -35,10 +47,17 @@ export function entityId(kind: TimelineEntity, id: string): string {
     case 'network':
       return `cidr:${id}`
     case 'asn':
-      return `asn:${id.trim().replace(/^AS/i, '')}`
+      return `asn:${asNumberOf(id) ?? id.trim()}`
+    case 'cluster': {
+      const at = id.indexOf(':')
+      const [clusterKind, value] = at < 0 ? [id, ''] : [id.slice(0, at), id.slice(at + 1)]
+      if (clusterKind === 'payload') return `payload:${value}`
+      if (clusterKind === 'asn') return entityId('asn', value)
+      return `cluster:${id}`
+    }
     default:
-      // session, payload, identity, campaign, and the two `kind:value`
-      // pairs cluster and ioc, whose page id already is that pair.
+      // session, payload, identity, campaign, and ioc, whose page id
+      // already is its `kind:value` pair.
       return `${kind}:${id}`
   }
 }

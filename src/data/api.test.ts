@@ -2981,6 +2981,13 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
     expect(out.group.networks).toEqual([{ id: '198.51.100.0/24', label: '198.51.100.0/24', count: 1 }, { id: '203.0.113.0/24', label: '203.0.113.0/24', count: 1 }])
   })
 
+  it('quotes the CIDR in the campaigns query, so its slash is not a Lucene regex', async () => {
+    const calls = stub(sourcesFixtures())
+    await live('getNetwork')(cidr)
+    const campaigns = calls.find((url) => new URL(url).pathname === '/api/v1/campaigns')!
+    expect(new URL(campaigns).searchParams.get('q')).toBe('cidr:"203.0.113.0/24"')
+  })
+
   it('asks the campaigns store for the network own campaign, and leaves it off when the store holds none', async () => {
     stub(sourcesFixtures({ '/api/v1/campaigns': { total: 0, rows: [] } }))
     expect((await live('getNetwork')(cidr))!.campaign).toBeUndefined()

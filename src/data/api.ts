@@ -1281,7 +1281,9 @@ const getNetwork: Backend['getNetwork'] = async (cidr) => {
   const events = wire.correlation.records.map(pageEvent)
   const group = correlationGroup(wire.correlation, events)
   if (!group.members.length) return null
-  const page = await get<CampaignPageWire>('getNetwork', '/api/v1/campaigns', { size: 100, q: `cidr:${cidr}` })
+  // Quoted: an unquoted `/` opens a Lucene regex, and the store answers
+  // that with a 400 the gateway turns into a 502 for the whole page.
+  const page = await get<CampaignPageWire>('getNetwork', '/api/v1/campaigns', { size: 100, q: `cidr:"${cidr}"` })
   // `networkCampaigns` maps the store page, so the prefix's own campaign is
   // the first row or nothing: a store page that does not hold it is a
   // prefix the correlator never scored, and the page says so.
