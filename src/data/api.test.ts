@@ -390,8 +390,37 @@ describe('the responses it maps', () => {
     expect(out!.event).toMatchObject({ id: 'ev_9f2c1a', sensor: 'cowrie', srcIp: '203.0.113.42', dstPort: 0 })
     expect(out!.event.summary).toBeUndefined()
     expect(out!.reading).toMatchObject({ what: expect.any(String) })
-    // The relation lists stay empty: the wire rows are four-field samples.
+    // No list rows answered (no fixture), so the relation tabs are empty.
     expect([out!.session, out!.connection, out!.source]).toEqual([[], [], []])
+  })
+
+  it('fills the session, connection and source tabs with list rows, and the event from its own row', async () => {
+    const other = { ...row, id: 'ev_other', pivots: { ...pivots, tty_replay: 'ab12cd34' } }
+    const calls = stub({
+      '/api/v1/event/': eventPageWire,
+      // The event's own row, found by id: it carries the port and detail.
+      '/api/v1/events#q': { ...page, rows: [row] },
+      '/api/v1/events': { ...page, total: 2, rows: [row, other] },
+    })
+    const out = (await live('getEventDetail')('ev_9f2c1a'))!
+    const lists = calls.filter((url) => new URL(url).pathname === '/api/v1/events').map((url) => Object.fromEntries(new URL(url).searchParams))
+    expect(lists.find((q) => q.q)).toMatchObject({ q: '_id:"ev_9f2c1a"', size: '1' })
+    expect(lists.find((q) => q.session)).toMatchObject({ session: 'sess-77a1', size: '26' })
+    expect(lists.find((q) => q.community_id)).toMatchObject({ community_id: '1:abc' })
+    expect(lists.find((q) => q.ip)).toMatchObject({ ip: '203.0.113.42', since: '24h' })
+    // The session and flow reach back as far as the event's own age.
+    expect(lists.find((q) => q.session)!.since).toMatch(/^\d+d$/)
+    expect(out.event).toMatchObject({ id: 'ev_9f2c1a', dstPort: 22, summary: 'command.input: uname -a' })
+    // The event itself is never one of its own relations.
+    expect([out.session, out.connection, out.source].map((rows) => rows.map((e) => e.id))).toEqual([['ev_other'], ['ev_other'], ['ev_other']])
+    expect(out.recordingShasum).toBe('ab12cd34')
+  })
+
+  it('leaves a relation tab empty when its read fails, and still renders the event', async () => {
+    stub({ '/api/v1/event/': eventPageWire, '/api/v1/events': fail(502) })
+    const out = (await live('getEventDetail')('ev_9f2c1a'))!
+    expect(out.event).toMatchObject({ id: 'ev_9f2c1a' })
+    expect([out.session, out.connection, out.source]).toEqual([[], [], []])
   })
 
   it('maps the session bundle, dropping the sequences the page has no field for', async () => {
