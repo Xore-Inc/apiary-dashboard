@@ -23,6 +23,7 @@ import {
 import type { ReactElement } from 'react'
 import type { CountRow, HeatmapRow, KillChainData, SeriesPoint, TimeBucket } from '#/data/types'
 import { formatDateTime, formatCompact, formatDay, formatNumber, formatTime } from '#/lib/format'
+import { sankeyNodePadding } from '#/lib/sankey'
 import { useMeasuredWidth } from '#/lib/useMeasuredWidth'
 
 // Colors follow the protocol, never its rank, so filtering never repaints a
@@ -357,7 +358,7 @@ export function FlowSankey({ flow, height = 420 }: { flow: KillChainData['flow']
     <ChartBox height={height}>
       <Sankey
         data={flow}
-        nodePadding={28}
+        nodePadding={sankeyNodePadding(flow, height - 32)}
         nodeWidth={12}
         margin={{ top: 24, right: 8, bottom: 8, left: 8 }}
         link={{ stroke: DATA_INK, strokeOpacity: 0.25 }}
