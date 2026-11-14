@@ -2211,6 +2211,7 @@ const monitorFixtures = (overrides: Record<string, unknown> = {}) => ({
   '/api/v1/charts/tcp-stack-clusters': [],
   '/api/v1/charts/ml-backlog': [],
   '/api/v1/charts/netflow-packets': [],
+  '/api/v1/charts/anomaly-trend': [],
   '/api/v1/charts/ics-functions': emptyBars,
   '/api/v1/charts/decoy-requests': emptyBars,
   '/api/v1/charts/decoy-client-fingerprints': emptyBars,
@@ -2346,9 +2347,11 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     const calls = stub(monitorFixtures())
     const views = await live('getOverviewViews')()
     const paths = calls.map((url) => new URL(url).pathname)
-    expect(paths.filter((p) => !p.startsWith('/api/v1/charts/')).sort()).toEqual(['/api/v1/campaigns', '/api/v1/overview/dashboard', '/api/v1/payloads'])
-    // Fifteen chart routes, each read through the same chart proxy path.
-    expect(paths.filter((p) => p.startsWith('/api/v1/charts/'))).toHaveLength(15)
+    // The recorded catalog's sensors last reported weeks ago, so no
+    // attack-vectors read is made for them.
+    expect(paths.filter((p) => !p.startsWith('/api/v1/charts/')).sort()).toEqual(['/api/v1/campaigns', '/api/v1/overview/dashboard', '/api/v1/payloads', '/api/v1/sensors/catalog'])
+    // Sixteen chart routes, each read through the same chart proxy path.
+    expect(paths.filter((p) => p.startsWith('/api/v1/charts/'))).toHaveLength(16)
     expect(views.protocols).toEqual([{ id: 'ssh', label: 'ssh', count: 412 }])
     expect(views.credentials).toEqual([{ id: 'root / toor', label: 'root / toor', count: 140 }])
     // A heat cell's `pct`/`label` are the backend's own intensity, which the
@@ -2369,11 +2372,37 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     expect(views.mlBacklog).toEqual([])
   })
 
-  it('leaves the vectors and conformance views unavailable: no endpoint carries them', async () => {
-    stub(monitorFixtures())
+  it('reads attack vectors for every sensor that reported in the last 24 h, skipping the two the endpoint refuses', async () => {
+    const recent = new Date(Date.now() - 3_600_000).toISOString()
+    const calls = stub(monitorFixtures({
+      '/api/v1/sensors/catalog': { window: 'now-14d', sensors: [
+        { sensor: 'cowrie', events: 900, last_seen: recent },
+        { sensor: 'suricata', events: 9000, last_seen: recent },
+        { sensor: 'portbridge', events: 9000, last_seen: recent },
+        { sensor: 'conpot', events: 4, last_seen: '2026-09-30T19:25:19.534Z' },
+        { sensor: 'hellpot', events: 12, last_seen: recent },
+      ] },
+      '/api/v1/attack-vectors': { sensor: 'cowrie', ports: [{ key: '2223', count: 172464, link: '/events?sensor=cowrie&port=2223' }], protocols: [{ key: 'tcp', count: 196432, link: '/events?sensor=cowrie&proto=tcp' }] },
+    }))
     const views = await live('getOverviewViews')()
-    expect(views.vectors).toBeNull()
-    expect(views.conformance).toBeNull()
+    const asked = calls.filter((url) => new URL(url).pathname === '/api/v1/attack-vectors').map((url) => new URL(url).searchParams.get('sensor')).sort()
+    expect(asked).toEqual(['cowrie', 'hellpot'])
+    expect(views.vectors?.cowrie).toEqual({ ports: [{ id: '2223', label: '2223', count: 172464 }], protocols: [{ id: 'tcp', label: 'tcp', count: 196432 }] })
+  })
+
+  it('leaves the attack vectors unavailable when the sensor catalog has no answer', async () => {
+    stub(monitorFixtures({ '/api/v1/sensors/catalog': fail(404) }))
+    expect((await live('getOverviewViews')()).vectors).toBeNull()
+  })
+
+  it('reads the protocol-conformance violations from the anomaly-trend chart', async () => {
+    stub(monitorFixtures({ '/api/v1/charts/anomaly-trend': [{ name: '(none)', points: [{ time: '2026-11-12T01:00:00.000Z', value: 24 }] }, { name: 'http', points: [{ time: '2026-11-12T01:00:00.000Z', value: 3 }] }] }))
+    expect((await live('getOverviewViews')()).conformance).toEqual([{ time: '2026-11-12T01:00:00.000Z', '(none)': 24, http: 3 }])
+  })
+
+  it('leaves the conformance view unavailable when its chart route has no answer', async () => {
+    stub(monitorFixtures({ '/api/v1/charts/anomaly-trend': fail(404) }))
+    expect((await live('getOverviewViews')()).conformance).toBeNull()
   })
 
   it('leaves a chart whose route has no answer unavailable, not an empty list', async () => {

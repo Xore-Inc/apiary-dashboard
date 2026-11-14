@@ -50,6 +50,7 @@ import {
   toProtocolTimeline,
   toTopProtocols,
   toOverviewViews,
+  attackVectorRows,
   toPayloadCount,
   toSemanticSearch,
   toSeverity,
@@ -189,6 +190,7 @@ import type {
   MlDispositionResponse,
   MlModelHealth,
   OverviewKpis,
+  AttackVectorsWire,
   StorePage,
 } from './contracts/monitor'
 import type {
@@ -242,7 +244,7 @@ import type {
   SourcesPageWire,
 } from './contracts/sources'
 import type { Backend, Caller } from './backend'
-import type { ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
+import type { AttackVectors, ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
 
 /** A dashboard that hangs forever is worse than one that errors. */
 const TIMEOUT_MS = envInt('BACKEND_TIMEOUT_MS', 30_000)
@@ -2142,12 +2144,11 @@ const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique s
  *
  * `getOverviewViews` returns the whole `OverviewViews`, and the eighteen
  * slices of this one endpoint cover fifteen of its fields. The other twenty
- * are a GAP, kept as empty arrays rather than invented, and named in the
- * tests: vectors, ml-backlog, netflow, conformance, CVEs and the OS/TCP/ICS/
- * decoy/JA4/TLS/SSH/endlessh breakdowns have no dashboard slice — they are the
- * `/api/v1/charts/*` routes (already wired by the chart proxy in #82, and a
- * different endpoint this query does not reach), so the deep-dive tabs render
- * empty against live data while the live tab is fully live.
+ * come from elsewhere: ml-backlog, netflow, conformance (`anomaly-trend`),
+ * CVEs and the OS/TCP/ICS/decoy/JA4/TLS/SSH/endlessh breakdowns are the
+ * `/api/v1/charts/*` routes, read here through the chart proxy's own
+ * `liveChart`, and the attack vectors are `/api/v1/attack-vectors`, one read
+ * per sensor that reported in the last 24 h.
  *
  * `campaigns` and `payloads` are the two views the dashboard DOES carry, but
  * not in the shape the table renders: `payloads` is `DashboardPayloadRow`
@@ -2159,7 +2160,8 @@ const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique s
  * sources slices already make. */
 const getOverviewViews: Backend['getOverviewViews'] = async () => {
   const chart = <TChart extends ChartName>(name: TChart) => liveChart(name, new URLSearchParams())
-  const [dashboard, payloads, campaigns, osDistribution, tcpClusters, icsFunctions, decoyRequests, decoyClients, ja4h, ja4l, ja4x, tls, ssh, endlessh, cves, mlBacklog, netflowBytes, netflowPackets] = await Promise.all([
+  const [vectors, dashboard, payloads, campaigns, osDistribution, tcpClusters, icsFunctions, decoyRequests, decoyClients, ja4h, ja4l, ja4x, tls, ssh, endlessh, cves, mlBacklog, netflowBytes, netflowPackets, anomalyTrend] = await Promise.all([
+    attackVectors(),
     get<Dashboard>('getOverviewViews', '/api/v1/overview/dashboard'),
     get<PayloadPageWire>('getOverviewViews', '/api/v1/payloads', { offset: 0, size: 15, aggs: 'sources' }),
     get<CampaignPageWire>('getOverviewViews', '/api/v1/campaigns', { offset: 0, size: 15 }),
@@ -2178,17 +2180,17 @@ const getOverviewViews: Backend['getOverviewViews'] = async () => {
     chart('ml-backlog'),
     chart('netflow-bytes'),
     chart('netflow-packets'),
+    chart('anomaly-trend'),
   ])
   return {
     // A missing dashboard leaves every field it fills unavailable.
     ...(dashboard ? toOverviewViews(dashboard) : DASHBOARD_GAPS),
     payloads: payloads ? capturedPayloads(payloads).payloads : null,
     campaigns: campaigns ? networkCampaigns(campaigns) : null,
-    // GAP: attack vectors (targeted ports and protocols per sensor) have no
-    // endpoint on the wire.
-    vectors: null,
-    // GAP: protocol-conformance violations have no `/api/v1/charts` route.
-    conformance: null,
+    vectors,
+    // charts.rs `anomaly_trend`: protocol-conformance violations per claimed
+    // app protocol, hourly over 48 h (suricata anomaly events).
+    conformance: mapped(anomalyTrend, seriesPoints),
     // A chart route with no answer (`null`) is unavailable, never an empty series.
     mlBacklog: mapped(mlBacklog, seriesPoints),
     netflowBytes: mapped(netflowBytes, seriesPoints),
@@ -2206,6 +2208,33 @@ const getOverviewViews: Backend['getOverviewViews'] = async () => {
     ssh: mapped(ssh, barRows),
     endlessh: mapped(endlessh, barRows),
   }
+}
+
+/** Sensors the attack-vectors read skips: detail.rs `attack_vectors`
+ * refuses these two with a 400 (they ship to their own index families). */
+const NO_VECTORS = new Set(['suricata', 'portbridge'])
+/** At most this many sensors are read, newest first: one small aggregation each. */
+const VECTOR_SENSORS = 40
+
+/** GET /api/v1/attack-vectors?sensor= for every sensor that reported in
+ * the last 24 h (the endpoint's own window), from the sensor catalog.
+ * A sensor whose read fails is left out; the whole view is unavailable
+ * only when the catalog itself has no answer. */
+const attackVectors = async (): Promise<Record<string, AttackVectors> | null> => {
+  const catalog = await get<SensorCatalogWire>('getOverviewViews', '/api/v1/sensors/catalog')
+  if (!catalog) return null
+  const since = Date.now() - 24 * 3_600_000
+  const sensors = catalog.sensors
+    .filter((row) => !NO_VECTORS.has(row.sensor) && row.events > 0 && Date.parse(row.last_seen) >= since)
+    .sort((a, b) => b.last_seen.localeCompare(a.last_seen))
+    .slice(0, VECTOR_SENSORS)
+    .map((row) => row.sensor)
+  const reads = await Promise.all(sensors.map((sensor) => get<AttackVectorsWire>('getOverviewViews', '/api/v1/attack-vectors', { sensor }).catch(() => null)))
+  const out: Record<string, AttackVectors> = {}
+  reads.forEach((wire, i) => {
+    if (wire && (wire.ports.length || wire.protocols.length)) out[sensors[i]] = attackVectorRows(wire)
+  })
+  return out
 }
 
 /** Maps a chart the route answered, and passes its `null` (no route) through as unavailable. */

@@ -505,3 +505,12 @@ export interface AuthEventRow {
   details?: AuthEventDetails
   [key: string]: unknown
 }
+/** detail.rs `attack_vectors`: GET /api/v1/attack-vectors?sensor= — one
+ * sensor's targeted destination ports and network protocols over the last
+ * 24 h, top 12 each, fleet healthchecks excluded. `key` is the port number
+ * or protocol as a string; `link` is the event-explorer drill-down. */
+export interface AttackVectorsWire {
+  sensor: string
+  ports: Array<{ key: string; count: number; link: string }>
+  protocols: Array<{ key: string; count: number; link: string }>
+}
