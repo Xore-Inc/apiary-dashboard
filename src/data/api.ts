@@ -971,8 +971,11 @@ function deploymentLinks(env: NodeJS.ProcessEnv = process.env): ShellConfig['lin
  * editor asks for. A refused section is a 200 carrying `problems`, which is
  * a result and not an error; only an unreachable validator throws, and the
  * page treats that as "no preview" (its save still decides). */
-const validateConfig: Backend['validateConfig'] = async (section, value) => {
-  const wire = await request<ConfigValidateWire>('validateConfig', '/api/v1/config/validate', { method: 'POST', body: configValidateBody(section, value) })
+const validateConfig: Backend['validateConfig'] = async (section, value, fields) => {
+  // The validator refuses an empty patch; nothing to send is nothing to fix.
+  const body = configValidateBody(section, value, fields)
+  if (Object.keys(Object.values(body)[0] as Record<string, unknown>).length === 0) return {}
+  const wire = await request<ConfigValidateWire>('validateConfig', '/api/v1/config/validate', { method: 'POST', body })
   return configProblems(wire ?? { ok: true, problems: [] })
 }
 
@@ -989,11 +992,11 @@ const validateConfig: Backend['validateConfig'] = async (section, value) => {
  * on the separate `/config/validate` route — so a refusal here is a genuine
  * fault, and it is thrown rather than dressed up as a per-field problem the
  * page would show against the wrong field. */
-const saveConfigSection: Backend['saveConfigSection'] = async (section, value) => {
+const saveConfigSection: Backend['saveConfigSection'] = async (section, value, fields) => {
   await guardReadOnly('saveConfigSection')
   const { subject, username } = await sessionOf()
   const path = configSectionPath(section)
-  const wire = await request<ConfigWire>('saveConfigSection', `/api/v1/config/${path}`, { method: 'PUT', search: { actor_subject: subject, actor_username: username }, body: configSectionBody(section, value) })
+  const wire = await request<ConfigWire>('saveConfigSection', `/api/v1/config/${path}`, { method: 'PUT', search: { actor_subject: subject, actor_username: username }, body: configSectionBody(section, value, fields) })
   return { ok: true, revision: wire?.revision ?? 0 }
 }
 

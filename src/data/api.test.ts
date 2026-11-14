@@ -10,6 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from './errors'
 import { isLiveBackend, liveQuery, liveQueryNames } from './api'
+import { configSetFields, configSectionBody, dashboardConfig } from './adapters/settings'
 import { commandsQuery, eventsQuery, recordingSourceIpQuery } from './adapters/explorer'
 import type { EventPageWire, FilterValuesWire, RecordingsPageWire, ReplayWire, SearchResultWire, SessionDetailWire } from './contracts/explorer'
 import type { EventRow } from './contracts/events'
@@ -1004,6 +1005,45 @@ describe('the config writes', () => {
     expect(body).toMatchObject({ default_time_window: '7d', read_only: false, rows_per_page_options: [50] })
     expect(body).not.toHaveProperty('revision')
     expect(out).toEqual({ ok: true, revision: 15 })
+  })
+
+  it('saves with every field left at its default: only the changed field is sent, and nothing is validated that was not entered', async () => {
+    // A fresh deployment: GET /api/v1/config is `payload: {}`, so the page
+    // reads 0 and '' for every field it has. Those are the backend's
+    // defaults, not values: the save sends only what the operator changed.
+    const page = dashboardConfig({ revision: 0, payload: {} })
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => new Response(JSON.stringify(url.includes('/validate') ? { ok: true, problems: [] } : { ...configWire, revision: 1 }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const form = { ...page.behavior, maintenanceMode: true }
+    expect(await live('validateConfig')('behavior', form, ['maintenanceMode'])).toEqual({})
+    expect(await live('saveConfigSection')('behavior', form, ['maintenanceMode'])).toEqual({ ok: true, revision: 1 })
+    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)))
+    expect(bodies[0]).toEqual({ behavior: { maintenance_mode: true } })
+    expect(bodies[1]).toEqual({ maintenance_mode: true })
+    // Nothing changed and nothing stored: no validation call at all, and a
+    // save stores an empty section (every field at its default).
+    fetchMock.mockClear()
+    expect(await live('validateConfig')('honeypot', page.honeypot, [])).toEqual({})
+    expect(fetchMock).not.toHaveBeenCalled()
+    await live('saveConfigSection')('honeypot', page.honeypot, [])
+    expect(JSON.parse(String(fetchMock.mock.calls.at(-1)![1]?.body))).toEqual({})
+  })
+
+  it('knows which fields the stored document sets, and keeps them on a save', () => {
+    const wire = { revision: 3, payload: { behavior: { max_export_rows: 5000 }, presentation: {}, report_presets: { executive: { name: 'Board' } } } }
+    const set = configSetFields(wire)
+    expect(set).toEqual({ presentation: [], behavior: ['maxExportRows'], honeypot: [], reportPresets: ['executive'] })
+    const page = dashboardConfig(wire)
+    // The stored export cap rides along with a changed toggle; the rest stays out.
+    expect(configSectionBody('behavior', { ...page.behavior, readOnly: true }, [...set.behavior!, 'readOnly'])).toEqual({ max_export_rows: 5000, read_only: true })
+  })
+
+  it('still sends and rejects a value the operator entered', async () => {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response(JSON.stringify({ ok: false, problems: ['behavior.max_export_rows must be an integer between 100 and 100000'] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const page = dashboardConfig({ revision: 0, payload: {} })
+    expect(await live('validateConfig')('behavior', { ...page.behavior, maxExportRows: 5 }, ['maxExportRows'])).toEqual({ 'behavior.max_export_rows': 'must be an integer between 100 and 100000' })
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ behavior: { max_export_rows: 5 } })
   })
 
   it('sends presentation to its own route, not to the section that 404s', async () => {

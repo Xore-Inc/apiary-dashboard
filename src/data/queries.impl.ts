@@ -1334,14 +1334,16 @@ const SNAPSHOTS = new Map<string, { section: ConfigSection; value: unknown }>()
 const SECTION_NAME: Record<ConfigSection, string> = { presentation: 'presentation', behavior: 'behavior', honeypot: 'honeypot', reportPresets: 'report-presets' }
 
 /** Persist-nothing preview: what saving this section would refuse. */
-export async function validateConfig<TSection extends ConfigSection>(section: TSection, value: DashboardConfig[TSection]): Promise<ConfigProblems> {
+/** `fields`: the page fields the save would send (stored or changed). The
+ * mock stores whole sections, so it validates the whole value. */
+export async function validateConfig<TSection extends ConfigSection>(section: TSection, value: DashboardConfig[TSection], _fields?: string[]): Promise<ConfigProblems> {
   await mockDelay()
   return validateSection(section, value, REPORT_TEMPLATES.map((t) => t.id))
 }
 
 /** Stages one config section: validated first, then recorded as a new
  * revision with what it replaced, so it can be rolled back. */
-export async function saveConfigSection<TSection extends ConfigSection>(section: TSection, value: DashboardConfig[TSection]): Promise<{ ok: true; revision: number } | { ok: false; problems: ConfigProblems }> {
+export async function saveConfigSection<TSection extends ConfigSection>(section: TSection, value: DashboardConfig[TSection], _fields?: string[]): Promise<{ ok: true; revision: number } | { ok: false; problems: ConfigProblems }> {
   await mockDelay()
   const problems = validateSection(section, value, REPORT_TEMPLATES.map((t) => t.id))
   if (Object.keys(problems).length > 0) {

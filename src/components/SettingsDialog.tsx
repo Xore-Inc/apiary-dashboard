@@ -17,6 +17,7 @@ import { Divider } from '@astryxdesign/core/Divider'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
 import { CodeBlock } from '@astryxdesign/core/CodeBlock'
 import { describeError } from '#/lib/actionError'
+import { isDefaultField, stagedFields } from '#/lib/stagedFields'
 import { NumberInput } from '@astryxdesign/core/NumberInput'
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { Selector } from '@astryxdesign/core/Selector'
@@ -85,6 +86,14 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
   const { error, guard } = useGuardedAction()
   const isAdmin = useIsAdmin()
   const dirty = JSON.stringify(form) !== JSON.stringify(saved)
+  // What a save sends: every field the stored document already sets, plus
+  // the ones changed here. A field left at the backend's default is not
+  // sent (and so not validated): "keep the default", never a typed-in 0 or
+  // empty string. `undefined` (the mock) sends the whole section.
+  const stored = data.configSet?.[section]
+  const fields = stagedFields(saved, form, stored)
+  /** A field the stored document leaves to the default, and not changed here. */
+  const isDefault = (field: string) => isDefaultField(field, saved, form, stored)
   useEffect(() => setDirty(panel, dirty), [panel, dirty, setDirty])
   useEffect(() => () => setDirty(panel, false), [panel, setDirty])
   // Ask the store what it would refuse, a beat after typing stops.
@@ -94,7 +103,7 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
       return
     }
     let live = true
-    const timer = setTimeout(() => void validateConfig(section, form).then((p) => live && setProblems(p)).catch(() => {}), 300)
+    const timer = setTimeout(() => void validateConfig(section, form, fields).then((p) => live && setProblems(p)).catch(() => {}), 300)
     return () => {
       live = false
       clearTimeout(timer)
@@ -117,13 +126,13 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
         <Button label="Revert" variant="secondary" isDisabled={!dirty || !isAdmin} onClick={() => setForm(saved)} />
         <Button
           label="Save"
-          isDisabled={!dirty || count > 0 || !isAdmin}
+          isDisabled={count > 0 || !isAdmin}
           isLoading={busy}
           onClick={async () => {
             setBusy(true)
             try {
               await guard(async () => {
-                const result = await saveConfigSection(section, form)
+                const result = await saveConfigSection(section, form, fields)
                 // The shell renders with this config too: refresh it at once.
                 if (result.ok) await Promise.all([reload(), router.invalidate()])
                 else setProblems(result.problems)
@@ -136,7 +145,7 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
       </HStack>
     </PanelRow>
   )
-  return { form, set, statusOf, actions }
+  return { form, set, statusOf, actions, isDefault }
 }
 
 // ---- Personal panels (apply as they change) --------------------------------------
@@ -372,12 +381,16 @@ function InvestigationPanel() {
 
 // ---- Administration panels (staged; affect everyone) -----------------------------
 
+/** What an input shows for a field left at the backend's default. */
+const DEFAULT_PLACEHOLDER = 'Default'
+
+
 const BANNER_STATUS = { info: 'info', success: 'success', warning: 'warning', danger: 'error' } as const
 
 function BrandingPanel() {
-  const { form, set, statusOf, actions } = useStagedForm('branding', 'presentation')
+  const { form, set, statusOf, actions, isDefault } = useStagedForm('branding', 'presentation')
   const text = (setting: string, field: keyof DashboardConfig['presentation'], label: string, placeholder?: string) => (
-    <SettingsRow setting={setting} control={<TextInput label={label} isLabelHidden width={CONTROL_WIDTH} value={String(form[field])} placeholder={placeholder} status={statusOf(field)} onChange={(value) => set({ [field]: value })} />} />
+    <SettingsRow setting={setting} control={<TextInput label={label} isLabelHidden width={CONTROL_WIDTH} value={String(form[field] ?? '')} placeholder={placeholder ?? (isDefault(field) ? DEFAULT_PLACEHOLDER : undefined)} status={statusOf(field)} onChange={(value) => set({ [field]: value })} />} />
   )
   return (
     <>
@@ -436,7 +449,7 @@ function BrandingPanel() {
 const optionList = (values: number[]) => values.map(String)
 
 function BehaviorPanel() {
-  const { form, set, statusOf, actions } = useStagedForm('behavior', 'behavior')
+  const { form, set, statusOf, actions, isDefault } = useStagedForm('behavior', 'behavior')
   const choose = (setting: string, field: 'rowsPerPageOptions' | 'refreshIntervalOptions', label: string, all: number[], unit: string) => (
     <SettingsRow
       setting={setting}
@@ -465,8 +478,8 @@ function BehaviorPanel() {
         {choose('refreshIntervalOptions', 'refreshIntervalOptions', 'Refresh interval choices', [10, 15, 30, 60, 120, 300], ' s')}
       </SettingsCard>
       <SettingsCard title="Limits">
-        <SettingsRow setting="maxExportRows" control={<NumberInput label="Export cap" isLabelHidden width={CONTROL_WIDTH} min={100} max={100_000} step={500} units="rows" value={form.maxExportRows} status={statusOf('maxExportRows')} onChange={(maxExportRows) => set({ maxExportRows })} />} />
-        <SettingsRow setting="sourceStaleMinutes" control={<NumberInput label="Stale after" isLabelHidden width={CONTROL_WIDTH} min={1} max={1440} units="min" value={form.sourceStaleMinutes} status={statusOf('sourceStaleMinutes')} onChange={(sourceStaleMinutes) => set({ sourceStaleMinutes })} />} />
+        <SettingsRow setting="maxExportRows" control={<NumberInput label="Export cap" isLabelHidden width={CONTROL_WIDTH} min={100} max={100_000} step={500} units="rows" value={isDefault('maxExportRows') ? null : form.maxExportRows} placeholder={DEFAULT_PLACEHOLDER} status={statusOf('maxExportRows')} onChange={(maxExportRows) => set({ maxExportRows })} />} />
+        <SettingsRow setting="sourceStaleMinutes" control={<NumberInput label="Stale after" isLabelHidden width={CONTROL_WIDTH} min={1} max={1440} units="min" value={isDefault('sourceStaleMinutes') ? null : form.sourceStaleMinutes} placeholder={DEFAULT_PLACEHOLDER} status={statusOf('sourceStaleMinutes')} onChange={(sourceStaleMinutes) => set({ sourceStaleMinutes })} />} />
         <SettingsRow setting="mapProvider" control={<Selector label="Map provider" isLabelHidden width={CONTROL_WIDTH} value={form.mapProvider} onChange={() => set({ mapProvider: 'osm' })} options={[{ value: 'osm', label: 'OpenStreetMap' }]} />} />
       </SettingsCard>
       <SettingsCard title="Features">
@@ -523,15 +536,15 @@ function ReporterCard() {
 }
 
 function HoneypotPanel() {
-  const { form, set, statusOf, actions } = useStagedForm('honeypot', 'honeypot')
+  const { form, set, statusOf, actions, isDefault } = useStagedForm('honeypot', 'honeypot')
   const number = (setting: string, field: keyof DashboardConfig['honeypot'], label: string, props: { min: number; max: number; step?: number; units?: string }) => (
-    <SettingsRow setting={setting} control={<NumberInput label={label} isLabelHidden width={CONTROL_WIDTH} {...props} value={Number(form[field])} status={statusOf(field)} onChange={(value) => set({ [field]: value })} />} />
+    <SettingsRow setting={setting} control={<NumberInput label={label} isLabelHidden width={CONTROL_WIDTH} {...props} value={isDefault(field) ? null : Number(form[field])} placeholder={DEFAULT_PLACEHOLDER} status={statusOf(field)} onChange={(value) => set({ [field]: value })} />} />
   )
   return (
     <>
       <ReporterCard />
       <SettingsCard title="Alerting">
-        <SettingsRow setting="alertCooldown" control={<TextInput label="Alert cooldown" isLabelHidden width={CONTROL_WIDTH} value={form.alertCooldown} placeholder="30m" status={statusOf('alertCooldown')} onChange={(alertCooldown) => set({ alertCooldown })} />} />
+        <SettingsRow setting="alertCooldown" control={<TextInput label="Alert cooldown" isLabelHidden width={CONTROL_WIDTH} value={form.alertCooldown} placeholder={isDefault('alertCooldown') ? DEFAULT_PLACEHOLDER : '30m'} status={statusOf('alertCooldown')} onChange={(alertCooldown) => set({ alertCooldown })} />} />
         {number('alertCampaignScore', 'alertCampaignScore', 'Campaign alert score', { min: 0, max: 100 })}
         {number('sandboxAlertRiskScore', 'sandboxAlertRiskScore', 'Sandbox alert risk', { min: 0, max: 100 })}
         {number('mlAlertThreshold', 'mlAlertThreshold', 'ML alert threshold', { min: 0, max: 1, step: 0.01 })}
@@ -540,7 +553,7 @@ function HoneypotPanel() {
         {number('yaraScanIntervalSeconds', 'yaraScanIntervalSeconds', 'YARA scan interval', { min: 60, max: 86_400, step: 60, units: 's' })}
         <SettingsRow
           setting="yaraMaxBytes"
-          control={<NumberInput label="YARA size cap" isLabelHidden width={CONTROL_WIDTH} min={1} max={1024} units="MiB" value={mib(form.yaraMaxBytes)} status={statusOf('yaraMaxBytes')} onChange={(value) => set({ yaraMaxBytes: value * 1024 ** 2 })} />}
+          control={<NumberInput label="YARA size cap" isLabelHidden width={CONTROL_WIDTH} min={1} max={1024} units="MiB" value={isDefault('yaraMaxBytes') ? null : mib(form.yaraMaxBytes)} placeholder={DEFAULT_PLACEHOLDER} status={statusOf('yaraMaxBytes')} onChange={(value) => set({ yaraMaxBytes: value * 1024 ** 2 })} />}
         />
         {number('payloadDedupeIntervalSeconds', 'payloadDedupeIntervalSeconds', 'Payload dedupe interval', { min: 60, max: 86_400, step: 60, units: 's' })}
       </SettingsCard>
