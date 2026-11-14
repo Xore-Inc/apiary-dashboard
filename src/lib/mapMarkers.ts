@@ -10,7 +10,12 @@ export const CLUSTER_DISTANCE = 36
 /** How many of the busiest markers pulse, when the map animates. */
 export const PULSING = 5
 
-export type Marker = { key: string; lat: number; lon: number; radius: number; events: number; countries: string[] }
+/** One drawn marker: an origin, or several merged. `countries` names each
+ * country once; production's points are per city, so one country can be
+ * many origins. */
+export type Marker = { key: string; lat: number; lon: number; radius: number; events: number; countries: string[]; points: MapPoint[] }
+
+const pointKey = (p: MapPoint) => `${p.country}@${p.lat.toFixed(3)},${p.lon.toFixed(3)}`
 
 /** Area proportional to event volume, 4 to 26 px across the map's range. */
 export const markerRadius = (events: number, max: number) => 4 + Math.sqrt(events / Math.max(1, max)) * 22
@@ -23,7 +28,7 @@ export const markerRadius = (events: number, max: number) => 4 + Math.sqrt(event
 export function clusterMarkers(points: MapPoint[], clustering: boolean, project: (lat: number, lon: number) => [number, number]): Marker[] {
   const max = Math.max(1, ...points.map((p) => p.events))
   const sorted = [...points].sort((a, b) => b.events - a.events)
-  if (!clustering) return sorted.map((p) => ({ key: p.country, lat: p.lat, lon: p.lon, radius: markerRadius(p.events, max), events: p.events, countries: [p.country] }))
+  if (!clustering) return sorted.map((p) => ({ key: pointKey(p), lat: p.lat, lon: p.lon, radius: markerRadius(p.events, max), events: p.events, countries: [p.country], points: [p] }))
   const groups: Array<Marker & { x: number; y: number }> = []
   for (const p of sorted) {
     const [x, y] = project(p.lat, p.lon)
@@ -35,16 +40,22 @@ export function clusterMarkers(points: MapPoint[], clustering: boolean, project:
       near.x = (near.x * near.events + x * p.events) / total
       near.y = (near.y * near.events + y * p.events) / total
       near.events = total
-      near.countries.push(p.country)
+      if (!near.countries.includes(p.country)) near.countries.push(p.country)
+      near.points.push(p)
       near.radius = markerRadius(total, max)
-    } else groups.push({ key: p.country, lat: p.lat, lon: p.lon, x, y, radius: markerRadius(p.events, max), events: p.events, countries: [p.country] })
+    } else groups.push({ key: pointKey(p), lat: p.lat, lon: p.lon, x, y, radius: markerRadius(p.events, max), events: p.events, countries: [p.country], points: [p] })
   }
-  return groups.map(({ x: _x, y: _y, ...m }) => ({ ...m, key: m.countries.join(',') })).sort((a, b) => b.radius - a.radius)
+  return groups.map(({ x: _x, y: _y, ...m }) => m).sort((a, b) => b.radius - a.radius)
 }
 
-/** What a marker says, as its tooltip and its accessible name. */
+/** Whether a marker merges several origins (a click zooms in on them). */
+export const isCluster = (m: Marker) => m.points.length > 1
+
+/** What a marker says, as its tooltip and its accessible name: each country
+ * once, at most five named. */
 export function markerLabel(m: Marker): string {
-  const where = m.countries.length > 1 ? `${m.countries.length} countries: ${m.countries.join(', ')}` : m.countries[0]
+  const named = m.countries.length > 5 ? `${m.countries.slice(0, 5).join(', ')} and ${m.countries.length - 5} more` : m.countries.join(', ')
+  const where = isCluster(m) ? `${m.points.length} origins in ${named}` : named
   return `${where}: ${formatNumber(m.events)} events`
 }
 
