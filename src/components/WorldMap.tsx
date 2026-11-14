@@ -1,109 +1,208 @@
-import { useMemo } from 'react'
-import { geoNaturalEarth1, geoPath } from 'd3-geo'
-import { feature } from 'topojson-client'
-import type { FeatureCollection } from 'geojson'
-import type { GeometryCollection, Topology } from 'topojson-specification'
-import countries110m from 'world-atlas/countries-110m.json'
+// The attack map on Leaflet (dash#305), as the old dashboard drew it: real
+// tiles from the configured provider (keyless OpenStreetMap by default,
+// darkened in dark mode), one marker per source country sized by volume,
+// clustered on screen so zooming in splits a group.
+//
+// Leaflet and its stylesheet are loaded inside an effect: their own chunk,
+// fetched only where a map is drawn, never part of the server render. The
+// div Leaflet draws into is never one React renders children into.
+import { useEffect, useRef, useState } from 'react'
+import { useTheme } from '@astryxdesign/core/theme'
 import { useNavigate } from '@tanstack/react-router'
-import type { MapPoint } from '#/data/types'
-import { formatNumber } from '#/lib/format'
+import type * as Leaflet from 'leaflet'
+import type { Map as LeafletMap } from 'leaflet'
+import type { MapPoint, MapTileProvider } from '#/data/types'
+import { DEFAULT_MAP_TILES } from '#/data/mapTiles'
+import { busiest, clusterMarkers, markerHref, markerLabel, worldZoom } from '#/lib/mapMarkers'
 import { usePreferences } from '#/lib/prefs'
-import { DATA_INK } from './charts'
+import { useShellConfig } from '#/lib/session'
+import { DATA_INK } from '#/lib/chartTheme'
 
-const WIDTH = 960
-const HEIGHT = 470
-
-const topology = countries110m as unknown as Topology<{ countries: GeometryCollection }>
-const land = feature(topology, topology.objects.countries) as FeatureCollection
-const projection = geoNaturalEarth1().fitSize([WIDTH, HEIGHT], land)
-const path = geoPath(projection)
-const outlines = land.features.map((f, i) => ({ id: String(f.id ?? i), d: path(f) ?? '' }))
-
-/** Origins closer than this (map units) merge into one marker when
- * clustering is on. */
-const CLUSTER_DISTANCE = 36
-const PULSING = 5
-
-type Dot = MapPoint & { x: number; y: number; r: number }
-type Marker = { key: string; x: number; y: number; r: number; events: number; countries: string[] }
-
-/** Greedy clustering, biggest first: each dot joins the first marker whose
- * centre is within reach, or starts its own. */
-function cluster(dots: Dot[], max: number): Marker[] {
-  const markers: Marker[] = []
-  for (const dot of dots) {
-    const near = markers.find((m) => Math.hypot(m.x - dot.x, m.y - dot.y) < CLUSTER_DISTANCE)
-    if (near) {
-      const total = near.events + dot.events
-      near.x = (near.x * near.events + dot.x * dot.events) / total
-      near.y = (near.y * near.events + dot.y * dot.events) / total
-      near.events = total
-      near.countries.push(dot.country)
-      near.r = 4 + Math.sqrt(total / max) * 22
-    } else markers.push({ key: dot.country, x: dot.x, y: dot.y, r: dot.r, events: dot.events, countries: [dot.country] })
-  }
-  return markers
-}
+const HEIGHT = 420
+const CARD = 'var(--color-background-card)'
 
 /** Attack origins: one marker per source country (or per cluster of nearby
  * countries, as the operator prefers), area proportional to event volume.
- * Clicking one opens the events from there. The busiest pulse, unless the
+ * A country's marker opens its events; a cluster's zooms in on its members.
+ * Markers are links a keyboard reaches. The busiest pulse, unless the
  * operator turned map animation off or asked for reduced motion. */
 export function WorldMap({ points }: { points: MapPoint[] }) {
   const navigate = useNavigate()
   const prefs = usePreferences()
+  const tiles = useShellConfig().map ?? DEFAULT_MAP_TILES
+  const { mode } = useTheme()
   const clustering = prefs?.mapClustering ?? true
   const animate = (prefs?.mapAnimation ?? true) && prefs?.motion !== 'on'
-  const max = Math.max(1, ...points.map((p) => p.events))
-  const markers = useMemo(() => {
-    const dots: Dot[] = points
-      .map((p) => {
-        const [x, y] = projection([p.lon, p.lat]) ?? [0, 0]
-        return { ...p, x, y, r: 4 + Math.sqrt(p.events / max) * 22 }
+  // The basemap preference has one value today ("osm"), which follows the theme.
+  const provider: MapTileProvider = mode === 'dark' ? tiles.dark : tiles.light
+  const boxRef = useRef<HTMLDivElement>(null)
+  const [map, setMap] = useState<{ L: typeof Leaflet; map: LeafletMap } | null>(null)
+  const navigateRef = useRef(navigate)
+  navigateRef.current = navigate
+
+  // The map itself: rebuilt only when the animation setting changes (Leaflet
+  // fixes its animations at construction).
+  useEffect(() => {
+    const box = boxRef.current
+    if (!box) return
+    const life = { disposed: false }
+    let created: LeafletMap | null = null
+    let observer: ResizeObserver | null = null
+    void (async () => {
+      const L = (await import('leaflet')).default
+      await import('leaflet/dist/leaflet.css')
+      if (life.disposed) return
+      const m = L.map(box, {
+        minZoom: 1,
+        maxZoom: 10,
+        zoomSnap: 0.25,
+        // One world: no blank gutters past ±180°.
+        maxBounds: [
+          [-85, -180],
+          [85, 180],
+        ],
+        maxBoundsViscosity: 1,
+        // `map_animation` off means off everywhere Leaflet animates.
+        zoomAnimation: animate,
+        fadeAnimation: animate,
+        markerZoomAnimation: animate,
       })
-      .sort((a, b) => b.r - a.r)
-    const list = clustering ? cluster(dots, max) : dots.map((d) => ({ key: d.country, x: d.x, y: d.y, r: d.r, events: d.events, countries: [d.country] }))
-    // Big markers first so small ones stay clickable on top.
-    return list.sort((a, b) => b.r - a.r)
-  }, [points, max, clustering])
-  const busiest = new Set([...markers].sort((a, b) => b.events - a.events).slice(0, PULSING).map((m) => m.key))
+      created = m
+      // The card settles at its width after the map is built, and changes it
+      // when the sidebar or the window does; Leaflet measures only at
+      // construction, so it is told (old dashboard #1565: a bare strip down
+      // the right edge). An untouched map re-fits the world.
+      let touched = false
+      m.on('dragstart', () => (touched = true))
+      const fit = () => {
+        m.invalidateSize({ animate: false })
+        if (!touched) m.setView([25, 10], worldZoom(box.clientWidth), { animate: false })
+      }
+      fit()
+      m.on('zoomstart', (e) => {
+        if ((e as unknown as { originalEvent?: unknown }).originalEvent !== undefined) touched = true
+      })
+      m.getContainer().addEventListener('wheel', () => (touched = true), { passive: true })
+      observer = new ResizeObserver(fit)
+      observer.observe(box)
+      setMap({ L, map: m })
+    })()
+    return () => {
+      life.disposed = true
+      observer?.disconnect()
+      created?.remove()
+      setMap(null)
+    }
+  }, [animate])
+
+  // The tiles: swapped in place when the mode or the provider changes, so a
+  // theme switch keeps the reader's view.
+  useEffect(() => {
+    if (!map) return
+    const layer = map.L.tileLayer(provider.url, {
+      attribution: provider.attribution,
+      noWrap: true,
+      // Only tiles that exist: none past ±180° or the poles.
+      bounds: [
+        [-85.0511, -180],
+        [85.0511, 180],
+      ],
+      ...(provider.subdomains ? { subdomains: provider.subdomains } : {}),
+      ...(provider.apiKey ? { apikey: provider.apiKey } : {}),
+    }).addTo(map.map)
+    // Light tiles serving dark mode are darkened in place (an inline style on
+    // Leaflet's own pane, not a stylesheet).
+    const pane = map.map.getPane('tilePane')
+    if (pane) pane.style.filter = provider.filter ?? ''
+    return () => {
+      layer.remove()
+    }
+  }, [map, provider.url, provider.attribution, provider.subdomains, provider.apiKey, provider.filter])
+
+  // The markers: redrawn for new data, the clustering preference, and each
+  // zoom (clusters are measured on screen).
+  useEffect(() => {
+    if (!map) return
+    const { L, map: m } = map
+    const layer = L.layerGroup().addTo(m)
+    let frame = 0
+    const draw = () => {
+      cancelAnimationFrame(frame)
+      layer.clearLayers()
+      const markers = clusterMarkers(points, clustering, (lat, lon) => {
+        const p = m.latLngToContainerPoint([lat, lon])
+        return [p.x, p.y]
+      })
+      const pulsing = animate ? busiest(markers) : new Set<string>()
+      const rings: Array<{ ring: Leaflet.CircleMarker; r: number }> = []
+      for (const marker of markers) {
+        const label = markerLabel(marker)
+        const isCluster = marker.countries.length > 1
+        if (pulsing.has(marker.key)) {
+          const ring = L.circleMarker([marker.lat, marker.lon], { radius: marker.radius, color: DATA_INK, weight: 2, fill: false, interactive: false, opacity: 0.6 })
+          ring.addTo(layer)
+          rings.push({ ring, r: marker.radius })
+        }
+        const circle = L.circleMarker([marker.lat, marker.lon], {
+          radius: marker.radius,
+          color: CARD,
+          weight: isCluster ? 3 : 2,
+          fillColor: DATA_INK,
+          fillOpacity: isCluster ? 0.75 : 0.55,
+        })
+        circle.bindTooltip(isCluster ? `${label}. Click to zoom in.` : label, { direction: 'top', offset: [0, -marker.radius] })
+        const go = () => {
+          if (isCluster) {
+            const members = points.filter((p) => marker.countries.includes(p.country))
+            m.fitBounds(L.latLngBounds(members.map((p) => [p.lat, p.lon] as [number, number])).pad(0.5), { maxZoom: Math.min(m.getMaxZoom(), m.getZoom() + 3), animate })
+          } else void navigateRef.current({ href: markerHref(marker) })
+        }
+        circle.on('click', go)
+        circle.on('add', () => {
+          const el = circle.getElement()
+          if (!el) return
+          // Tabbable, announced, Enter/Space-activated, its tooltip shown on focus.
+          el.setAttribute('tabindex', '0')
+          el.setAttribute('role', isCluster ? 'button' : 'link')
+          el.setAttribute('aria-label', isCluster ? `${label}. Zoom in` : label)
+          el.addEventListener('keydown', (event: Event) => {
+            if (!(event instanceof KeyboardEvent)) return
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              go()
+            }
+          })
+          el.addEventListener('focus', () => circle.openTooltip())
+          el.addEventListener('blur', () => circle.closeTooltip())
+        })
+        circle.addTo(layer)
+      }
+      // The busiest origins pulse: a ring that grows and fades every 2.4 s.
+      if (rings.length) {
+        const start = performance.now()
+        const tick = (now: number) => {
+          const phase = ((now - start) % 2400) / 2400
+          for (const { ring, r } of rings) {
+            ring.setRadius(r + phase * 14)
+            ring.setStyle({ opacity: 0.6 * (1 - phase) })
+          }
+          frame = requestAnimationFrame(tick)
+        }
+        frame = requestAnimationFrame(tick)
+      }
+    }
+    draw()
+    m.on('zoomend', draw)
+    return () => {
+      cancelAnimationFrame(frame)
+      m.off('zoomend', draw)
+      layer.remove()
+    }
+  }, [map, points, clustering, animate])
 
   return (
-    // A group, not an image: each marker is a link a keyboard reaches.
-    <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} width="100%" role="group" aria-label="Map of attack origins by country">
-      <g fill="var(--color-background-muted)" stroke="var(--color-border)" strokeWidth={0.5}>
-        {outlines.map((o) => (
-          <path key={o.id} d={o.d} />
-        ))}
-      </g>
-      {markers.map((m) => (
-        <a
-          key={m.key}
-          href={`/events?country=${m.countries.join(',')}`}
-          aria-label={`${m.countries.length > 1 ? `${m.countries.length} countries: ` : ''}${m.countries.join(', ')}: ${formatNumber(m.events)} events`}
-          onClick={(event) => {
-            // Plain clicks route in the app; modified ones open a tab.
-            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return
-            event.preventDefault()
-            void navigate({ to: '/events', search: { country: m.countries.join(',') } })
-          }}
-        >
-          {animate && busiest.has(m.key) && (
-            <circle cx={m.x} cy={m.y} r={m.r} fill="none" stroke={DATA_INK} strokeWidth={2}>
-              <animate attributeName="r" from={m.r} to={m.r + 14} dur="2.4s" repeatCount="indefinite" />
-              <animate attributeName="opacity" from="0.6" to="0" dur="2.4s" repeatCount="indefinite" />
-            </circle>
-          )}
-          <circle cx={m.x} cy={m.y} r={m.r} fill={DATA_INK} fillOpacity={0.55} stroke="var(--color-background-card)" strokeWidth={2}>
-            <title>{m.countries.length > 1 ? `${m.countries.join(', ')}: ${formatNumber(m.events)} events` : `${m.countries[0]}: ${formatNumber(m.events)} events`}</title>
-          </circle>
-          {m.countries.length > 1 && (
-            <text x={m.x} y={m.y + 4} textAnchor="middle" fontSize={11} fontWeight={600} fill="var(--color-text-primary)" pointerEvents="none">
-              {m.countries.length}
-            </text>
-          )}
-        </a>
-      ))}
-    </svg>
+    <div style={{ position: 'relative', height: HEIGHT, borderRadius: 8, overflow: 'hidden', isolation: 'isolate' }}>
+      <div ref={boxRef} role="region" aria-label="Map of attack origins by country. Markers are links to their events." style={{ height: HEIGHT, background: 'var(--color-background-muted)' }} />
+    </div>
   )
 }
