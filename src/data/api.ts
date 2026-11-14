@@ -90,6 +90,7 @@ import {
   alertAckBody,
   alertPage,
   deadLetters,
+  deadLetter,
   purgedDeadLetters,
   sensorCatalog,
   sensorEvents,
@@ -1640,6 +1641,13 @@ const getTopology: Backend['getTopology'] = async () => {
  * list, and anything else throws. */
 const getDeadLetters: Backend['getDeadLetters'] = async (query) => deadLetters((await get<{ total: number; rows: DeadLetterWire[] }>('getDeadLetters', '/api/v1/store/dead-letters', { offset: 0, size: 100, q: query.trim() || undefined })) ?? { total: 0, rows: [] })
 
+/** GET /api/v1/store/dead-letters/{id} (entity_details.rs `store_detail`,
+ * APIARY#3846): the whole document, which the list cuts. 404 is null. */
+const getDeadLetter: Backend['getDeadLetter'] = async (id) => {
+  const wire = await get<Omit<DeadLetterWire, '_doc_id'>>('getDeadLetter', `/api/v1/store/dead-letters/${encodeURIComponent(id)}`)
+  return wire ? deadLetter({ ...wire, _doc_id: id }) : null
+}
+
 /** DELETE /api/v1/store/dead-letters?q= — `generic_delete` (stores.rs
  * `generic_delete`, L601) on the SAME path-parameterised route, which the
  * handler guards: a `name` other than `dead-letters` is a 405, not a purge.
@@ -2721,6 +2729,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   getSourceHealth,
   getTopology,
   getDeadLetters,
+  getDeadLetter,
   purgeDeadLetters,
   // Sources and correlation (#76)
   getSourceProfiles,

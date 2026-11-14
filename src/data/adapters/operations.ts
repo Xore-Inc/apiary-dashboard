@@ -272,21 +272,46 @@ const isIngress = (kind: string): kind is TopologySensor['ingress'][number] => k
 // ---- Dead letters ----------------------------------------------------------
 
 /** GET /api/v1/store/dead-letters?{query}. A generic store passthrough, so
- * the row IS its `_source`; the page's five fields are read out of it with no
- * canonical key guaranteed (see gaps). `index` and `_index` are not on the
- * row — the store's search does not add them — so it is left empty. */
+ * the row IS its `_source`. Filebeat writes the rejected event to `message`
+ * and the refusal to `error.message`; the backend lifts `origin` and
+ * `failure` out of them and cuts both strings (APIARY#3846), so the list
+ * reads those. Older keys (`reason`/`error`, `logset`/`pipeline`) are still
+ * read for documents written another way. `index` is not on the row — the
+ * dead-letter writer does not record the target index — so it is left
+ * empty, and the source log file is carried as `path` instead. */
 export function deadLetters(wire: { total: number; rows: DeadLetterWire[] }): DeadLetter[] {
-  return wire.rows.map((row) => {
-    const { _doc_id: id, ...doc } = row
-    return {
-      id,
-      timestamp: str(row['@timestamp']),
-      reason: str(row.reason) || str(row.error),
-      source: str(row.logset) || str(row.pipeline),
-      index: '',
-      document: doc,
-    }
-  })
+  return wire.rows.map(deadLetter)
+}
+
+/** One dead letter. `document` is the rejected event itself when `message`
+ * holds it whole (the single-document read); otherwise the row as stored. */
+export function deadLetter(row: DeadLetterWire): DeadLetter {
+  const { _doc_id: id, origin, failure, _truncated: cut, ...doc } = row
+  const truncated = Array.isArray(cut) ? cut.filter((f): f is string => typeof f === 'string') : []
+  const original = !truncated.includes('message') ? parsedObject(row.message) : null
+  const refusal = parsedObject(row['error.message'])
+  const path = str(origin?.path) || str((original?.log as { file?: { path?: unknown } } | undefined)?.file?.path)
+  return {
+    id,
+    timestamp: str(row['@timestamp']),
+    reason: str(failure?.reason) || str(refusal?.reason) || str(row.reason) || str(row.error) || str(failure?.type) || str(row['error.type']),
+    source: str(origin?.logset) || str(original?.logset) || str(row.logset) || str(origin?.pipeline) || str(row.pipeline),
+    index: '',
+    ...(path ? { path } : {}),
+    ...(truncated.length ? { truncated } : {}),
+    document: original ?? doc,
+  }
+}
+
+/** A JSON object out of a string, or null. */
+const parsedObject = (text: unknown): Record<string, unknown> | null => {
+  if (typeof text !== 'string' || !text.startsWith('{')) return null
+  try {
+    const value: unknown = JSON.parse(text)
+    return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
 }
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '')

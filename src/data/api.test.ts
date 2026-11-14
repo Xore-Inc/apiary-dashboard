@@ -188,6 +188,7 @@ describe('which queries the real backend answers', () => {
         'getAlertDetail',
         'getAlerts',
         'getDeadLetters',
+        'getDeadLetter',
         'getOpenAlertCount',
         'getSensorCatalog',
         'getSensorDetail',
@@ -1255,6 +1256,34 @@ describe('alerts', () => {
     stub(operationsFixtures({ '/api/v1/config': { ...configWire, payload: { behavior: { read_only: true } } } }))
     await expect(live('setAlertsAcknowledged')(['yara:abc123'], true)).rejects.toThrow(ApiError)
     await expect(live('acknowledgeAllAlerts')()).rejects.toThrow(ApiError)
+  })
+})
+
+describe('dead letters (APIARY#3846)', () => {
+  // The live shape: Filebeat's keys, plus what the backend lifts and cuts.
+  const original = { '@timestamp': '2026-11-09T08:00:15.466Z', pipeline: 'honeypot', logset: 'zeek', log: { file: { path: '/logs/zeek/redis.log' } }, zeek: { 'cmd.value': 'x' } }
+  const refusal = { type: 'document_parsing_exception', reason: '[1:462] failed to parse field [zeek] of type [flattened]' }
+
+  it('lists the backend-cut rows with their origin and reason', async () => {
+    stub(operationsFixtures({ '/api/v1/store/dead-letters': { total: 1, rows: [{
+      _doc_id: 'qJJS', '@timestamp': '2026-11-09T08:00:15.466Z', 'error.type': 400, 'error.message': JSON.stringify(refusal).slice(0, 60), message: JSON.stringify(original).slice(0, 80),
+      origin: { logset: 'zeek', pipeline: 'honeypot', path: '/logs/zeek/redis.log' }, failure: refusal, _truncated: ['message', 'error.message'],
+    }] } }))
+    const [letter] = await live('getDeadLetters')('')
+    expect(letter).toMatchObject({ id: 'qJJS', source: 'zeek', reason: refusal.reason, path: '/logs/zeek/redis.log', truncated: ['message', 'error.message'] })
+  })
+
+  it('reads one letter whole, with the rejected event as its document', async () => {
+    const calls = stub(operationsFixtures({ '/api/v1/store/dead-letters/': { '@timestamp': '2026-11-09T08:00:15.466Z', 'error.type': 400, 'error.message': JSON.stringify(refusal), message: JSON.stringify(original) } }))
+    const letter = await live('getDeadLetter')('qJJS')
+    expect(new URL(calls[0]).pathname).toBe('/api/v1/store/dead-letters/qJJS')
+    expect(letter).toMatchObject({ id: 'qJJS', source: 'zeek', reason: refusal.reason, path: '/logs/zeek/redis.log' })
+    expect(letter?.document).toEqual(original)
+  })
+
+  it('answers null for a letter that is gone', async () => {
+    stub(operationsFixtures({ '/api/v1/store/dead-letters/': fail(404, 'null') }))
+    expect(await live('getDeadLetter')('purged')).toBeNull()
   })
 })
 

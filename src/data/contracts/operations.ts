@@ -360,6 +360,18 @@ export interface DeadLetterWire extends Record<string, unknown> {
   error?: string
   logset?: string
   pipeline?: string
+  /** Filebeat's dead-letter keys, stored as literal dotted keys: the
+   * rejected event as a JSON string, Elasticsearch's refusal as a JSON
+   * string, and the HTTP status. */
+  message?: string
+  'error.message'?: string
+  'error.type'?: string | number
+  /** stores.rs `summarize_dead_letter` (APIARY#3846), list rows only:
+   * where the event came from, why it was refused, and which of the two
+   * strings above were cut to 4 KB. */
+  origin?: { logset?: string; pipeline?: string; path?: string }
+  failure?: { type?: string; reason?: string }
+  _truncated?: string[]
 }
 
 /** DELETE /api/v1/store/dead-letters?q= — the same `q` scope the GET
