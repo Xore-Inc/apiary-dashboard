@@ -13,7 +13,7 @@ import type * as Leaflet from 'leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import type { MapPoint, MapTileProvider } from '#/data/types'
 import { DEFAULT_MAP_TILES } from '#/data/mapTiles'
-import { busiest, clusterMarkers, markerHref, markerLabel, worldZoom } from '#/lib/mapMarkers'
+import { busiest, clusterMarkers, isCluster as merged, markerHref, markerLabel, worldZoom } from '#/lib/mapMarkers'
 import { usePreferences } from '#/lib/prefs'
 import { useShellConfig } from '#/lib/session'
 import { DATA_INK } from '#/lib/chartTheme'
@@ -137,7 +137,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
       const rings: Array<{ ring: Leaflet.CircleMarker; r: number }> = []
       for (const marker of markers) {
         const label = markerLabel(marker)
-        const isCluster = marker.countries.length > 1
+        const isCluster = merged(marker)
         if (pulsing.has(marker.key)) {
           const ring = L.circleMarker([marker.lat, marker.lon], { radius: marker.radius, color: DATA_INK, weight: 2, fill: false, interactive: false, opacity: 0.6 })
           ring.addTo(layer)
@@ -153,8 +153,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
         circle.bindTooltip(isCluster ? `${label}. Click to zoom in.` : label, { direction: 'top', offset: [0, -marker.radius] })
         const go = () => {
           if (isCluster) {
-            const members = points.filter((p) => marker.countries.includes(p.country))
-            m.fitBounds(L.latLngBounds(members.map((p) => [p.lat, p.lon] as [number, number])).pad(0.5), { maxZoom: Math.min(m.getMaxZoom(), m.getZoom() + 3), animate })
+            m.fitBounds(L.latLngBounds(marker.points.map((p) => [p.lat, p.lon] as [number, number])).pad(0.5), { maxZoom: Math.min(m.getMaxZoom(), m.getZoom() + 3), animate })
           } else void navigateRef.current({ href: markerHref(marker) })
         }
         circle.on('click', go)
