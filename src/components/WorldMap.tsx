@@ -16,7 +16,7 @@ import { DEFAULT_MAP_TILES } from '#/data/mapTiles'
 import { busiest, clusterMarkers, markerHref, markerLabel, worldZoom } from '#/lib/mapMarkers'
 import { usePreferences } from '#/lib/prefs'
 import { useShellConfig } from '#/lib/session'
-import { DATA_INK } from './charts'
+import { DATA_INK } from '#/lib/chartTheme'
 
 const HEIGHT = 420
 const CARD = 'var(--color-background-card)'

@@ -45,13 +45,13 @@
     "@heroicons/react": "^2.2.0",
     "@tanstack/react-router": "1.170.41",
     "@tanstack/react-start": "1.168.60",
+    "echarts": "^6.1.0",
     "ioredis": "^6.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.52.0",
     "openid-client": "^6.8.7",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0",
-    "recharts": "^3.10.1"
+    "react-dom": "^19.3.0"
   },
   "devDependencies": {
     "@astryxdesign/cli": "^0.6.5",
