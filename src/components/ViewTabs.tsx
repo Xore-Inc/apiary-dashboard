@@ -91,14 +91,19 @@ function safeDecode(path: string): string {
 /** Tabs as route segments under an entity's base path (epic #25): the first
  * tab is the base path itself, the rest are `<base>/<id>`. A tab's sections
  * live in `?section=`, the first one the default and left out of the URL. */
-export function entityTabs({ label, basePath, tabs }: { label: string; basePath: (params: Record<string, string>) => string; tabs: (data: unknown) => ViewTab[] }): ViewTabsFn {
+/** `aliases` maps an old tab path to the tab it was folded into (a route
+ * that only redirects there). A browser's first load renders the old path's
+ * skeleton on the server (lib/pageSsr) while the client has already
+ * redirected, so both must select the same tab or hydration fails (#299). */
+export function entityTabs({ label, basePath, tabs, aliases = {} }: { label: string; basePath: (params: Record<string, string>) => string; tabs: (data: unknown) => ViewTab[]; aliases?: Record<string, string> }): ViewTabsFn {
   return ({ params, pathname, data, search }) => {
     const base = basePath(params)
     const list = tabs(data)
     const path = safeDecode(pathname)
     const decodedBase = safeDecode(base)
     const rest = path.startsWith(decodedBase) ? path.slice(decodedBase.length).replace(/^\//, '') : ''
-    const value = list.find((tab) => tab.id === rest.split('/')[0])?.id ?? list[0].id
+    const segment = rest.split('/')[0]
+    const value = list.find((tab) => tab.id === (aliases[segment] ?? segment))?.id ?? list[0].id
     const sections = list.find((tab) => tab.id === value)?.sections
     return {
       label,
