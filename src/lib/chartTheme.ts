@@ -137,3 +137,34 @@ export function domResolver(host: HTMLElement, prefetch: readonly string[] = [])
 /** What a theme change looks like to a chart: the colours it would resolve
  * now. Two equal keys draw the same pixels, so no repaint is needed. */
 export const themeKey = (t: ChartTheme) => [...Object.values(TOKENS), ...PALETTE].map(t.c).join('|') + t.fontFamily
+
+let canvasSupport: boolean | undefined
+/** Whether this DOM can paint a canvas: false in the unit tests' jsdom,
+ * where charts and graphs draw nothing rather than throw. */
+export const canvasWorks = () =>
+  (canvasSupport ??= (() => {
+    try {
+      return !!document.createElement('canvas').getContext('2d')
+    } catch {
+      return false
+    }
+  })())
+
+/** Calls `onChange` when the theme, mode, palette or motion preference on
+ * <html> changes, or the system colour scheme does. Returns the unsubscribe. */
+export function onThemeChange(onChange: () => void): () => void {
+  let frame = 0
+  const fire = () => {
+    cancelAnimationFrame(frame)
+    frame = requestAnimationFrame(onChange)
+  }
+  const mutations = new MutationObserver(fire)
+  mutations.observe(document.documentElement, { attributes: true, attributeFilter: [...THEME_ATTRIBUTES, 'data-motion'] })
+  const scheme = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null
+  scheme?.addEventListener('change', fire)
+  return () => {
+    cancelAnimationFrame(frame)
+    mutations.disconnect()
+    scheme?.removeEventListener('change', fire)
+  }
+}
