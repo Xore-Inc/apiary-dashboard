@@ -739,6 +739,19 @@ describe('the Evidence queries against a fixture per endpoint', () => {
     expect(await live('getPayloadAnalysis')('deadbeef')).toBeNull()
   })
 
+  it('notes the golden image a Windows run ran on, and none for a Linux run', async () => {
+    const windows = { sandbox: { job: 'sbx-9', sha256: 'd'.repeat(64), completed_at: '2026-10-01T09:00:00Z', exit_status: 'ok', run_status: 'ok', duration_seconds: 5, risk_score: 80, platform: 'windows-kvm', iocs: [] }, _doc_id: 'sbx:9' }
+    const golden = { configured: true, built_at: '2026-09-01T00:00:00Z', age_days: 74, checksum_written: true, checksum_verified: false, stale_monthly: true, stale_iso_eval: false, checked_at: '2026-11-14T00:00:00Z' }
+    let calls = stub({ '/api/v1/sandbox/golden-image-status': golden, '/api/v1/sandbox/': windows })
+    expect((await live('getSandboxRun')('sbx-9'))?.goldenImage).toEqual({ builtAt: '2026-09-01T00:00:00Z', ageDays: 74, checksumWritten: true, checksumVerified: false, staleMonthly: true, staleIsoEval: false, checkedAt: '2026-11-14T00:00:00Z' })
+    expect(calls.map((url) => new URL(url).pathname)).toEqual(['/api/v1/sandbox/sbx-9', '/api/v1/sandbox/golden-image-status'])
+    stub({ '/api/v1/sandbox/golden-image-status': { configured: false }, '/api/v1/sandbox/': windows })
+    expect((await live('getSandboxRun')('sbx-9'))?.goldenImage).toBeUndefined()
+    calls = stub({ '/api/v1/sandbox/': { ...windows, sandbox: { ...windows.sandbox, platform: 'linux-x86_64' } } })
+    expect((await live('getSandboxRun')('sbx-9'))?.goldenImage).toBeUndefined()
+    expect(calls).toHaveLength(1)
+  })
+
   it('maps GET /sandbox/{job} and the double-nested GET /revdeck/{sha}', async () => {
     stub({
       '/api/v1/sandbox/sbx-9': { sandbox: { job: 'sbx-9', sha256: 'd'.repeat(64), completed_at: '2026-10-01T09:00:00Z', exit_status: 'ok', run_status: 'ok', duration_seconds: 5, risk_score: 80, platform: 'windows-kvm', iocs: [] }, _doc_id: 'sbx:9' },

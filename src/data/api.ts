@@ -136,6 +136,7 @@ import {
   revDeckRun,
   revDeckRuns,
   sandboxRun,
+  goldenImageStatus,
   savedWorkbenchRecipes,
   workbenchRun,
   workbenchRuns,
@@ -1990,9 +1991,19 @@ const getPayloadAnalysis: Backend['getPayloadAnalysis'] = async (hash) => {
   return payloadAnalysis(wire, capturedPayload({ ...wire.inventory, _doc_id: hash }), wire.analysis?.Analysis?.StaticRiskScore ?? 0)
 }
 
+/** GET /api/v1/sandbox/{job}, and for a Windows run the golden image it
+ * ran on (GET /api/v1/sandbox/golden-image-status, sandbox_submit.rs): the
+ * page notes a stale or unverified image beside the verdict. Both are
+ * mounted reads. An unconfigured image, or one the backend cannot answer
+ * for, leaves the note off. */
 const getSandboxRun: Backend['getSandboxRun'] = async (job) => {
   const wire = await get<SandboxRunDetailWire>('getSandboxRun', `/api/v1/sandbox/${encodeURIComponent(job)}`, {}, { mounted: true })
-  return wire ? sandboxRun(wire) : null
+  if (!wire) return null
+  const run = sandboxRun(wire)
+  if (run.route.name !== 'windows-kvm') return run
+  const status = await get<Record<string, unknown> & { configured: boolean }>('getSandboxRun', '/api/v1/sandbox/golden-image-status', {}, { mounted: true }).catch(() => null)
+  const image = status ? goldenImageStatus(status) : undefined
+  return image ? { ...run, goldenImage: image } : run
 }
 
 /** The Windows sandbox's live detonation (sandbox_submit.rs `/api/v1/sandbox/vnc`).
