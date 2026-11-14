@@ -26,10 +26,12 @@ import type {
   MlStatus,
   OverviewKpis,
   StorePage,
+  AttackVectorsWire,
 } from '../contracts/monitor'
 import type {
   AgentCampaign,
   AnomalyStatus,
+  AttackVectors,
   AuthFailure,
   CountRow,
   DashboardConfig,
@@ -445,3 +447,9 @@ export function toAuthFailure(row: AuthEventRow & { _doc_id: string }): AuthFail
     userId: opt(row.user_id),
   }
 }
+/** GET /api/v1/attack-vectors?sensor= → the overview's per-sensor vectors,
+ * one count row per port and per protocol, in the wire's (count) order. */
+export const attackVectorRows = (wire: AttackVectorsWire): AttackVectors => ({
+  ports: wire.ports.map((row) => ({ id: row.key, label: row.key, count: row.count })),
+  protocols: wire.protocols.map((row) => ({ id: row.key, label: row.key, count: row.count })),
+})

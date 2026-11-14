@@ -3,6 +3,7 @@ import { ActionLink } from '#/components/ActionLink'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { virusTotalLink } from '#/lib/toolLinks'
+import { conformanceSeries } from '#/lib/conformance'
 import { OpenInMenu } from '#/components/OpenInMenu'
 import { Card } from '@astryxdesign/core/Card'
 import { Grid } from '@astryxdesign/core/Grid'
@@ -253,7 +254,7 @@ function ThreatsView({ views, section }: { views: OverviewViews; section?: strin
             </Panel>
           </Grid>
           <Panel title="Protocol-conformance violations by protocol">
-            {available(views.conformance, (points) => <SeriesLines data={points} series={[{ key: 'http', label: 'HTTP' }, { key: 'smb', label: 'SMB' }, { key: 'sip', label: 'SIP' }]} dayTicks />)}
+            {available(views.conformance, (points) => <SeriesLines data={points} series={conformanceSeries(points)} dayTicks />)}
           </Panel>
         </VStack>
       )}

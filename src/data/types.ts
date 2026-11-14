@@ -1524,8 +1524,10 @@ export interface AttackVectors {
 /** The deep-dive tabs. Every field the dashboard endpoint fills, and the
  * payloads and campaigns legs, is `Unavailable` when its endpoint has no
  * answer. The chart-backed fields are `Unavailable` when their
- * `/api/v1/charts/*` route does not answer; `vectors` and `conformance` have no
- * backend source at all. */
+ * `/api/v1/charts/*` route does not answer (`conformance` is the
+ * `anomaly-trend` chart); `vectors` is unavailable when the sensor catalog
+ * has no answer, and holds one entry per sensor `/api/v1/attack-vectors`
+ * answered for. */
 export interface OverviewViews {
   heatmap: Unavailable<HeatmapRow[]>
   vectors: Unavailable<Record<string, AttackVectors>>
