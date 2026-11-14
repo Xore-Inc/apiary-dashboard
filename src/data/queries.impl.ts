@@ -74,6 +74,7 @@ import { generatePassword, inRange, nextScheduledRun, redact } from './shared'
 import { clusterHref } from '#/lib/entities'
 import type {
   AgentCampaign,
+  ServiceLogs,
   CapeRun,
   GhidraAnalysis,
   PageRequest,
@@ -1365,6 +1366,18 @@ export async function runServiceAction(name: string, action: 'start' | 'stop' | 
   service.state = action === 'stop' ? 'exited' : 'running'
   service.uptime = action === 'stop' ? '—' : '0m'
   audit(`service.${action}`, [name])
+}
+
+/** A container's last log lines, made up from its state. */
+export async function getServiceLogs(name: string): Promise<ServiceLogs | null> {
+  await mockDelay()
+  const service = SERVICES.find((s) => s.name === name)
+  if (!service) return null
+  const at = (i: number) => new Date(MOCK_NOW - (40 - i) * 30_000).toISOString()
+  const text = service.state === 'exited'
+    ? [`${at(39)} ${name}: received SIGTERM, shutting down`, `${at(40)} ${name}: stopped`]
+    : Array.from({ length: 40 }, (_, i) => `${at(i)} ${name}: ${i % 7 === 0 ? 'health check ok' : `handled request ${1000 + i}`}`)
+  return { name, lines: 200, text }
 }
 
 export async function rollbackConfig(revisionId: string): Promise<void> {

@@ -15,6 +15,8 @@ import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList'
 import { Button } from '@astryxdesign/core/Button'
 import { Divider } from '@astryxdesign/core/Divider'
 import { Layout, LayoutContent } from '@astryxdesign/core/Layout'
+import { CodeBlock } from '@astryxdesign/core/CodeBlock'
+import { describeError } from '#/lib/actionError'
 import { NumberInput } from '@astryxdesign/core/NumberInput'
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { Selector } from '@astryxdesign/core/Selector'
@@ -34,11 +36,11 @@ import { ContainerStateLabel } from './FeedState'
 import { CONTROL_WIDTH, PanelColumn, PanelRow, PinnedClose, SettingsCard, SettingsPanelHeading, SettingsPanelTabs, SettingsRow, SettingsSearchInput, SettingsGrid, SettingsSearchResults, SettingsSideNav, ThemeChoiceCards, useSettingsSearch } from './settings/parts'
 import { isAdminPanel, panelOf } from './settings/registry'
 import type { PaneId } from './settings/registry'
-import { getSettings, rollbackConfig, runServiceAction, saveConfigSection, savePreferences, validateConfig } from '#/data/queries'
-import type { AuditEntry, ConfigProblems, ConfigRevision, ConfigSection, DashboardConfig, EsStorage, Palette, Preferences, ServiceStatus, SettingsData, AstryxTheme } from '#/data/types'
+import { getServiceLogs, getSettings, rollbackConfig, runServiceAction, saveConfigSection, savePreferences, validateConfig } from '#/data/queries'
+import type { AuditEntry, ConfigProblems, ConfigRevision, ConfigSection, DashboardConfig, EsStorage, Palette, Preferences, ServiceLogs, ServiceStatus, SettingsData, AstryxTheme } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { NAV_SECTIONS } from '#/lib/nav'
-import { AppDialog, ConfirmDialog } from './AppDialog'
+import { AppDialog, AppDialogHeader, ConfirmDialog } from './AppDialog'
 import { APIARY_PALETTES } from '#/themes/neutral/apiaryPalettes.generated'
 import type { ApiaryPalette } from '#/themes/neutral/apiaryPalettes.generated'
 import { ASTRYX_THEMES } from '#/themes/appTheme'
@@ -633,9 +635,51 @@ function UsersPanel() {
   )
 }
 
+/** A container's recent log lines, read when the dialog opens. */
+function ServiceLogsDialog({ name, onClose }: { name: string | null; onClose: () => void }) {
+  const [logs, setLogs] = useState<ServiceLogs | null | undefined>(undefined)
+  const [failed, setFailed] = useState<string>()
+  useEffect(() => {
+    if (!name) return
+    let live = true
+    setLogs(undefined)
+    setFailed(undefined)
+    getServiceLogs(name).then(
+      (value) => live && setLogs(value),
+      (error: unknown) => live && setFailed(describeError(error)),
+    )
+    return () => {
+      live = false
+    }
+  }, [name])
+  return (
+    <AppDialog isOpen={name !== null} onClose={onClose} kind="large" aria-label={`Logs of ${name ?? ''}`}>
+      <Layout
+        header={<AppDialogHeader title={`Logs: ${name ?? ''}`} />}
+        content={
+          <LayoutContent>
+            {failed ? (
+              <Banner status="error" title="Could not read the logs" description={failed} />
+            ) : logs === undefined ? (
+              <Skeleton height={240} />
+            ) : logs === null ? (
+              <Text type="supporting">The services adapter has no logs for this container.</Text>
+            ) : logs.text.length === 0 ? (
+              <Text type="supporting">No log lines.</Text>
+            ) : (
+              <CodeBlock isWrapped code={logs.text.join('\n')} language="text" title={`Last ${formatNumber(logs.text.length)} lines`} />
+            )}
+          </LayoutContent>
+        }
+      />
+    </AppDialog>
+  )
+}
+
 function ServicesPanel() {
   const { data, reload } = useSettings()
   const [busy, setBusy] = useState<string | null>(null)
+  const [logsOf, setLogsOf] = useState<string | null>(null)
   const { error, guard } = useGuardedAction()
   const isAdmin = useIsAdmin()
   const act = async (name: string, action: 'start' | 'stop' | 'restart') => {
@@ -656,9 +700,10 @@ function ServicesPanel() {
     {
       key: 'image',
       header: '',
-      width: pixel(184),
+      width: pixel(248),
       renderCell: (row) => (
         <HStack gap={1}>
+          <Button label="Logs" size="sm" variant="ghost" onClick={() => setLogsOf(row.name)} />
           {row.state === 'exited' ? (
             <Button label="Start" size="sm" isLoading={busy === row.name} isDisabled={!isAdmin} onClick={() => act(row.name, 'start')} />
           ) : (
@@ -677,6 +722,7 @@ function ServicesPanel() {
       <SettingsCard>
       <SettingsRow setting="services" detail={<Table data={data.services} columns={columns} idKey="name" density="compact" />} />
     </SettingsCard>
+      <ServiceLogsDialog name={logsOf} onClose={() => setLogsOf(null)} />
     </>
   )
 }

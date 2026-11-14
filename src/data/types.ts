@@ -1229,6 +1229,15 @@ export interface ServiceStatus extends Record<string, unknown> {
   image: string
 }
 
+/** One container's recent log lines, newest last (`viewLogs` in the admin
+ * services pane). */
+export interface ServiceLogs {
+  name: string
+  /** Lines asked for, after the backend's clamp. */
+  lines: number
+  text: string[]
+}
+
 export interface ConfigRevision extends Record<string, unknown> {
   id: string
   at: string

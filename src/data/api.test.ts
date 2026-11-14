@@ -130,6 +130,7 @@ describe('which queries the real backend answers', () => {
         'getSessionUser',
         'rollbackConfig',
         'runServiceAction',
+        'getServiceLogs',
         'saveConfigSection',
         'savePreferences',
         'setProblemStatus',
@@ -1062,6 +1063,17 @@ describe('services, mail and problem reports', () => {
     // HTTP error, so it would otherwise reach the page as a success.
     stub({ '/api/v1/config': configWire, '/api/v1/services/hp-tanner/restart': { ok: false, error: 'adapter unreachable' } })
     await expect(live('runServiceAction')('hp-tanner', 'restart')).rejects.toThrow(ApiError)
+  })
+
+  it('reads a container\'s last 200 log lines, and null for one outside the adapter', async () => {
+    const calls = stub({ '/api/v1/services/hp-tanner/logs': { name: 'hp-tanner', lines: 200, log: '2026-11-14T07:00:00Z ready\n2026-11-14T07:00:01Z listening\n' } })
+    expect(await live('getServiceLogs')('hp-tanner')).toEqual({ name: 'hp-tanner', lines: 200, text: ['2026-11-14T07:00:00Z ready', '2026-11-14T07:00:01Z listening'] })
+    expect(new URL(calls[0]).searchParams.get('lines')).toBe('200')
+    stub({ '/api/v1/services/': fail(404, 'unknown service') })
+    expect(await live('getServiceLogs')('nope')).toBeNull()
+    // Measured live: a container outside the adapter's allowlist is its 403.
+    stub({ '/api/v1/services/': fail(403, '{"error":"services adapter returned 403"}') })
+    expect(await live('getServiceLogs')('hp-apiary-backend')).toBeNull()
   })
 
   it('answers a mail session that captured nothing with null, not an error', async () => {

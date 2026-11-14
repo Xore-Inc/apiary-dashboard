@@ -111,7 +111,7 @@ import {
   credentialList,
   decodedBase64Length,
 } from './adapters/tools'
-import { DEFAULT_PREFERENCES_WIRE, capturedMail, preferences, preferencesPatch, preferencesQuery, preferencesWriteBody, configProblems, configRollbackBody, configSectionBody, configSectionPath, configValidateBody, problemReportBody, problemReports, problemStatusPatch, settingsData, shellConfig } from './adapters/settings'
+import { DEFAULT_PREFERENCES_WIRE, capturedMail, preferences, preferencesPatch, preferencesQuery, preferencesWriteBody, configProblems, configRollbackBody, configSectionBody, configSectionPath, configValidateBody, problemReportBody, problemReports, problemStatusPatch, serviceLogs, settingsData, shellConfig } from './adapters/settings'
 import type { DashboardViews } from './adapters/monitor'
 import { readingOf } from '#/lib/sensorSpecs'
 import { authorize } from '#/server/authorize'
@@ -177,7 +177,7 @@ import type {
   TopologySensorWire,
   TopologyWire,
 } from './contracts/operations'
-import type { AuditWire, ConfigHistoryWire, ConfigValidateWire, ConfigWire, MailWire, PreferencesDocWire, PreferencesWire, ProblemReportCreatedWire, ProblemReportsPageWire, ReporterStatsWire, ServiceActionWireResponse, ServicesWire, StorageWire, UsersWire } from './contracts/settings'
+import type { AuditWire, ConfigHistoryWire, ConfigValidateWire, ConfigWire, MailWire, PreferencesDocWire, PreferencesWire, ProblemReportCreatedWire, ProblemReportsPageWire, ReporterStatsWire, ServiceActionWireResponse, ServiceLogsWire, ServicesWire, StorageWire, UsersWire } from './contracts/settings'
 import type {
   AgentCampaignRow,
   AuthEventRow,
@@ -1646,6 +1646,18 @@ const getTopology: Backend['getTopology'] = async () => {
  * list, and anything else throws. */
 const getDeadLetters: Backend['getDeadLetters'] = async (query) => deadLetters((await get<{ total: number; rows: DeadLetterWire[] }>('getDeadLetters', '/api/v1/store/dead-letters', { offset: 0, size: 100, q: query.trim() || undefined })) ?? { total: 0, rows: [] })
 
+/** GET /api/v1/services/{name}/logs?lines=200 (services adapter): the
+ * container's last lines, as canonical's `fetchServiceLogs` read them. A
+ * container that does not exist (404) or that the adapter does not serve
+ * (its 403, relayed) has no logs to show: null. */
+const getServiceLogs: Backend['getServiceLogs'] = async (name) => {
+  const wire = await get<ServiceLogsWire>('getServiceLogs', `/api/v1/services/${encodeURIComponent(name)}/logs`, { lines: 200 }).catch((error: unknown) => {
+    if (error instanceof ApiError && error.kind === 'forbidden') return null
+    throw error
+  })
+  return wire ? serviceLogs(wire) : null
+}
+
 /** GET /api/v1/store/dead-letters/{id} (entity_details.rs `store_detail`,
  * APIARY#3846): the whole document, which the list cuts. 404 is null. */
 const getDeadLetter: Backend['getDeadLetter'] = async (id) => {
@@ -2811,6 +2823,7 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   getTopology,
   getDeadLetters,
   getDeadLetter,
+  getServiceLogs,
   purgeDeadLetters,
   // Sources and correlation (#76)
   getSourceProfiles,

@@ -442,6 +442,12 @@ const getSensorDetailFn = createServerFn({ method: 'GET' })
   .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getSensorDetail', data, context.mock)) as Json)
 export const getSensorDetail = announced('getSensorDetail', getSensorDetailFn) as Rpc<typeof impl.getSensorDetail>
 
+const getServiceLogsFn = createServerFn({ method: 'GET' })
+  .middleware([mockScenarioMiddleware])
+  .validator((args: unknown[]) => args)
+  .handler(async ({ data, context }) => (await (await import('./backend')).runForRequest('getServiceLogs', data, context.mock)) as Json)
+export const getServiceLogs = announced('getServiceLogs', getServiceLogsFn) as Rpc<typeof impl.getServiceLogs>
+
 const getSessionDetailFn = createServerFn({ method: 'GET' })
   .middleware([mockScenarioMiddleware])
   .validator((args: unknown[]) => args)
