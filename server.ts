@@ -66,6 +66,7 @@
 import path from 'node:path'
 import { assertBootPolicies } from './src/server/policy'
 import { serverIdleTimeoutSeconds } from './src/server/idleTimeout'
+import { FOLDED_TAB_ROUTES, foldedTabRedirect } from './src/server/foldedTabs'
 
 // Configuration
 const SERVER_PORT = Number(process.env.PORT ?? 3000)
@@ -537,6 +538,14 @@ async function initializeServer() {
     routes: {
       // Serve static assets (preloaded or on-demand)
       ...routes,
+
+      // Folded entity tabs: a 301 before rendering, for browsers too (#299).
+      ...Object.fromEntries(
+        Object.entries(FOLDED_TAB_ROUTES).map(([pattern, target]) => [
+          pattern,
+          (req: Request & { params: Record<string, string> }) => foldedTabRedirect(req, target(req.params)),
+        ]),
+      ),
 
       // Fallback to TanStack Start handler for all other routes
       '/*': (req: Request) => {

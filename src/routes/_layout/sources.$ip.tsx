@@ -13,9 +13,12 @@ import { NotFound } from '#/components/NotFound'
 import { getIpProfile } from '#/data/queries'
 import { formatAs, formatDateTime, formatNumber } from '#/lib/format'
 
+/** Old tabs folded into Breakdown; each route only redirects there. */
+const FOLDED_TABS = { alerts: 'breakdown', commands: 'breakdown', credentials: 'breakdown' }
+
 export const Route = createFileRoute('/_layout/sources/$ip')({
   ssr: pageSsr,
-  staticData: { viewTabs: entityTabs({ label: 'Source IP views', basePath: (params) => `/sources/${encodeURIComponent(params.ip)}`, tabs: tabsFor }) },
+  staticData: { viewTabs: entityTabs({ label: 'Source IP views', basePath: (params) => `/sources/${encodeURIComponent(params.ip)}`, tabs: tabsFor, aliases: FOLDED_TABS }) },
   loader: async ({ params }) => {
     const profile = await getIpProfile(params.ip)
     if (!profile) throw notFound()
