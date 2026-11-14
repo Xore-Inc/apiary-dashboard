@@ -329,7 +329,7 @@ export function ghidraRunPage(wire: GhidraRunPageWire): { total: number; runs: G
 /** GET /api/v1/ghidra-callgraph/{sha}. Cytoscape reads this shape as-is.
  *
  * There is no page type for this: the dashboard renders the call graph from
- * `GhidraAnalysis.functions` (see `#/lib/callGraphLayout`), not from this
+ * `GhidraAnalysis.functions` (see `#/lib/graphModels` `callGraph`), not from this
  * endpoint, so this is a pass-through for whoever wants the Cytoscape view.
  * `GhidraAnalysis` itself never carries `truncated` — the node cap is
  * `detail.rs`'s own `GHIDRA_CALLGRAPH_MAX_NODES`. */

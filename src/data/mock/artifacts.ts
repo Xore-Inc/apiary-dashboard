@@ -1,8 +1,7 @@
 // The files an analysis run leaves behind, as the artifact store lists them:
 // Ghidra's exports per sample, the sandbox's per job. Each file's content is
 // built from the run itself, so what downloads matches what the page shows.
-import type { GhidraAnalysis, SandboxRun } from '../types'
-import { callGraphSvg } from '#/lib/callGraphLayout'
+import type { GhidraAnalysis, GhidraFunction, SandboxRun } from '../types'
 
 export type ArtifactKind = 'ghidra' | 'sandbox'
 
@@ -14,6 +13,23 @@ export interface ArtifactFile {
 }
 
 const json = (value: unknown) => `${JSON.stringify(value, null, 2)}\n`
+
+const escapeXml = (text: string) => text.replace(/[<>&"']/g, (c) => `&#${c.charCodeAt(0)};`)
+
+/** The mock's stand-in for Ghidra's call-graph export: a static SVG listing
+ * each function and what it calls (the real file comes from the analyzer;
+ * the page draws the graph itself, with cytoscape). */
+function callGraphSvg(functions: GhidraFunction[]): string {
+  const rows = functions.map((f, i) => `<text x="16" y="${28 + i * 20}">${escapeXml(f.name)} @ ${escapeXml(f.address)}${f.callees.length ? ` → ${escapeXml(f.callees.join(', '))}` : ''}</text>`)
+  const height = 40 + functions.length * 20
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="${height}" viewBox="0 0 720 ${height}" font-family="monospace" font-size="12" fill="#202124">`,
+    '<rect width="100%" height="100%" fill="#ffffff"/>',
+    ...rows,
+    '</svg>',
+    '',
+  ].join('\n')
+}
 
 /** An empty capture in the classic pcap format: the header, no packets. */
 function emptyPcap(): Uint8Array {

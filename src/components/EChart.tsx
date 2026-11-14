@@ -12,21 +12,12 @@ import type { EChartsOption, ECElementEvent } from 'echarts'
 import type { EChartsType } from 'echarts/core'
 import type * as EChartsLib from '#/lib/echarts'
 import { usePreferences } from '#/lib/prefs'
-import { THEME_ATTRIBUTES, domResolver, echartsTheme, themeKey } from '#/lib/chartTheme'
+import { THEME_ATTRIBUTES, canvasWorks, domResolver, echartsTheme, themeKey } from '#/lib/chartTheme'
 import type { ChartTheme } from '#/lib/chartTheme'
 import { CHART_COLORS } from '#/lib/chartOptions'
 
 
 type EChartsModule = typeof EChartsLib
-
-let canvasSupport: boolean | undefined
-const canvasWorks = () => (canvasSupport ??= (() => {
-  try {
-    return !!document.createElement('canvas').getContext('2d')
-  } catch {
-    return false
-  }
-})())
 
 export type ChartBuild = (theme: ChartTheme) => EChartsOption
 
