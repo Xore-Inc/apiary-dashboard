@@ -1278,6 +1278,10 @@ export interface SettingsData {
   storage: EsStorage
   /** The template catalog, for naming preset overrides. */
   reportTemplates: ReportTemplate[]
+  /** Per config section, the page fields the stored document sets. A field
+   * it leaves out is at the backend's default; a save sends it only when the
+   * operator changes it. Absent (the mock) means every field is set. */
+  configSet?: Partial<Record<ConfigSection, string[]>>
 }
 
 // ---- Evidence detail -------------------------------------------------------

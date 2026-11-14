@@ -306,16 +306,60 @@ export const configSectionPath = (section: ConfigSection): 'presentation' | 'hon
  *
  * These two are the SAME handler (`put_config_field`), differing only in
  * which `payload.*` key they splat into — the page's two saves hit two
- * routes for one code path, not two body shapes. Every block is sent whole:
- * both handlers REPLACE their block (`doc["payload"][key] = value`), so a
- * partial body would drop the fields it omits.
+ * routes for one code path, not two body shapes. Both handlers REPLACE their
+ * block (`doc["payload"][key] = value`), so the page sends every field the
+ * stored block already sets plus the ones the operator changed
+ * (`configSectionBody`'s `fields`); a field left at its default stays out.
  *
  * The rules this mirrors are the Rust tier's, not Go's: it constrains the
  * enum and range fields below and leaves the rest to the page. Two bounds
  * differ from the page's own `validateSection` and the wire wins —
  * `source_stale_minutes` is 2..120 there and 1..1440 in `src/data/mock`,
  * `ml_alert_threshold` is 0.5..0.99 there and 0..1 in the mock. */
-export function configSectionBody(section: ConfigSection, value: DashboardConfig[ConfigSection]): Record<string, unknown> {
+/** Page field → wire key, per section whose fields map one to one. */
+const CONFIG_WIRE_KEYS = {
+  presentation: {
+    appName: 'app_name', titleFormat: 'title_format', productLabel: 'product_label', dashboardTitle: 'dashboard_title', dashboardSubtitle: 'dashboard_subtitle',
+    orgName: 'org_name', overviewIntro: 'overview_intro', helpLinkLabel: 'help_link_label', helpLinkUrl: 'help_link_url', bannerText: 'banner_text',
+    bannerSeverity: 'banner_severity', bannerExpires: 'banner_expires', footerText: 'footer_text', aiDisclaimer: 'ai_disclaimer', privacyNotice: 'privacy_notice',
+    brandPrefix: 'brand_prefix',
+  },
+  behavior: {
+    defaultLanding: 'default_landing', defaultTimeWindow: 'default_time_window', rowsPerPageOptions: 'rows_per_page_options', maxExportRows: 'max_export_rows',
+    refreshIntervalOptions: 'refresh_interval_seconds_options', sourceStaleMinutes: 'source_stale_minutes', mapProvider: 'map_provider', defaultTimezone: 'default_timezone',
+    showMlPanels: 'show_ml_panels', maintenanceMode: 'maintenance_mode', readOnly: 'read_only', showProblemReportButton: 'show_problem_report_button',
+  },
+  honeypot: {
+    alertCooldown: 'alert_cooldown', alertCampaignScore: 'alert_campaign_score', sandboxAlertRiskScore: 'sandbox_alert_risk_score', mlAlertThreshold: 'ml_alert_threshold',
+    yaraScanIntervalSeconds: 'yara_scan_interval_seconds', yaraMaxBytes: 'yara_max_bytes', payloadDedupeIntervalSeconds: 'payload_dedupe_interval_seconds',
+  },
+} as const satisfies Record<Exclude<ConfigSection, 'reportPresets'>, Record<string, string>>
+
+/** The page fields each stored config section sets. `GET /api/v1/config`
+ * serves only what operators saved (on a fresh deployment, `payload: {}`):
+ * the defaults belong to the consuming services, so a field the document
+ * leaves out is at its default, not empty or zero. */
+export function configSetFields(wire: ConfigWire): Partial<Record<ConfigSection, string[]>> {
+  const out: Partial<Record<ConfigSection, string[]>> = {}
+  for (const section of ['presentation', 'behavior', 'honeypot'] as const) {
+    const stored = (wire.payload[section] ?? {}) as Record<string, unknown>
+    out[section] = Object.entries(CONFIG_WIRE_KEYS[section]).filter(([, key]) => key in stored).map(([field]) => field)
+  }
+  out.reportPresets = Object.keys(wire.payload.report_presets ?? {})
+  return out
+}
+
+/** Page → wire body, keeping only the given page fields (a section's report
+ * presets are a map of overrides and always go whole). Without `fields`
+ * every field is sent, as the mock tier stores whole sections. */
+export function configSectionBody(section: ConfigSection, value: DashboardConfig[ConfigSection], fields?: readonly string[]): Record<string, unknown> {
+  const body = fullConfigSectionBody(section, value)
+  if (!fields || section === 'reportPresets') return body
+  const keep = new Set(fields.map((field) => (CONFIG_WIRE_KEYS[section] as Record<string, string>)[field]).filter(Boolean))
+  return Object.fromEntries(Object.entries(body).filter(([key]) => keep.has(key)))
+}
+
+function fullConfigSectionBody(section: ConfigSection, value: DashboardConfig[ConfigSection]): Record<string, unknown> {
   if (section === 'presentation') {
     const p = value as DashboardConfig['presentation']
     return {
@@ -373,8 +417,8 @@ export function configSectionBody(section: ConfigSection, value: DashboardConfig
 /** POST /api/v1/config/validate body. The preview is section-scoped: only
  * the sections submitted are checked, and within one only the fields
  * present — so send the section under test, not the whole document. */
-export const configValidateBody = (section: ConfigSection, value: DashboardConfig[ConfigSection]): Record<string, unknown> => ({
-  [section === 'reportPresets' ? 'report_presets' : section]: configSectionBody(section, value),
+export const configValidateBody = (section: ConfigSection, value: DashboardConfig[ConfigSection], fields?: readonly string[]): Record<string, unknown> => ({
+  [section === 'reportPresets' ? 'report_presets' : section]: configSectionBody(section, value, fields),
 })
 
 /** POST /api/v1/config/validate response → the page's `ConfigProblems`.
@@ -662,6 +706,7 @@ export function settingsData(parts: {
     history: configHistory(parts.history),
     audit: auditEntries(parts.audit),
     config: dashboardConfig(parts.config),
+    configSet: configSetFields(parts.config),
     reporter: reporterStats(parts.reporter),
     storage: esStorage(parts.storage),
     reportTemplates: parts.templates,
