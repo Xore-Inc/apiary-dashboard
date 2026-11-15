@@ -49,9 +49,6 @@ type RecordListProps<T extends Record<string, unknown>> = {
 
 /** A store-backed record page: summary band, filter row, and a paged
  * full-width table whose rows open their entity page. */
-/** How many of a list's first rows preload as they come into view. */
-const LIKELY_ROWS = 5
-
 export function RecordList<T extends Record<string, unknown>>({
   title,
   description,
@@ -120,11 +117,10 @@ export function RecordList<T extends Record<string, unknown>>({
   // middle-click and "copy link" all reach the entity through it. A plain
   // click on it, or anywhere on the row, still opens the row the app's way.
   const linkKey = linkColumn === false ? undefined : (linkColumn ?? columns[0]?.key)
-  // The first rows on screen are the likely clicks: their pages preload as
-  // they scroll into view (#309); the rest preload on hover or focus. A
-  // preload answers from the data cache and never starts a slow panel.
-  const firstOnPage = paging ? 0 : (Math.min(page, Math.max(1, Math.ceil((rows?.length ?? 0) / pageSize))) - 1) * pageSize
-  const likely = new Set((rows ?? []).slice(firstOnPage, firstOnPage + LIKELY_ROWS))
+  // Rows preload on hover or focus (the router's intent default), not as
+  // they scroll into view: on production a list render then fired five
+  // entity reads at once, and the backend's limiter shed some (503,
+  // #309 v0.1.19).
   const linkedColumns = columns.map((column) =>
     column.key !== linkKey
       ? column
@@ -133,7 +129,6 @@ export function RecordList<T extends Record<string, unknown>>({
           renderCell: (row: T) => (
             <Link
               href={addressOf(row)}
-              data-preload={likely.has(row) ? 'viewport' : undefined}
               onClick={(event) => {
                 if (event.button !== 0 || event.shiftKey || event.altKey) return
                 event.preventDefault()

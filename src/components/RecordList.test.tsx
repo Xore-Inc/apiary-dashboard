@@ -20,7 +20,9 @@ const rows: Row[] = [
   { id: 'b', name: 'Beta', colour: 'amber' },
 ]
 
-function renderList(listRows: Row[] = rows) {
+/** The list, and a detail route whose loader stands for the entity reads a
+ * row's page makes (a server function per row). Preloading as the app has it. */
+function renderList(listRows: Row[] = rows, onThingLoad: (id: string) => void = () => {}) {
   const root = createRootRoute()
   const list = createRoute({
     getParentRoute: () => root,
@@ -39,8 +41,8 @@ function renderList(listRows: Row[] = rows) {
       />
     ),
   })
-  const thing = createRoute({ getParentRoute: () => root, path: '/things/$id', component: () => <p>thing page</p> })
-  const router = createRouter({ routeTree: root.addChildren([list, thing]), history: createMemoryHistory({ initialEntries: ['/things'] }) })
+  const thing = createRoute({ getParentRoute: () => root, path: '/things/$id', loader: ({ params }) => { onThingLoad(params.id) }, component: () => <p>thing page</p> })
+  const router = createRouter({ routeTree: root.addChildren([list, thing]), history: createMemoryHistory({ initialEntries: ['/things'] }), defaultPreload: 'intent', defaultPreloadStaleTime: 0 })
   render(
     <Theme theme={neutralTheme}>
       <LinkProvider component={RouterLink}>
@@ -70,7 +72,7 @@ describe('RecordList', () => {
     expect(router.state.location.pathname).toBe('/things/b')
   })
 
-  it('preloads the first rows as they come into view, the rest on hover (#309)', async () => {
+  it('preloads no row as it comes into view, only on intent (#309: viewport preloading shed reads on production)', async () => {
     const observed = new Set<Element>()
     const original = window.IntersectionObserver
     window.IntersectionObserver = class {
@@ -87,8 +89,38 @@ describe('RecordList', () => {
       const many = Array.from({ length: 8 }, (_, i) => ({ id: `r${i}`, name: `Row ${i}`, colour: 'teal' }))
       renderList(many)
       await screen.findByRole('link', { name: 'Row 0' })
-      const watched = many.filter((row) => [...observed].some((el) => el.getAttribute('href') === `/things/${row.id}`)).map((row) => row.id)
-      expect(watched).toEqual(['r0', 'r1', 'r2', 'r3', 'r4'])
+      expect([...observed].filter((el) => el.getAttribute('href')?.startsWith('/things/'))).toEqual([])
+    } finally {
+      window.IntersectionObserver = original
+    }
+  })
+
+  it('rendering a list reads no entity: the row loaders stay idle even when every row is on screen (#309)', async () => {
+    const original = window.IntersectionObserver
+    // Every observed element reports itself visible at once, the worst case
+    // for any viewport-triggered preloading.
+    window.IntersectionObserver = class {
+      constructor(private readonly callback: IntersectionObserverCallback) {}
+      observe(el: Element) {
+        this.callback([{ isIntersecting: true, target: el } as IntersectionObserverEntry], this as unknown as IntersectionObserver)
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return []
+      }
+    } as unknown as typeof IntersectionObserver
+    try {
+      const loaded: string[] = []
+      const many = Array.from({ length: 20 }, (_, i) => ({ id: `r${i}`, name: `Row ${i}`, colour: 'teal' }))
+      renderList(many, (id) => loaded.push(id))
+      await screen.findByRole('link', { name: 'Row 0' })
+      await new Promise((resolve) => setTimeout(resolve, 100))
+      expect(loaded).toEqual([])
+      // Intent still preloads: the hovered row, and only it.
+      await userEvent.hover(screen.getByRole('link', { name: 'Row 3' }))
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      expect(loaded).toEqual(['r3'])
     } finally {
       window.IntersectionObserver = original
     }

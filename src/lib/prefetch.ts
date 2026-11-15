@@ -1,8 +1,7 @@
 // Predictive prefetch: after each navigation settles, the likely next
 // routes are preloaded while the browser is idle, so their data is in the
 // cache by the time the click lands. The router's own preloading covers the
-// links themselves: intent (hover, focus, touch) by default, and viewport
-// for a list's first rows (components/RecordList.tsx). This layer adds what
+// links themselves: intent (hover, focus, touch). This layer adds what
 // the router has no strategy for, pages one is likely to open next that no
 // link on screen points at yet, through the router's own preloadRoute; so
 // nothing here duplicates it (#309). A preload answers from the data cache
