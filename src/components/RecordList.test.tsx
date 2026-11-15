@@ -70,7 +70,7 @@ describe('RecordList', () => {
     expect(router.state.location.pathname).toBe('/things/b')
   })
 
-  it('preloads the first rows as they come into view, the rest on hover (#309)', async () => {
+  it('preloads no row as it comes into view, only on intent (#309: viewport preloading shed reads on production)', async () => {
     const observed = new Set<Element>()
     const original = window.IntersectionObserver
     window.IntersectionObserver = class {
@@ -87,8 +87,7 @@ describe('RecordList', () => {
       const many = Array.from({ length: 8 }, (_, i) => ({ id: `r${i}`, name: `Row ${i}`, colour: 'teal' }))
       renderList(many)
       await screen.findByRole('link', { name: 'Row 0' })
-      const watched = many.filter((row) => [...observed].some((el) => el.getAttribute('href') === `/things/${row.id}`)).map((row) => row.id)
-      expect(watched).toEqual(['r0', 'r1', 'r2', 'r3', 'r4'])
+      expect([...observed].filter((el) => el.getAttribute('href')?.startsWith('/things/'))).toEqual([])
     } finally {
       window.IntersectionObserver = original
     }
