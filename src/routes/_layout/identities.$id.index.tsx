@@ -9,14 +9,16 @@ import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
 import { Panel } from '#/components/DashboardBlocks'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery, usePageQuery } from '#/lib/query'
 import { identityQuery, relatedQuery } from '#/data/resources'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/identities/$id')
 
 export const Route = createFileRoute('/_layout/identities/$id/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('identity', params.id)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('identity', params.id)),
   component: IdentityOverview,
   pendingComponent: IdentityOverview,
 })
@@ -24,7 +26,7 @@ export const Route = createFileRoute('/_layout/identities/$id/')({
 
 function IdentityOverview() {
   const loaded = usePageQuery(identityQuery(parent.useParams().id))
-  const related = usePageQuery(relatedQuery('identity', Route.useParams().id))
+  const related = relatedQuery('identity', Route.useParams().id)
   if (!loaded) return <SkeletonPanels count={3} />
   const a = loaded.identity
   const group = loaded.group
@@ -51,7 +53,7 @@ function IdentityOverview() {
         {a.ips.length > 0 && <ActionLink href={`/recordings?ip=${encodeURIComponent(a.ips[0])}`}>Session recordings</ActionLink>}
       </Panel>
       <GroupOverview group={group} base={`/identities/${a.id}`} sourcesTab="members" />
-      <RelatedPanel center={a.id.slice(0, 8)} groups={related} />
+      <Deferred query={related}>{(groups) => <RelatedPanel center={a.id.slice(0, 8)} groups={groups} />}</Deferred>
     </VStack>
   )
 }

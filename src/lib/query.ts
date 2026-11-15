@@ -135,12 +135,15 @@ export function ensure<TData>(cache: LoaderCache, options: ResourceOptions<TData
   return queryClient.query({ ...options, staleTime: 'static' })
 }
 
-/** A slow read a loader starts without waiting for it: the page renders
- * with its fast data, and the panel reading this under a Suspense boundary
- * fills in when it answers (the router's deferred-data pattern for an
- * external cache). */
-export function startQuery<TData>(queryClient: QueryClient, options: ResourceOptions<TData>): void {
-  void queryClient.query(options).catch(noop)
+/** A slow read a loader starts without waiting for it (the router's
+ * deferred-data pattern for an external cache): the page renders with its
+ * fast data, and the panel reading this under a Suspense boundary
+ * (components/Deferred.tsx) fills in when it answers. A preload does not
+ * start it: hovering over a link, or a list row scrolling into view, must
+ * not set off a 30 s aggregate (APIARY#3856); the navigation does. */
+export function startQuery<TData>(cache: LoaderCache, options: ResourceOptions<TData>): void {
+  if (!(cache instanceof QueryClient) && cache.preload === true) return
+  void clientOf(cache).query(options).catch(noop)
 }
 
 /** A page's read of what its loader put in the cache: undefined while the

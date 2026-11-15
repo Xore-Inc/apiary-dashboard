@@ -8,14 +8,16 @@ import { RelatedPanel } from '#/components/Related'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { GroupOverview } from '#/components/EntityBlocks'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery, usePageQuery } from '#/lib/query'
 import { campaignQuery, relatedQuery } from '#/data/resources'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/campaigns/$cidr')
 
 export const Route = createFileRoute('/_layout/campaigns/$cidr/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('campaign', params.cidr)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('campaign', params.cidr)),
   component: CampaignOverview,
   pendingComponent: CampaignOverview,
 })
@@ -45,7 +47,7 @@ function CampaignOverview() {
         </HStack>
       </Panel>
       <GroupOverview group={group} base={`/campaigns/${encodeURIComponent(cidr)}`} sourcesTab="sources" />
-      <RelatedPanel center={cidr} groups={usePageQuery(relatedQuery('campaign', Route.useParams().cidr))} />
+      <Deferred query={relatedQuery('campaign', Route.useParams().cidr)}>{(groups) => <RelatedPanel center={cidr} groups={groups} />}</Deferred>
     </VStack>
   )
 }
