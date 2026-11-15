@@ -75,7 +75,7 @@ export const Route = createFileRoute('/auth/callback')({
 
 function Callback() {
   const { code, error } = Route.useSearch()
-  const failed = Route.useRouteContext()?.failed
+  const failed = Route.useRouteContext({ select: (context) => 'failed' in context && context.failed })
   if (error) {
     return <AuthProblem heading="Sign-in was not completed" detail={`The identity provider refused this sign-in attempt (${error}). This usually means the attempt expired or was already used.`} retryHref="/auth/login" />
   }

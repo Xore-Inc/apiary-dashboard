@@ -11,9 +11,11 @@
 // however many arrive) and runs when that load has resolved. Actions an
 // operator takes still call router.invalidate() directly.
 
+type Invalidation = { filter?: (match: { routeId: string }) => boolean }
+
 type SettlingRouter = {
   state: { status: string; isLoading: boolean }
-  invalidate: () => Promise<unknown>
+  invalidate: (options?: Invalidation) => Promise<unknown>
   subscribe: (event: 'onResolved', fn: () => void) => () => void
 }
 
@@ -21,10 +23,12 @@ const deferred = new WeakSet<object>()
 
 const busy = (router: SettlingRouter) => router.state.isLoading || router.state.status === 'pending'
 
-/** Invalidate now if the router is idle, else once its current load resolves. */
-export function refreshWhenSettled(router: SettlingRouter): void {
+/** Invalidate now if the router is idle, else once its current load
+ * resolves. `options.filter` limits it to some routes (the first-visit time
+ * zone re-runs only the root's loader, not every page read). */
+export function refreshWhenSettled(router: SettlingRouter, options?: Invalidation): void {
   if (!busy(router)) {
-    void router.invalidate()
+    void router.invalidate(options)
     return
   }
   if (deferred.has(router)) return
@@ -34,6 +38,6 @@ export function refreshWhenSettled(router: SettlingRouter): void {
     if (busy(router)) return
     unsubscribe()
     deferred.delete(router)
-    void router.invalidate()
+    void router.invalidate(options)
   })
 }

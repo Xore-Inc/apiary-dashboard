@@ -31,6 +31,10 @@ The same ten page kinds, cold loads at 1440×900 on the production build:
 
 **Gates:** a page may not grow more than 25 % (and at least 5 KB) past its recorded size. Timings are recorded but not gated, because they follow the machine. `bun scripts/perf.ts <url> --update` records a new baseline after an intended change.
 
+Re-recorded since:
+
+- **2026-11-15, `/auth/login` HTML 12.1 → 17.3 KB (#309):** every server-rendered document now carries the data cache's hand-off (`@tanstack/react-router-ssr-query`): the reads the server made (preferences, mock clock; on shell pages also the session and shell configuration), plus about 2 KB of stream runtime the integration always emits. The browser no longer reads those again after hydration. Main itself measured 14.6–14.9 KB here, against a 15.1 KB limit. The other pages grow by the same ~3.5 KB and stay within their allowance.
+
 What the first measurement shows (all loads under half a second locally):
 
 - **HTML** is heaviest where pages carry the most data: the overview (~510 KB), a source (~420 KB) and the event explorer (~370 KB, even paged, mostly its filter facets). Moving those facets and the overview's views behind their own requests is the obvious next saving.

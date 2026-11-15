@@ -6,8 +6,10 @@ function fakeRouter() {
   const router = {
     state: { status: 'idle', isLoading: false },
     invalidations: 0,
-    invalidate: async () => {
+    lastOptions: undefined as unknown,
+    invalidate: async (options?: unknown) => {
       router.invalidations++
+      router.lastOptions = options
     },
     subscribe: (_: 'onResolved', fn: () => void) => {
       listeners.add(fn)
@@ -51,5 +53,19 @@ describe('refreshWhenSettled', () => {
     expect(router.invalidations).toBe(1)
     router.resolve()
     expect(router.invalidations).toBe(2)
+  })
+
+  it('passes a route filter through, now or once the load resolves', () => {
+    const root = (match: { routeId: string }) => match.routeId === '__root__'
+    const router = fakeRouter()
+    refreshWhenSettled(router, { filter: root })
+    expect(router.lastOptions).toEqual({ filter: root })
+    router.state = { status: 'pending', isLoading: true }
+    refreshWhenSettled(fakeRouter(), { filter: root })
+    const busy = fakeRouter()
+    busy.state = { status: 'pending', isLoading: true }
+    refreshWhenSettled(busy, { filter: root })
+    busy.resolve()
+    expect(busy.lastOptions).toEqual({ filter: root })
   })
 })

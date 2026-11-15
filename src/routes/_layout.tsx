@@ -6,12 +6,12 @@ import type { RangeId } from '#/lib/range'
 import { PANE_IDS } from '#/components/SettingsDialog'
 import type { PaneId } from '#/components/SettingsDialog'
 import { ShellAppShell } from '#/components/ShellAppShell'
-import { getPreferences, getSessionUser, getShellConfig } from '#/data/queries'
+import { mockScenariosAllowedQuery, preferencesQuery, sessionUserQuery, shellConfigQuery } from '#/data/resources'
+import { ensure } from '#/lib/query'
 import { isScenario } from '#/data/scenarios'
-import { getMockScenariosAllowed, setNavigationScenario } from '#/data/serverFn'
+import { setNavigationScenario } from '#/data/serverFn'
 import type { MockScenario } from '#/data/scenarios'
 import { isNarrowViewport } from '#/lib/viewport'
-import { recentShellRead, rememberShellRead } from '#/lib/shellRead'
 import { pageFor, sectionFor } from '#/lib/nav'
 import { DEFAULT_TITLE_FORMAT, formatTitle } from '#/lib/title'
 
@@ -27,16 +27,16 @@ export const Route = createFileRoute('/_layout')({
   search: { middlewares: [retainSearchParams(['range', 'mock'])] },
   // Before any loader below runs: the navigation's mock scenario (every
   // query of it carries that), then the landing and default-range redirects.
-  beforeLoad: async ({ search, location }) => {
-    setNavigationScenario(search.mock)
+  beforeLoad: async ({ search, location, context: { queryClient } }) => {
+    // A switch of mock scenario changes every answer: drop the cached ones
+    // (development only; production has no scenarios).
+    if (setNavigationScenario(search.mock)) queryClient.removeQueries()
     // The navigation guard: no session, no page. Sign-in brings the operator
-    // back here.
-    // Reused for a moment in the browser (lib/shellRead).
-    const recent = recentShellRead()
-    const user = recent ? recent.user : await getSessionUser()
+    // back here. Answered from the cache when it has the session (asked again
+    // in the background after 30 s, lib/query.ts), so a navigation never
+    // waits on it behind a slow page's requests.
+    const [user, prefs] = await Promise.all([ensure(queryClient, sessionUserQuery()), ensure(queryClient, preferencesQuery())])
     if (!user) throw redirect({ href: `/auth/login?return_to=${encodeURIComponent(location.href)}` })
-    const prefs = recent ? recent.prefs : await getPreferences()
-    if (!recent) rememberShellRead(user, prefs)
     // A fresh page load: every server render is one; in the browser only
     // the very first navigation (hydration of that same page) is.
     const fresh = typeof window === 'undefined' || firstClientLoad
@@ -54,7 +54,7 @@ export const Route = createFileRoute('/_layout')({
     return { user }
   },
   loader: async ({ context }) => {
-    const [config, mockScenarios] = await Promise.all([getShellConfig(), getMockScenariosAllowed()])
+    const [config, mockScenarios] = await Promise.all([ensure(context.queryClient, shellConfigQuery()), ensure(context.queryClient, mockScenariosAllowedQuery())])
     return { user: context.user, config, mockScenarios, narrow: isNarrowViewport() }
   },
   // The document title follows navigation (WCAG 2.4.2): it is what a

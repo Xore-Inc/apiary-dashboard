@@ -1,7 +1,10 @@
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
+import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 import { DefaultCatchBoundary } from './components/DefaultCatchBoundary'
 import { NotFound } from './components/NotFound'
 import { PagePending } from './components/PagePending'
+import { PENDING_TIMING } from './lib/pending'
+import { createQueryClient } from './lib/query'
 import { routeTree } from './routeTree.gen'
 
 export function getRouter() {
@@ -9,23 +12,38 @@ export function getRouter() {
   // server makes one per request, inside that request's scope. The global is
   // absent in the browser, so this is undefined there.
   const csp = (globalThis as typeof globalThis & { __APIARY_CSP__?: { current?: () => string | undefined } }).__APIARY_CSP__
+  // One data cache per router, so per server request (#309, lib/query.ts):
+  // what the server read for this page is handed to the browser's cache
+  // with the HTML and is not fetched again on hydration.
+  const queryClient = createQueryClient()
   const router = createTanStackRouter({
     routeTree,
+    context: { queryClient },
     ssr: { nonce: csp?.current?.() },
     scrollRestoration: true,
     defaultPreload: 'intent',
+    // Query owns freshness: a preload's answer sits in its cache with its
+    // resource's staleTime, so the router treats its own copy as stale at
+    // once and the click re-runs the loader, which answers from the cache
+    // (the router docs' setting for an external cache).
     defaultPreloadStaleTime: 0,
     defaultNotFoundComponent: () => <NotFound />,
     defaultErrorComponent: DefaultCatchBoundary,
-    // Every navigation shows the page's own skeleton at once while its data
-    // loads (each page is its own pendingComponent; this is the fallback),
-    // held long enough to read as loading rather than a flicker. A full load
-    // does the same from the server (lib/pageSsr).
+    // A navigation whose data is cached never shows a skeleton: its loaders
+    // answer within the pending delay. A cold load shows the page's own
+    // skeleton (each page is its own pendingComponent; this is the fallback)
+    // after that short delay, held long enough to read as loading rather
+    // than a flicker. A full load does the same from the server (lib/pageSsr).
     defaultPendingComponent: PagePending,
-    defaultPendingMs: 0,
-    defaultPendingMinMs: 250,
+    ...PENDING_TIMING,
   })
-
+  setupRouterSsrQueryIntegration({
+    router,
+    queryClient,
+    // A failed read is the route's error (serialized by the router); the
+    // cache hands over answers only, so the browser asks a failed read again.
+    dehydrateOptions: { shouldDehydrateQuery: (query) => query.state.status !== 'error' },
+  })
   return router
 }
 
