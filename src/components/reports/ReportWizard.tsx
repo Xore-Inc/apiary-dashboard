@@ -158,8 +158,9 @@ const facetOptions = (facets: Facets | BackendGap, key: keyof Facets): Facets[ke
 export function ReportWizard({ data, facets, initial, onRestart }: { data: ReportsData; facets: Facets | BackendGap; initial: ReportDefinition; onRestart: () => void }) {
   // Generating invalidates the reports read (data/writes.ts).
   const generate = useDataMutation(generateReportFromWrite())
-  // Generating (and keeping the definition) is an admin's; a viewer can
-  // still compose and preview.
+  // Generating (and keeping the definition) is an admin's, and so is the
+  // preview, a POST the backend refuses a viewer (APIARY#3857): a viewer can
+  // compose, and the wizard goes on as it does where no preview is served.
   const isAdmin = useIsAdmin()
   const [draft, setDraft] = useState<ReportDefinition>(initial)
   const [active, setActive] = useState(0)
@@ -186,15 +187,17 @@ export function ReportWizard({ data, facets, initial, onRestart }: { data: Repor
   // The data check needs the preview; fetch it when the chain reaches it.
   useEffect(() => {
     if (active !== CHECK_STEP || preview !== undefined) return
+    if (!isAdmin) return setPreview(null)
     let live = true
     void previewReport(draft).then((p) => live && setPreview(p))
     return () => {
       live = false
     }
-  }, [active, draft, preview])
+  }, [active, draft, preview, isAdmin])
 
   useEffect(() => {
     if (!wide) return
+    if (!isAdmin) return setLivePreview(null)
     let current = true
     const timer = setTimeout(() => {
       previewReport(draft).then(
@@ -208,7 +211,7 @@ export function ReportWizard({ data, facets, initial, onRestart }: { data: Repor
       current = false
       clearTimeout(timer)
     }
-  }, [wide, draft])
+  }, [wide, draft, isAdmin])
 
   // What each automatic step does, as the checks its body ticks through.
   const checksFor = useMemo(() => automaticChecks(draft, preview, data.elements), [draft, preview, data.elements])

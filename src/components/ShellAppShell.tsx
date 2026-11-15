@@ -107,7 +107,7 @@ export function ShellAppShell({ user, config, mockScenarios = false, narrow = fa
             user={user}
             config={config}
             onOpenSettings={() => onSettingsPane('account')}
-            actions={<ShellStandingActions config={config} problemReport={<ProblemReportButton enabled={config.behavior.showProblemReportButton} />} />}
+            actions={<ShellStandingActions config={config} problemReport={<ProblemReportButton enabled={config.behavior.showProblemReportButton && isAdmin} />} />}
           />
         }
       >

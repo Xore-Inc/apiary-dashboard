@@ -755,7 +755,7 @@ const CREDENTIAL_TARGET = 'cowrie_honeyfs'
 /** POST /api/v1/credentials (credentials.rs `create`, L150). The actor rides
  * in the BODY, not a header: `CreateBody` takes `actor_subject` /
  * `actor_username` (L126-127) and stamps them into `created_by` and the audit
- * record. Admin-only, enforced by `ADMIN_QUERIES` before this runs.
+ * record. Admin-only, enforced by `authorize` before this runs.
  *
  * An empty `template` is left empty so the backend applies its own
  * `DEFAULT_CONTENT_TEMPLATE` (credentials.rs:191) rather than this tier
@@ -1019,7 +1019,7 @@ const rollbackConfig: Backend['rollbackConfig'] = async (revisionId) => {
  *
  * This restarts containers — in a normal deployment, the very stack this
  * dashboard is served from. It is wired because it is what the operator
- * asked for and what canonical serves, admin-gated by `ADMIN_QUERIES`, and
+ * asked for and what canonical serves, admin-gated by `authorize`, and
  * a failure is the backend's own status rather than a swallowed one: the
  * handler answers 503 when the services adapter is unconfigured and 400 for
  * an action it does not accept, both of which reach the page as errors.
@@ -2410,7 +2410,7 @@ const scorePoints = (series: SeriesWire[]): ScorePoint[] => {
  * `{}` is sent at minimum; the actor rides in it when there is one. The
  * sweep is the WHOLE index — every open anomaly, not the loaded page — so the
  * returned `changed` is what the backend says it changed and the page re-reads
- * the list for the rest. Admin-only by `ADMIN_QUERIES`, before this runs.
+ * the list for the rest. Admin-only by `authorize`, before this runs.
  *
  * One deliberate divergence from the mock: a row carrying a DISPOSITION is
  * refused by this endpoint (the handler will not overwrite an operator

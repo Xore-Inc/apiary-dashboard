@@ -134,7 +134,7 @@ export function renderAuthorizationMatrix(
   return [
     '# Authorization matrix',
     '',
-    'Effective access for every generated HTTP route and every server query. “Viewer” is the canonical user role. A page redirect is navigation behavior; a direct handler or server query returns an HTTP refusal.',
+    'Effective access for every generated HTTP route and every server query. “Viewer” is the canonical user role, and strictly read-only (APIARY#3857): every state-changing query is admin-only. A page redirect is navigation behavior; a direct handler or server query returns an HTTP refusal.',
     '',
     `## HTTP routes (${routeRows.length})`,
     '',

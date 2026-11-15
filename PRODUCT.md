@@ -8,7 +8,7 @@ web
 
 ## Users
 
-A security team working a SOC: analysts on shifts who triage alerts and investigate attackers, and administrators (the Operator role) who run the honeypot fleet and change its configuration. Analysts use the Viewer role and see no admin-only controls.
+A security team working a SOC: analysts on shifts who triage alerts and investigate attackers, and administrators (the Operator role) who run the honeypot fleet and change its configuration. Analysts use the Viewer role, which is read-only: they see no write controls.
 
 ## Product Purpose
 

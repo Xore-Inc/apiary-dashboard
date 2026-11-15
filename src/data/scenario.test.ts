@@ -71,11 +71,13 @@ describe('mock scenarios', () => {
     expect(first.some(Boolean) && first.some((ok) => !ok)).toBe(true)
   })
 
-  it('viewer: any signed-in caller becomes a viewer; admin writes refused, other writes allowed', async () => {
+  it('viewer: any signed-in caller becomes a viewer; every write refused', async () => {
     q = backend('viewer', { name: 'Operator', email: 'operator@example.test', roles: ['admin'] })
     expect((await q.getSessionUser())?.roles).toEqual(['viewer'])
     expect((await failure(() => q.setIpBlocked('198.51.100.1', true)))?.kind).toBe('forbidden')
-    expect(await failure(() => q.setAlertsAcknowledged([], true))).toBeUndefined()
+    // Viewers are read-only (APIARY#3857): acknowledging is a write too.
+    expect((await failure(() => q.setAlertsAcknowledged([], true)))?.kind).toBe('forbidden')
+    expect(await failure(() => q.getEvents({}))).toBeUndefined()
   })
 
   it('an ApiError survives being reduced to its message', () => {

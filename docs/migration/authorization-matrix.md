@@ -1,6 +1,6 @@
 # Authorization matrix
 
-Effective access for every generated HTTP route and every server query. “Viewer” is the canonical user role. A page redirect is navigation behavior; a direct handler or server query returns an HTTP refusal.
+Effective access for every generated HTTP route and every server query. “Viewer” is the canonical user role, and strictly read-only (APIARY#3857): every state-changing query is admin-only. A page redirect is navigation behavior; a direct handler or server query returns an HTTP refusal.
 
 ## HTTP routes (188)
 
@@ -204,10 +204,10 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | Query | Anonymous | Viewer | Admin |
 |---|---|---|---|
 | `abortGpuJob` | 401 | 403 | allow |
-| `acknowledgeAllAlerts` | 401 | allow | allow |
+| `acknowledgeAllAlerts` | 401 | 403 | allow |
 | `acknowledgeAllAnomalies` | 401 | 403 | allow |
 | `acknowledgeAnomalies` | 401 | 403 | allow |
-| `createCanarytoken` | 401 | allow | allow |
+| `createCanarytoken` | 401 | 403 | allow |
 | `deleteGeneratedReport` | 401 | 403 | allow |
 | `deleteReportDefinition` | 401 | 403 | allow |
 | `generatePayloadReport` | 401 | 403 | allow |
@@ -291,7 +291,7 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `getSourceTimeline` | 401 | allow | allow |
 | `getTopology` | 401 | allow | allow |
 | `linkCredentialToken` | 401 | 403 | allow |
-| `previewReport` | 401 | allow | allow |
+| `previewReport` | 401 | 403 | allow |
 | `provisionCredential` | 401 | 403 | allow |
 | `purgeDeadLetters` | 401 | 403 | allow |
 | `queuePayloadAction` | 401 | 403 | allow |
@@ -301,17 +301,17 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `rotateCredential` | 401 | 403 | allow |
 | `runServiceAction` | 401 | 403 | allow |
 | `saveConfigSection` | 401 | 403 | allow |
-| `savePreferences` | 401 | allow | allow |
+| `savePreferences` | 401 | 403 | allow |
 | `saveReportDefinition` | 401 | 403 | allow |
 | `searchAll` | 401 | allow | allow |
 | `searchHistory` | 401 | allow | allow |
 | `semanticSearch` | 401 | allow | allow |
-| `setAlertsAcknowledged` | 401 | allow | allow |
+| `setAlertsAcknowledged` | 401 | 403 | allow |
 | `setAnomalyDisposition` | 401 | 403 | allow |
 | `setIpBlocked` | 401 | 403 | allow |
 | `setProblemStatus` | 401 | 403 | allow |
 | `setRunChild` | 401 | 403 | allow |
 | `simulateIncident` | 401 | allow | allow |
 | `startAnalysisRun` | 401 | 403 | allow |
-| `submitProblemReport` | 401 | allow | allow |
-| `validateConfig` | 401 | allow | allow |
+| `submitProblemReport` | 401 | 403 | allow |
+| `validateConfig` | 401 | 403 | allow |

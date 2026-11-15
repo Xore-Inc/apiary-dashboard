@@ -54,14 +54,16 @@ export function ShellSideNav({ user, config, onOpenSettings, actions }: { user: 
   const savePrefs = useDataMutation(savePreferencesWrite())
   // The stored preferences, not usePreferences' resolved view (its "browser"
   // time zone is already a zone): saving that would pin the zone.
+  const isAdmin = user.roles.includes('admin')
+  // A viewer's preferences are read-only (APIARY#3857): the sidebar still
+  // collapses for them, it is just not remembered.
   const collapse = (collapsedSidebar: boolean) => {
     const stored = queryClient.getQueryData(preferencesQuery().queryKey)
-    if (stored) savePrefs.mutate({ ...stored, collapsedSidebar })
+    if (stored && isAdmin) savePrefs.mutate({ ...stored, collapsedSidebar })
   }
   const pathname = useLocation({ select: (location) => location.pathname })
   const activeHref = navHrefFor(pathname)
   const recent = useRecentInvestigations()
-  const isAdmin = user.roles.includes('admin')
 
   return (
     <SideNav

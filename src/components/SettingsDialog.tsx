@@ -70,6 +70,8 @@ type SettingsContextValue = {
   reload: () => Promise<void>
   prefs: Preferences
   setPref: (patch: Partial<Preferences>) => void
+  /** A viewer's preferences are shown, not changed (APIARY#3857). */
+  locked: boolean
   /** An admin panel reports whether it holds unsaved edits. */
   setDirty: (panel: PaneId, dirty: boolean) => void
   openPage: (href: string) => void
@@ -103,7 +105,8 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
   useEffect(() => () => setDirty(panel, false), [panel, setDirty])
   // Ask the store what it would refuse, a beat after typing stops.
   useEffect(() => {
-    if (!dirty) {
+    // Validating is a POST the backend refuses a viewer (APIARY#3857).
+    if (!dirty || !isAdmin) {
       setProblems({})
       return
     }
@@ -113,7 +116,7 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
       live = false
       clearTimeout(timer)
     }
-  }, [section, form, dirty])
+  }, [section, form, dirty, isAdmin])
   const count = Object.keys(problems).length
   const set = (patch: Partial<DashboardConfig[TSection]>) => setForm((f) => ({ ...f, ...patch }))
   /** The field's validation message, as an input status. */
@@ -201,15 +204,16 @@ const swatch = (ground: string, accent: string) => (
 )
 
 function AppearancePanel() {
-  const { prefs, setPref } = useSettings()
+  const { prefs, setPref, locked } = useSettings()
   return (
     <>
       <SettingsCard title="Display">
-        <SettingsRow setting="theme" detail={<ThemeChoiceCards value={prefs.theme} onChange={(theme) => setPref({ theme })} />} />
+        <SettingsRow setting="theme" detail={<ThemeChoiceCards isDisabled={locked} value={prefs.theme} onChange={(theme) => setPref({ theme })} />} />
         <SettingsRow
           setting="palette"
           control={
             <Selector
+              isDisabled={locked}
               label="Palette"
               isLabelHidden
               width={CONTROL_WIDTH}
@@ -222,7 +226,7 @@ function AppearancePanel() {
         <SettingsRow
           setting="density"
           control={
-            <SegmentedControl label="Density" value={prefs.density} onChange={(density) => setPref({ density: density as Preferences['density'] })}>
+            <SegmentedControl isDisabled={locked} label="Density" value={prefs.density} onChange={(density) => setPref({ density: density as Preferences['density'] })}>
               <SegmentedControlItem value="comfortable" label="Comfortable" />
               <SegmentedControlItem value="compact" label="Compact" />
             </SegmentedControl>
@@ -231,7 +235,7 @@ function AppearancePanel() {
         <SettingsRow
           setting="motion"
           control={
-            <SegmentedControl label="Motion" value={prefs.motion} onChange={(motion) => setPref({ motion: motion as Preferences['motion'] })}>
+            <SegmentedControl isDisabled={locked} label="Motion" value={prefs.motion} onChange={(motion) => setPref({ motion: motion as Preferences['motion'] })}>
               <SegmentedControlItem value="system" label="System" />
               <SegmentedControlItem value="on" label="Reduced" />
               <SegmentedControlItem value="off" label="Full" />
@@ -240,9 +244,9 @@ function AppearancePanel() {
         />
       </SettingsCard>
       <SettingsCard title="Readability">
-        <SettingsRow setting="highContrast" control={<Switch label="High contrast" isLabelHidden value={prefs.highContrast} onChange={(highContrast) => setPref({ highContrast })} />} />
-        <SettingsRow setting="largeEvidenceText" control={<Switch label="Larger evidence text" isLabelHidden value={prefs.largeEvidenceText} onChange={(largeEvidenceText) => setPref({ largeEvidenceText })} />} />
-        <SettingsRow setting="wrapLongValues" control={<Switch label="Wrap long values" isLabelHidden value={prefs.wrapLongValues} onChange={(wrapLongValues) => setPref({ wrapLongValues })} />} />
+        <SettingsRow setting="highContrast" control={<Switch isDisabled={locked} label="High contrast" isLabelHidden value={prefs.highContrast} onChange={(highContrast) => setPref({ highContrast })} />} />
+        <SettingsRow setting="largeEvidenceText" control={<Switch isDisabled={locked} label="Larger evidence text" isLabelHidden value={prefs.largeEvidenceText} onChange={(largeEvidenceText) => setPref({ largeEvidenceText })} />} />
+        <SettingsRow setting="wrapLongValues" control={<Switch isDisabled={locked} label="Wrap long values" isLabelHidden value={prefs.wrapLongValues} onChange={(wrapLongValues) => setPref({ wrapLongValues })} />} />
       </SettingsCard>
     </>
   )
@@ -267,17 +271,17 @@ function PrefetchSwitch() {
 }
 
 function NavigationPanel() {
-  const { prefs, setPref } = useSettings()
+  const { prefs, setPref, locked } = useSettings()
   return (
     <SettingsCard title="Pages and lists">
       <SettingsRow
         setting="landing"
-        control={<Selector label="Landing page" isLabelHidden width={CONTROL_WIDTH} value={prefs.landing} onChange={(landing) => setPref({ landing })} options={NAV_SECTIONS.flatMap((s) => s.items.map((i) => ({ value: i.to, label: i.label })))} />}
+        control={<Selector isDisabled={locked} label="Landing page" isLabelHidden width={CONTROL_WIDTH} value={prefs.landing} onChange={(landing) => setPref({ landing })} options={NAV_SECTIONS.flatMap((s) => s.items.map((i) => ({ value: i.to, label: i.label })))} />}
       />
-      <SettingsRow setting="rowsPerPage" control={<Selector label="Rows per page" isLabelHidden width={CONTROL_WIDTH} value={String(prefs.rowsPerPage)} onChange={(v) => setPref({ rowsPerPage: Number(v) })} options={['10', '25', '50', '100']} />} />
-      <SettingsRow setting="newTab" control={<Switch label="Open detail pages in a new tab" isLabelHidden value={prefs.openDetailsInNewTab} onChange={(openDetailsInNewTab) => setPref({ openDetailsInNewTab })} />} />
-      <SettingsRow setting="rememberFilters" control={<Switch label="Remember filters" isLabelHidden value={prefs.rememberFilters} onChange={(rememberFilters) => setPref({ rememberFilters })} />} />
-      <SettingsRow setting="collapsedSidebar" control={<Switch label="Start with the sidebar collapsed" isLabelHidden value={prefs.collapsedSidebar} onChange={(collapsedSidebar) => setPref({ collapsedSidebar })} />} />
+      <SettingsRow setting="rowsPerPage" control={<Selector isDisabled={locked} label="Rows per page" isLabelHidden width={CONTROL_WIDTH} value={String(prefs.rowsPerPage)} onChange={(v) => setPref({ rowsPerPage: Number(v) })} options={['10', '25', '50', '100']} />} />
+      <SettingsRow setting="newTab" control={<Switch isDisabled={locked} label="Open detail pages in a new tab" isLabelHidden value={prefs.openDetailsInNewTab} onChange={(openDetailsInNewTab) => setPref({ openDetailsInNewTab })} />} />
+      <SettingsRow setting="rememberFilters" control={<Switch isDisabled={locked} label="Remember filters" isLabelHidden value={prefs.rememberFilters} onChange={(rememberFilters) => setPref({ rememberFilters })} />} />
+      <SettingsRow setting="collapsedSidebar" control={<Switch isDisabled={locked} label="Start with the sidebar collapsed" isLabelHidden value={prefs.collapsedSidebar} onChange={(collapsedSidebar) => setPref({ collapsedSidebar })} />} />
       <SettingsRow setting="prefetch" control={<PrefetchSwitch />} />
     </SettingsCard>
   )
@@ -288,15 +292,15 @@ const TIMEZONES = ['browser', 'UTC', 'Europe/Berlin', 'Europe/London', 'America/
 const timezoneOption = (zone: string) => ({ value: zone, label: zone === 'browser' ? 'Browser time zone' : zone })
 
 function TimePanel() {
-  const { data, prefs, setPref } = useSettings()
+  const { data, prefs, setPref, locked } = useSettings()
   return (
     <>
       <SettingsCard title="Time">
-        <SettingsRow setting="timezone" control={<Selector label="Time zone" isLabelHidden width={CONTROL_WIDTH} value={prefs.timezone} onChange={(timezone) => setPref({ timezone })} options={TIMEZONES.map(timezoneOption)} />} />
+        <SettingsRow setting="timezone" control={<Selector isDisabled={locked} label="Time zone" isLabelHidden width={CONTROL_WIDTH} value={prefs.timezone} onChange={(timezone) => setPref({ timezone })} options={TIMEZONES.map(timezoneOption)} />} />
         <SettingsRow
           setting="clock"
           control={
-            <SegmentedControl label="Clock" value={prefs.clock} onChange={(clock) => setPref({ clock: clock as Preferences['clock'] })}>
+            <SegmentedControl isDisabled={locked} label="Clock" value={prefs.clock} onChange={(clock) => setPref({ clock: clock as Preferences['clock'] })}>
               <SegmentedControlItem value="h24" label="24-hour" />
               <SegmentedControlItem value="h12" label="12-hour" />
             </SegmentedControl>
@@ -305,7 +309,7 @@ function TimePanel() {
         <SettingsRow
           setting="timestamps"
           control={
-            <SegmentedControl label="Timestamps" value={prefs.timestamps} onChange={(timestamps) => setPref({ timestamps: timestamps as Preferences['timestamps'] })}>
+            <SegmentedControl isDisabled={locked} label="Timestamps" value={prefs.timestamps} onChange={(timestamps) => setPref({ timestamps: timestamps as Preferences['timestamps'] })}>
               <SegmentedControlItem value="absolute" label="Absolute" />
               <SegmentedControlItem value="relative" label="Relative" />
             </SegmentedControl>
@@ -313,22 +317,22 @@ function TimePanel() {
         />
       </SettingsCard>
       <SettingsCard title="Live data">
-        <SettingsRow setting="autoRefresh" control={<Switch label="Refresh automatically" isLabelHidden value={prefs.autoRefresh} onChange={(autoRefresh) => setPref({ autoRefresh })} />} />
+        <SettingsRow setting="autoRefresh" control={<Switch isDisabled={locked} label="Refresh automatically" isLabelHidden value={prefs.autoRefresh} onChange={(autoRefresh) => setPref({ autoRefresh })} />} />
         <SettingsRow
           setting="refresh"
-          control={<Selector label="Refresh every" isLabelHidden width={CONTROL_WIDTH} isDisabled={!prefs.autoRefresh} value={String(prefs.refreshSeconds)} onChange={(v) => setPref({ refreshSeconds: Number(v) })} options={refreshChoices(data.config.behavior.refreshIntervalOptions, prefs.refreshSeconds).map((n) => ({ value: String(n), label: n < 60 ? `${n} seconds` : `${n / 60} minute${n === 60 ? '' : 's'}` }))} />}
+          control={<Selector label="Refresh every" isLabelHidden width={CONTROL_WIDTH} isDisabled={locked || !prefs.autoRefresh} value={String(prefs.refreshSeconds)} onChange={(v) => setPref({ refreshSeconds: Number(v) })} options={refreshChoices(data.config.behavior.refreshIntervalOptions, prefs.refreshSeconds).map((n) => ({ value: String(n), label: n < 60 ? `${n} seconds` : `${n / 60} minute${n === 60 ? '' : 's'}` }))} />}
         />
-        <SettingsRow setting="liveToasts" control={<Switch label="Operational toasts" isLabelHidden value={prefs.liveToasts} onChange={(liveToasts) => setPref({ liveToasts })} />} />
+        <SettingsRow setting="liveToasts" control={<Switch isDisabled={locked} label="Operational toasts" isLabelHidden value={prefs.liveToasts} onChange={(liveToasts) => setPref({ liveToasts })} />} />
         <SettingsRow
           setting="liveToastSeconds"
-          control={<Selector label="At most one toast every" isLabelHidden width={CONTROL_WIDTH} isDisabled={!prefs.liveToasts} value={String(prefs.liveToastSeconds)} onChange={(v) => setPref({ liveToastSeconds: Number(v) })} options={[3, 30, 60, 120, 300, 900].map((n) => ({ value: String(n), label: n < 60 ? `${n} seconds` : `${n / 60} minute${n === 60 ? '' : 's'}` }))} />}
+          control={<Selector label="At most one toast every" isLabelHidden width={CONTROL_WIDTH} isDisabled={locked || !prefs.liveToasts} value={String(prefs.liveToastSeconds)} onChange={(v) => setPref({ liveToastSeconds: Number(v) })} options={[3, 30, 60, 120, 300, 900].map((n) => ({ value: String(n), label: n < 60 ? `${n} seconds` : `${n / 60} minute${n === 60 ? '' : 's'}` }))} />}
         />
       </SettingsCard>
       <SettingsCard title="Notifications">
         <SettingsRow
           setting="notifySeverity"
           control={
-            <SegmentedControl label="Notify from" value={prefs.notifySeverity} onChange={(notifySeverity) => setPref({ notifySeverity: notifySeverity as Preferences['notifySeverity'] })}>
+            <SegmentedControl isDisabled={locked} label="Notify from" value={prefs.notifySeverity} onChange={(notifySeverity) => setPref({ notifySeverity: notifySeverity as Preferences['notifySeverity'] })}>
               <SegmentedControlItem value="low" label="Low" />
               <SegmentedControlItem value="medium" label="Medium" />
               <SegmentedControlItem value="high" label="High" />
@@ -340,6 +344,7 @@ function TimePanel() {
           setting="notifyDesktop"
           control={
             <Switch
+              isDisabled={locked}
               label="Desktop notifications"
               isLabelHidden
               value={prefs.notifyDesktop}
@@ -352,8 +357,8 @@ function TimePanel() {
           }
           detail={prefs.notifyDesktop && typeof Notification !== 'undefined' && Notification.permission === 'denied' ? <Text type="supporting">The browser blocks notifications for this site. Allow them in its site settings.</Text> : undefined}
         />
-        <SettingsRow setting="notifySound" control={<Switch label="Sound" isLabelHidden value={prefs.notifySound} onChange={(notifySound) => setPref({ notifySound })} />} />
-        <SettingsRow setting="notifyCanary" control={<Switch label="Canarytoken fires" isLabelHidden value={prefs.notifyCanary} onChange={(notifyCanary) => setPref({ notifyCanary })} />} />
+        <SettingsRow setting="notifySound" control={<Switch isDisabled={locked} label="Sound" isLabelHidden value={prefs.notifySound} onChange={(notifySound) => setPref({ notifySound })} />} />
+        <SettingsRow setting="notifyCanary" control={<Switch isDisabled={locked} label="Canarytoken fires" isLabelHidden value={prefs.notifyCanary} onChange={(notifyCanary) => setPref({ notifyCanary })} />} />
       </SettingsCard>
     </>
   )
@@ -368,16 +373,16 @@ const WINDOW_OPTIONS = [
 ]
 
 function InvestigationPanel() {
-  const { prefs, setPref } = useSettings()
+  const { prefs, setPref, locked } = useSettings()
   return (
     <>
       <SettingsCard title="Investigations">
-        <SettingsRow setting="defaultWindow" control={<Selector label="Default window" isLabelHidden width={CONTROL_WIDTH} value={prefs.defaultWindow} onChange={(defaultWindow) => setPref({ defaultWindow })} options={WINDOW_OPTIONS} />} />
+        <SettingsRow setting="defaultWindow" control={<Selector isDisabled={locked} label="Default window" isLabelHidden width={CONTROL_WIDTH} value={prefs.defaultWindow} onChange={(defaultWindow) => setPref({ defaultWindow })} options={WINDOW_OPTIONS} />} />
       </SettingsCard>
       <SettingsCard title="Attack map">
-        <SettingsRow setting="mapBasemap" control={<Selector label="Basemap" isLabelHidden width={CONTROL_WIDTH} value={prefs.mapBasemap} onChange={() => setPref({ mapBasemap: 'osm' })} options={[{ value: 'osm', label: 'OpenStreetMap' }]} />} />
-        <SettingsRow setting="mapClustering" control={<Switch label="Cluster markers" isLabelHidden value={prefs.mapClustering} onChange={(mapClustering) => setPref({ mapClustering })} />} />
-        <SettingsRow setting="mapAnimation" control={<Switch label="Map animation" isLabelHidden value={prefs.mapAnimation} onChange={(mapAnimation) => setPref({ mapAnimation })} />} />
+        <SettingsRow setting="mapBasemap" control={<Selector isDisabled={locked} label="Basemap" isLabelHidden width={CONTROL_WIDTH} value={prefs.mapBasemap} onChange={() => setPref({ mapBasemap: 'osm' })} options={[{ value: 'osm', label: 'OpenStreetMap' }]} />} />
+        <SettingsRow setting="mapClustering" control={<Switch isDisabled={locked} label="Cluster markers" isLabelHidden value={prefs.mapClustering} onChange={(mapClustering) => setPref({ mapClustering })} />} />
+        <SettingsRow setting="mapAnimation" control={<Switch isDisabled={locked} label="Map animation" isLabelHidden value={prefs.mapAnimation} onChange={(mapAnimation) => setPref({ mapAnimation })} />} />
       </SettingsCard>
     </>
   )
@@ -892,7 +897,7 @@ export function AdminPanelView({ pane, initial }: { pane: PaneId; initial: Setti
   // is edited here.
   const noop = useCallback(() => {}, [])
   return (
-    <SettingsContext.Provider value={{ data, reload, prefs: data.preferences, setPref: noop, setDirty: noop, openPage: (href) => void navigate({ href }) }}>
+    <SettingsContext.Provider value={{ data, reload, prefs: data.preferences, setPref: noop, locked: false, setDirty: noop, openPage: (href) => void navigate({ href }) }}>
       {GRID_PANELS.has(pane) ? (
         <SettingsGrid>
           <PanelBody key={pane} panel={pane} />
@@ -952,6 +957,9 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
 
   // Personal settings apply as they change; a short debounce batches typing.
   const setPref = (patch: Partial<Preferences>) => {
+    // The controls are disabled for a viewer; this keeps a stray change from
+    // reaching the backend, which refuses it (APIARY#3857).
+    if (!isAdmin) return
     setPrefs((current) => {
       const next = { ...(current ?? data!.preferences), ...patch }
       clearTimeout(saveTimer.current)
@@ -1012,7 +1020,7 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
     />
   )
   const body = data && prefs && (
-    <SettingsContext.Provider value={{ data, reload, prefs, setPref, setDirty, openPage }}>
+    <SettingsContext.Provider value={{ data, reload, prefs, setPref, locked: !isAdmin, setDirty, openPage }}>
       <PanelColumn>
         <HStack gap={2} vAlign="start">
           <StackItem size="fill">
@@ -1022,6 +1030,7 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
           <div aria-hidden style={{ width: 32 }} />
         </HStack>
         <VStack gap={4}>
+          {!isAdmin && pane !== 'account' && <Banner status="info" title="Read-only for viewers" description="Your settings are shown as they are. Changing them needs the admin role." />}
           <PanelBody key={pane} panel={pane} />
         </VStack>
       </PanelColumn>

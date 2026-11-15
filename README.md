@@ -70,7 +70,7 @@ A server function call whose session has gone (401) sends the browser to sign in
 
 On the server:
 - every server function passes a **same-origin check** (a cross-site state-changing call gets 403), and a state-changing one must carry the `x-csrf-token` header the dashboard's own fetch adds;
-- every query is **authorized for the caller**: no session → 401; a viewer calling an admin-only write → 403; the canonical permissions are in `src/server/authorize.ts`;
+- every query is **authorized for the caller**: no session → 401; a viewer calling any write → 403 (viewers are read-only, APIARY#3857); the canonical permissions are in `src/server/authorize.ts`;
 - direct handlers (`/api/*`) check the session themselves; `/healthz` is deliberately public; `/metrics` needs the service token in `x-service-token`;
 - the firewall blocklist export (`/export/portbridge-manual-blackhole.txt`) takes either an export-only token (`X-Export-Token`, not the service token) or a signed-in session the query policy allows (see below);
 - `/auth/logout` needs a same-origin Origin or Referer, then destroys the session.

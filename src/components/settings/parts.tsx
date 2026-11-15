@@ -163,13 +163,13 @@ const THEME_CHOICES: Array<{ value: 'light' | 'dark' | 'system'; label: string; 
 ]
 
 /** Comparing the pictures is how people pick a theme, so the choice is cards. */
-export function ThemeChoiceCards({ value, onChange }: { value: string; onChange: (value: 'light' | 'dark' | 'system') => void }) {
+export function ThemeChoiceCards({ value, onChange, isDisabled = false }: { value: string; onChange: (value: 'light' | 'dark' | 'system') => void; isDisabled?: boolean }) {
   return (
     <Grid role="radiogroup" aria-label="Color theme" columns={{ minWidth: 96, max: 3 }} gap={2} maxWidth={480}>
       {THEME_CHOICES.map((choice) => {
         const isSelected = choice.value === value
         return (
-          <SelectableCard key={choice.value} label={choice.label} isSelected={isSelected} padding={2} onChange={() => !isSelected && onChange(choice.value)}>
+          <SelectableCard key={choice.value} label={choice.label} isSelected={isSelected} isDisabled={isDisabled} padding={2} onChange={() => !isSelected && onChange(choice.value)}>
             <VStack gap={1.5}>
               <AspectRatio ratio={3 / 2}>
                 <div aria-hidden style={{ height: '100%', overflow: 'hidden', borderRadius: 'var(--radius-element)', pointerEvents: 'none', display: 'flex' }}>

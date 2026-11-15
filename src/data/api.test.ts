@@ -1748,7 +1748,7 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
     process.env.BACKEND_URL = 'http://backend.test'
     // The OIDC username, not the display name (#256): `created_by` must match
     // the `x-actor-username` and the signed assertion's username claim.
-    const analyst = rememberActor({ name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }, { sub: 'oidc|7', username: 'ada.analyst' })
+    const analyst = rememberActor({ name: 'Ada Analyst', email: 'a@example.test', roles: ['admin' as const] }, { sub: 'oidc|7', username: 'ada.analyst' })
     // A freshly minted token carries no filename_hint — the backend stamps
     // the file name onto the STORED record, not the created one (canarytokens.rs:246).
     const token = await (liveQuery('createCanarytoken', analyst) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll', snippet: 'Q3 adjustments' })
@@ -1764,7 +1764,7 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
 
   it('leaves created_by blank for a caller with no known username, never the display name', async () => {
     stub(toolsFixtures({ '/api/v1/canarytokens': tokenRecord }))
-    await (liveQuery('createCanarytoken', { name: 'Ada Analyst', email: 'a@example.test', roles: ['viewer' as const] }) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll' })
+    await (liveQuery('createCanarytoken', { name: 'Ada Analyst', email: 'a@example.test', roles: ['admin' as const] }) as Backend['createCanarytoken'])({ type: 'ms_word', memo: 'payroll' })
     expect(bodiesOf()[0].body).toEqual({ token_type: 'ms_word', memo: 'payroll', created_by: '' })
   })
 

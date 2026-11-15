@@ -12,12 +12,16 @@ import type { AlertGroup } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
+import { useIsAdmin } from '#/lib/session'
 
 export function AckButton({ group }: { group: AlertGroup }) {
   // Shown at once (the lists, the detail and the bell), rolled back if the
   // backend refuses (lib/mutation.ts).
   const acknowledge = useDataMutation(acknowledgeAlertsWrite())
   const { error, guard } = useGuardedAction()
+  // Acknowledge and reopen are writes: an admin's alone (APIARY#3857).
+  const isAdmin = useIsAdmin()
+  if (!isAdmin) return null
   const keys = group.members.map((m) => m.key)
   const button = (
     <Button
