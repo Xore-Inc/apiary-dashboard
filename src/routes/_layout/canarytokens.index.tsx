@@ -16,6 +16,7 @@ import { formatDateTime, formatTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
 import { ensure, usePageQuery } from '#/lib/query'
 import { canarytokensQuery } from '#/data/resources'
+import { useIsAdmin } from '#/lib/session'
 
 type View = 'deployed' | 'fired'
 
@@ -60,9 +61,10 @@ function CanarytokensPage() {
   const { view = 'deployed' } = Route.useSearch()
   const [creating, setCreating] = useState(false)
   const [minted, setMinted] = useState<CanaryToken | null>(null)
-  const create = (
+  const isAdmin = useIsAdmin()
+  // Planting a token is a write: an admin's alone (APIARY#3857).
+  const create = isAdmin && (
     <>
-      {/* Any signed-in operator may plant a token, as in the canonical dashboard. */}
       <Button label="Create token" size="sm" onClick={() => setCreating(true)} />
       {/* The kinds come with the data; the dialog opens once they are here. */}
       {data && <CanaryTokenDialog
@@ -91,7 +93,7 @@ function CanarytokensPage() {
       columns={tokenColumns}
       getId={(row) => row.id}
       getHref={(row) => `/canarytokens/${encodeURIComponent(row.id)}`}
-      emptyState={{ title: 'No tokens deployed yet', description: 'Use Create token to plant your first one.' }}
+      emptyState={{ title: 'No tokens deployed yet', description: isAdmin ? 'Use Create token to plant your first one.' : 'An admin plants them.' }}
     />
   ) : (
     <RecordList

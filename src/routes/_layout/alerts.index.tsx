@@ -19,6 +19,7 @@ import type { AlertGroup } from '#/data/types'
 import { formatNumber, formatTime } from '#/lib/format'
 import { AckButton } from '#/components/details/Alert'
 import { useGuardedAction } from '#/lib/useGuardedAction'
+import { useIsAdmin } from '#/lib/session'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { ensure, usePageQuery } from '#/lib/query'
 import { alertsQuery } from '#/data/resources'
@@ -56,12 +57,17 @@ const columns: TableColumn<AlertGroup>[] = [
   { key: 'acknowledged', header: '', width: pixel(176), renderCell: (row) => <AckButton group={row} /> },
 ]
 
+/** A viewer reads alerts and changes none of them (APIARY#3857): no ack
+ * column, no bulk action. */
+const viewerColumns = columns.filter((column) => column.key !== 'acknowledged')
+
 function AlertsPage() {
   // Undefined while the route is pending (this component is its own
   // pending state).
   const groups: AlertGroup[] | undefined = usePageQuery(alertsQuery())
   const { view = 'new' } = Route.useSearch()
   const acknowledgeAll = useDataMutation(acknowledgeAllAlertsWrite())
+  const isAdmin = useIsAdmin()
   const [filter, setFilter] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { error, guard } = useGuardedAction()
@@ -83,13 +89,15 @@ function AlertsPage() {
         actions={
           <HStack gap={2} vAlign="center">
             {error && <FieldStatus type="error" variant="detached" message={error} />}
-            <Button
-            label="Acknowledge all"
-            size="sm"
-            variant="secondary"
-            isDisabled={openRecords === 0}
-            onClick={() => setConfirmOpen(true)}
-            />
+            {isAdmin && (
+              <Button
+              label="Acknowledge all"
+              size="sm"
+              variant="secondary"
+              isDisabled={openRecords === 0}
+              onClick={() => setConfirmOpen(true)}
+              />
+            )}
           </HStack>
         }
         toolbar={
@@ -98,7 +106,7 @@ function AlertsPage() {
           </HStack>
         }
         rows={rows}
-        columns={columns}
+        columns={isAdmin ? columns : viewerColumns}
         getId={(row) => row.id}
         getHref={(row) => `/alerts/${encodeURIComponent(alertKeyOf(row))}`}
         emptyState={

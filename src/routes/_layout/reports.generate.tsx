@@ -8,6 +8,9 @@ import { REPORT_WIDE, ReportWizard, emptyDraft } from '#/components/reports/Repo
 import { useMediaQuery } from '@astryxdesign/core/hooks'
 import { facetsQuery, reportsQuery } from '#/data/resources'
 import { reportTabs } from '#/lib/navFamilies'
+import { Banner } from '@astryxdesign/core/Banner'
+import { VStack } from '@astryxdesign/core/Stack'
+import { useIsAdmin } from '#/lib/session'
 
 export const Route = createFileRoute('/_layout/reports/generate')({
   ssr: pageSsr,
@@ -36,6 +39,7 @@ function GeneratePage() {
   // Wide: the steps and a live preview fill the page side by side.
   const wide = useMediaQuery(REPORT_WIDE)
   const source = from ? data?.definitions.find((d) => d.id === from) : undefined
+  const isAdmin = useIsAdmin()
 
   return (
     <PageFrame
@@ -44,7 +48,11 @@ function GeneratePage() {
       contentWidth={wide ? undefined : 800}
     >
       {data && facets ? (
-        <ReportWizard key={`${from ?? template ?? ''}-${run}`} data={data} facets={facets} initial={source && run === 0 ? structuredClone(source) : emptyDraft(data, template)} onRestart={() => setRun((n) => n + 1)} />
+        <VStack gap={4}>
+          {/* Viewers are read-only (APIARY#3857). */}
+          {!isAdmin && <Banner status="info" title="Read-only for viewers" description="You can compose a report here. Previewing and generating it needs the admin role." />}
+          <ReportWizard key={`${from ?? template ?? ''}-${run}`} data={data} facets={facets} initial={source && run === 0 ? structuredClone(source) : emptyDraft(data, template)} onRestart={() => setRun((n) => n + 1)} />
+        </VStack>
       ) : (
         <SkeletonPanels count={1} lines={10} />
       )}
