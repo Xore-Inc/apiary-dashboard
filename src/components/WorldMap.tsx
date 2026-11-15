@@ -36,7 +36,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
   // The basemap preference has one value today ("osm"), which follows the theme.
   const provider: MapTileProvider = mode === 'dark' ? tiles.dark : tiles.light
   const boxRef = useRef<HTMLDivElement>(null)
-  const [map, setMap] = useState<{ L: typeof Leaflet; map: LeafletMap } | null>(null)
+  const [map, setMap] = useState<{ L: typeof Leaflet; map: LeafletMap; animate: boolean } | null>(null)
   const navigateRef = useRef(navigate)
   navigateRef.current = navigate
 
@@ -85,7 +85,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
       m.getContainer().addEventListener('wheel', () => (touched = true), { passive: true })
       observer = new ResizeObserver(fit)
       observer.observe(box)
-      setMap({ L, map: m })
+      setMap({ L, map: m, animate })
     })()
     return () => {
       life.disposed = true
@@ -121,9 +121,12 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
 
   // The markers: redrawn for new data, the clustering preference, and each
   // zoom (clusters are measured on screen).
+  // The animation setting is the map's own (it was built with it): read from
+  // the map, not the prop, so a change of the setting never redraws onto the
+  // map being torn down for it before its replacement exists (#317).
   useEffect(() => {
     if (!map) return
-    const { L, map: m } = map
+    const { L, map: m, animate: built } = map
     const layer = L.layerGroup().addTo(m)
     let frame = 0
     const draw = () => {
@@ -133,7 +136,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
         const p = m.latLngToContainerPoint([lat, lon])
         return [p.x, p.y]
       })
-      const pulsing = animate ? busiest(markers) : new Set<string>()
+      const pulsing = built ? busiest(markers) : new Set<string>()
       const rings: Array<{ ring: Leaflet.CircleMarker; r: number }> = []
       for (const marker of markers) {
         const label = markerLabel(marker)
@@ -153,7 +156,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
         circle.bindTooltip(isCluster ? `${label}. Click to zoom in.` : label, { direction: 'top', offset: [0, -marker.radius] })
         const go = () => {
           if (isCluster) {
-            m.fitBounds(L.latLngBounds(marker.points.map((p) => [p.lat, p.lon] as [number, number])).pad(0.5), { maxZoom: Math.min(m.getMaxZoom(), m.getZoom() + 3), animate })
+            m.fitBounds(L.latLngBounds(marker.points.map((p) => [p.lat, p.lon] as [number, number])).pad(0.5), { maxZoom: Math.min(m.getMaxZoom(), m.getZoom() + 3), animate: built })
           } else void navigateRef.current({ href: markerHref(marker) })
         }
         circle.on('click', go)
@@ -197,7 +200,7 @@ export function WorldMap({ points }: { points: MapPoint[] }) {
       m.off('zoomend', draw)
       layer.remove()
     }
-  }, [map, points, clustering, animate])
+  }, [map, points, clustering])
 
   return (
     <div style={{ position: 'relative', height: HEIGHT, borderRadius: 8, overflow: 'hidden', isolation: 'isolate' }}>
