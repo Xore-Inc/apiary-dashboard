@@ -32,7 +32,7 @@ bun install --frozen-lockfile
 step "typecheck";  bunx tsc --noEmit
 step "lint";       bun run lint
 step "unit tests"; bun run test
-step "theme outputs match source"; bun run theme:check
+step "theme outputs match source"; scripts/theme-check-ci.sh
 step "build";      bun run build
 
 step "the server refuses an environment that would open it"

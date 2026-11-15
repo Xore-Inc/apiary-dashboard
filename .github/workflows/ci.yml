@@ -71,7 +71,7 @@ jobs:
       - run: bun run lint
       - run: bun run test
       - name: Theme outputs match their source
-        run: bun run theme:check
+        run: scripts/theme-check-ci.sh
       - name: Generated server-function facade is current
         run: bun scripts/gen-queries.ts --check
       - run: bun run build
