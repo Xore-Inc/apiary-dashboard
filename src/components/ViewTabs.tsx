@@ -124,22 +124,26 @@ export function entityTabs({ label, basePath, tabs, aliases = {} }: { label: str
 export function useViewTabs(): ViewTabsModel | null {
   const router = useRouter()
   const location = useRouterState({ select: (state) => state.location })
-  const committed = useRouterState({ select: (state) => state.matches })
   // The server paints a page's skeleton without its data (lib/pageSsr), so
   // counts wait for hydration too, or the first render would not match.
   const hydrated = useHydrated()
   const [routes, params] = router.getMatchedRoutes(location.pathname)
   const route = [...routes].reverse().find((r) => r.options.staticData?.viewTabs)
-  if (!route) return null
   // Counts come from the route's loader data once that exact match loaded.
-  const match = committed.find((m) => m.routeId === route.id && JSON.stringify(m.params) === JSON.stringify(pick(params, m.params)))
+  // Only that match's status and data are selected, so the tabs re-render
+  // when those change, not on every router state change.
+  type Match = { routeId: string; params: object; status: string; loaderData?: unknown }
+  const matchOf = (matches: Match[]) => route && matches.find((c) => c.routeId === route.id && JSON.stringify(c.params) === JSON.stringify(pick(params, c.params)))
+  const status = useRouterState({ select: (state) => matchOf(state.matches)?.status, structuralSharing: false })
+  const loaderData = useRouterState({ select: (state) => matchOf(state.matches)?.loaderData, structuralSharing: false })
+  if (!route) return null
   const model = route.options.staticData!.viewTabs!({
     params,
     search: location.search,
     pathname: location.pathname,
     // Under the "Loading forever" mock scenario the page stays on its
     // skeleton (lib/pending), so its counts wait too.
-    data: hydrated && match?.status === 'success' && (location.search as Record<string, unknown>).mock !== 'loading' ? match.loaderData : undefined,
+    data: hydrated && status === 'success' && (location.search as Record<string, unknown>).mock !== 'loading' ? loaderData : undefined,
   })
   return model.tabs.length < 2 ? null : model
 }

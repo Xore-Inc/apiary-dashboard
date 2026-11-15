@@ -85,7 +85,7 @@ function rememberedSearch(path: string): string | null {
 function LayoutComponent() {
   const { user, config, mockScenarios, narrow } = Route.useLoaderData()
   const prefs = usePreferences()
-  const location = useLocation()
+  const location = useLocation({ select: (l) => ({ pathname: l.pathname, searchStr: l.searchStr }) })
   // Keep each page's last filters for "remember filters" (this tab only).
   useEffect(() => {
     if (!prefs?.rememberFilters) return

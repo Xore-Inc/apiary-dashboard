@@ -20,7 +20,7 @@ const rows: Row[] = [
   { id: 'b', name: 'Beta', colour: 'amber' },
 ]
 
-function renderList() {
+function renderList(listRows: Row[] = rows) {
   const root = createRootRoute()
   const list = createRoute({
     getParentRoute: () => root,
@@ -28,7 +28,7 @@ function renderList() {
     component: () => (
       <RecordList
         title="Things"
-        rows={rows}
+        rows={listRows}
         columns={[
           { key: 'name', header: 'Name' },
           { key: 'colour', header: 'Colour' },
@@ -68,5 +68,29 @@ describe('RecordList', () => {
     await userEvent.click(await screen.findByText('amber'))
     await screen.findByText('thing page')
     expect(router.state.location.pathname).toBe('/things/b')
+  })
+
+  it('preloads the first rows as they come into view, the rest on hover (#309)', async () => {
+    const observed = new Set<Element>()
+    const original = window.IntersectionObserver
+    window.IntersectionObserver = class {
+      observe(el: Element) {
+        observed.add(el)
+      }
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return []
+      }
+    } as unknown as typeof IntersectionObserver
+    try {
+      const many = Array.from({ length: 8 }, (_, i) => ({ id: `r${i}`, name: `Row ${i}`, colour: 'teal' }))
+      renderList(many)
+      await screen.findByRole('link', { name: 'Row 0' })
+      const watched = many.filter((row) => [...observed].some((el) => el.getAttribute('href') === `/things/${row.id}`)).map((row) => row.id)
+      expect(watched).toEqual(['r0', 'r1', 'r2', 'r3', 'r4'])
+    } finally {
+      window.IntersectionObserver = original
+    }
   })
 })
