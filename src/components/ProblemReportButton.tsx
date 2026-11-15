@@ -18,7 +18,8 @@ import { Text } from '@astryxdesign/core/Text'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline'
 import { useRouterState } from '@tanstack/react-router'
-import { submitProblemReport } from '#/data/queries'
+import { submitProblemReportWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { API_CALL } from '#/data/scenarios'
 import type { ApiCallRecord } from '#/data/scenarios'
 import { describeError } from '#/lib/actionError'
@@ -90,6 +91,7 @@ function useCapture(enabled: boolean) {
 /** In the footer, when the admin switch (Dashboard defaults) allows it. */
 export function ProblemReportButton({ enabled }: { enabled: boolean }) {
   const capture = useCapture(enabled)
+  const fileReport = useDataMutation(submitProblemReportWrite())
   const [open, setOpen] = useState(false)
   const [expected, setExpected] = useState('')
   const [actual, setActual] = useState('')
@@ -118,7 +120,7 @@ export function ProblemReportButton({ enabled }: { enabled: boolean }) {
     setBusy(true)
     setError(undefined)
     try {
-      const { id } = await submitProblemReport({
+      const { id } = await fileReport.mutateAsync([{
         page: capture.page,
         expected: expected.trim(),
         actual: actual.trim(),
@@ -128,7 +130,7 @@ export function ProblemReportButton({ enabled }: { enabled: boolean }) {
         apiCalls: [...capture.calls.current],
         domSnapshot: snapshot ? document.documentElement.outerHTML.slice(0, MAX_SNAPSHOT) : undefined,
         userAgent: navigator.userAgent,
-      })
+      }])
       setFiled(id)
     } catch (e) {
       setError(describeError(e))

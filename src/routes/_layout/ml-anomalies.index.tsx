@@ -10,12 +10,13 @@ import { Table, pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { TimeLines } from '#/components/charts'
 import { Panel, StatTile, MiniTable, windowTitle } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { acknowledgeAllAnomalies } from '#/data/queries'
+import { acknowledgeAllAnomaliesWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { DISPOSITIONS } from '#/data/types'
 import type { AnomalyStatus, MlAnomaly, ModelHealth, Severity } from '#/data/types'
 import { formatClock, formatNumber, formatTime } from '#/lib/format'
@@ -159,7 +160,7 @@ function MlAnomaliesPage() {
   const data = usePageQuery(mlAnomaliesQuery())
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
-  const router = useRouter()
+  const acknowledgeAll = useDataMutation(acknowledgeAllAnomaliesWrite())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { error, guard } = useGuardedAction()
   const [acking, setAcking] = useState(false)
@@ -231,8 +232,7 @@ function MlAnomaliesPage() {
           setAcking(true)
           try {
             await guard(async () => {
-              await acknowledgeAllAnomalies()
-              await router.invalidate()
+              await acknowledgeAll.mutateAsync([])
             })
           } finally {
             setAcking(false)

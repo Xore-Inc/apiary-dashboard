@@ -6,9 +6,9 @@ import { HStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Token } from '@astryxdesign/core/Token'
-import { useRouter } from '@tanstack/react-router'
 import { SeverityToken } from '#/components/SeverityToken'
-import { acknowledgeAnomalies, setAnomalyDisposition } from '#/data/queries'
+import { acknowledgeAnomaliesWrite, setAnomalyDispositionWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { DISPOSITIONS } from '#/data/types'
 import { Panel } from '#/components/DashboardBlocks'
 import type { AnomalyStatus, Disposition, MlAnomaly } from '#/data/types'
@@ -90,7 +90,8 @@ export function AnomalyFacts({ anomaly }: { anomaly: MlAnomaly }) {
 
 /** Acknowledge or label the anomaly; labels train the next model. */
 export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
-  const router = useRouter()
+  const acknowledge = useDataMutation(acknowledgeAnomaliesWrite())
+  const dispose = useDataMutation(setAnomalyDispositionWrite())
   const [busy, setBusy] = useState(false)
   const { error, guard } = useGuardedAction()
   const [verdict, setVerdict] = useState<Disposition>('true_positive')
@@ -101,10 +102,8 @@ export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
   const run = async (write: () => Promise<unknown>) => {
     setBusy(true)
     try {
-      await guard(async () => {
-        await write()
-        await router.invalidate()
-      })
+      // Each write invalidates the anomaly reads (data/writes.ts).
+      await guard(write)
     } finally {
       setBusy(false)
     }
@@ -126,7 +125,7 @@ export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
           variant="secondary"
           size="sm"
           isLoading={busy}
-          onClick={() => run(() => acknowledgeAnomalies(ids))}
+          onClick={() => run(() => acknowledge.mutateAsync([ids]))}
         />
       )}
       <Selector
@@ -153,7 +152,7 @@ export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
           }
           size="sm"
           isLoading={busy}
-          onClick={() => run(() => setAnomalyDisposition(ids, verdict, reason))}
+          onClick={() => run(() => dispose.mutateAsync([ids, verdict, reason]))}
         />
         {isDisposed && (
           <Button
@@ -161,7 +160,7 @@ export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
             variant="secondary"
             size="sm"
             isDisabled={busy}
-            onClick={() => run(() => setAnomalyDisposition(ids, 'open', ''))}
+            onClick={() => run(() => dispose.mutateAsync([ids, 'open', '']))}
           />
         )}
         {error && <FieldStatus type="error" variant="detached" message={error} />}

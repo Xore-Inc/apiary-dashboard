@@ -22,7 +22,8 @@ import { MiniTable, Panel, StatTile } from '../DashboardBlocks'
 import { EntityLink } from '../EntityLink'
 import { AnalyzerSection } from './AnalyzerSection'
 import { CallGraph } from './CallGraph'
-import { queuePayloadAction } from '#/data/queries'
+import { queuePayloadActionWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { GhidraAnalysis, GhidraFunction, IocEvidence } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { useIsAdmin } from '#/lib/session'
@@ -380,6 +381,8 @@ function DeepDive({ g }: { g: GhidraAnalysis }) {
 // ---- The result -------------------------------------------------------------------
 
 export function GhidraResult({ g, fn, section }: { g: GhidraAnalysis; fn?: string; section: GhidraSection }) {
+  // Queuing invalidates the payload's analysis reads (data/writes.ts).
+  const queue = useDataMutation(queuePayloadActionWrite())
   const sha = g.hash
   const navigate = useNavigate()
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -429,7 +432,7 @@ export function GhidraResult({ g, fn, section }: { g: GhidraAnalysis; fn?: strin
         actionVariant="primary"
         onAction={async () => {
           setConfirmOpen(false)
-          setQueued((await guard(() => queuePayloadAction(sha, 'ghidra'))) ?? null)
+          setQueued((await guard(() => queue.mutateAsync([sha, 'ghidra']))) ?? null)
         }}
       />
     </AnalyzerSection>

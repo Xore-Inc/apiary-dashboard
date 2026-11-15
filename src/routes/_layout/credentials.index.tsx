@@ -6,7 +6,7 @@ import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { BaitCredentialDialog } from '#/components/dialogs/BaitCredentialDialog'
 import { RecordList } from '#/components/RecordList'
 import type { BaitCredential } from '#/data/types'
@@ -26,7 +26,6 @@ function CredentialsPage() {
   const isAdmin = useIsAdmin()
   const data = usePageQuery(credentialsQuery())
   const tokenLabel = (id?: string) => data?.tokens.find((t) => t.id === id)?.memo
-  const router = useRouter()
   const [creating, setCreating] = useState(false)
 
   const columns: TableColumn<BaitCredential>[] = [
@@ -53,10 +52,8 @@ function CredentialsPage() {
           <BaitCredentialDialog
             targets={data?.targets ?? []}
             isOpen={creating}
-            onOpenChange={(open) => {
-              setCreating(open)
-              if (!open) void router.invalidate()
-            }}
+            // Planting invalidates the credentials read (data/writes.ts).
+            onOpenChange={setCreating}
           />
         </>
       }

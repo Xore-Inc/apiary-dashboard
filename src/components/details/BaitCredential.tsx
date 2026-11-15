@@ -8,8 +8,8 @@ import { Selector } from '@astryxdesign/core/Selector'
 import { HStack, StackItem, VStack } from '@astryxdesign/core/Stack'
 import { Heading, Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { useRouter } from '@tanstack/react-router'
-import { linkCredentialToken, rotateCredential } from '#/data/queries'
+import { linkCredentialTokenWrite, rotateCredentialWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { describeError } from '#/lib/actionError'
 import { useIsAdmin } from '#/lib/session'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
@@ -23,7 +23,8 @@ export function CredentialInspector({
   credential: BaitCredential
   tokens: CanaryToken[]
 }) {
-  const router = useRouter()
+  const rotate = useDataMutation(rotateCredentialWrite())
+  const link = useDataMutation(linkCredentialTokenWrite())
   const [newPassword, setNewPassword] = useState('')
   const [busy, setBusy] = useState<'rotate' | 'link' | null>(null)
   const [error, setError] = useState<{ kind: 'rotate' | 'link'; message: string }>()
@@ -36,8 +37,8 @@ export function CredentialInspector({
     setBusy(kind)
     setError(undefined)
     try {
+      // Each write invalidates the credential and token reads (data/writes.ts).
       await write()
-      await router.invalidate()
     } catch (e) {
       setError({ kind, message: describeError(e) })
     } finally {
@@ -100,7 +101,7 @@ export function CredentialInspector({
             isLoading={busy === 'rotate'}
             onClick={() =>
               run('rotate', async () => {
-                await rotateCredential(credential.id, newPassword || undefined)
+                await rotate.mutateAsync([credential.id, newPassword || undefined])
                 setNewPassword('')
               })
             }
@@ -121,7 +122,7 @@ export function CredentialInspector({
           value={credential.linkedTokenId ?? null}
           onChange={(tokenId) =>
             void run('link', () =>
-              linkCredentialToken(credential.id, tokenId ?? undefined),
+              link.mutateAsync([credential.id, tokenId ?? undefined]),
             )
           }
           options={tokens.map((t) => ({

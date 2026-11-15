@@ -8,8 +8,9 @@ import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { queuePayloadAction } from '#/data/queries'
 import type { PayloadAction } from '#/data/queries'
+import { queuePayloadActionWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { Ioc } from '#/data/types'
 import { AnalysisRunDialog } from '../dialogs/AnalysisRunDialog'
 import { queuedMessage } from './WorkbenchRuns'
@@ -35,6 +36,7 @@ export const iocColumns: TableColumn<Ioc>[] = [
  * next to "Open in": queue more analysis, publish, take the bytes. Admins
  * only; nothing runs on this host, every job goes to an isolated worker. */
 export function PayloadOperatorMenu({ hash }: { hash: string }) {
+  const queue = useDataMutation(queuePayloadActionWrite())
   const isAdmin = useIsAdmin()
   const toast = useToast()
   const [confirmPublish, setConfirmPublish] = useState(false)
@@ -42,7 +44,7 @@ export function PayloadOperatorMenu({ hash }: { hash: string }) {
   if (!isAdmin) return null
   const run = async (action: PayloadAction) => {
     try {
-      toast({ body: `${await queuePayloadAction(hash, action)} (mock: nothing was actually queued)` })
+      toast({ body: `${await queue.mutateAsync([hash, action])} (mock: nothing was actually queued)` })
     } catch (e) {
       toast({ type: 'error', body: `Not queued: ${describeError(e)}` })
     }

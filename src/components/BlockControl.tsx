@@ -5,8 +5,8 @@ import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { SegmentedControl, SegmentedControlItem } from '@astryxdesign/core/SegmentedControl'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
-import { useRouter } from '@tanstack/react-router'
-import { setIpBlocked } from '#/data/queries'
+import { setIpBlockedWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { describeError } from '#/lib/actionError'
 import { useIsAdmin } from '#/lib/session'
 
@@ -23,7 +23,7 @@ export const DEFAULT_BLOCK_DAYS = 7
 
 /** Add or remove an address on the portbridge manual blackhole list. */
 export function BlockControl({ ip, blocked }: { ip: string; blocked: boolean }) {
-  const router = useRouter()
+  const setBlocked = useDataMutation(setIpBlockedWrite())
   const isAdmin = useIsAdmin()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -68,8 +68,7 @@ export function BlockControl({ ip, blocked }: { ip: string; blocked: boolean }) 
           setBusy(true)
           setError(undefined)
           try {
-            await setIpBlocked(ip, !blocked, blocked ? undefined : days)
-            await router.invalidate()
+            await setBlocked.mutateAsync([ip, !blocked, blocked ? undefined : days])
           } catch (e) {
             setError(describeError(e))
           } finally {

@@ -7,7 +7,7 @@ import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { searchTabs } from '#/components/ViewTabs'
 import { CanaryTokenDialog } from '#/components/dialogs/CanaryTokenDialog'
 import { RecordList } from '#/components/RecordList'
@@ -58,7 +58,6 @@ function CanarytokensPage() {
   const data = usePageQuery(canarytokensQuery())
   const types = data?.types ?? []
   const { view = 'deployed' } = Route.useSearch()
-  const router = useRouter()
   const [creating, setCreating] = useState(false)
   const [minted, setMinted] = useState<CanaryToken | null>(null)
   const create = (
@@ -71,8 +70,8 @@ function CanarytokensPage() {
         isOpen={creating}
         onOpenChange={setCreating}
         onCreated={(token) => {
+          // The dialog's write invalidated the tokens read (data/writes.ts).
           setMinted(token)
-          void router.invalidate()
         }}
       />}
     </>

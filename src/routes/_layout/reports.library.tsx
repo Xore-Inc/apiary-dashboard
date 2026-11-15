@@ -8,10 +8,11 @@ import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { describeSchedule } from '#/components/details/Report'
 import { RecordList } from '#/components/RecordList'
-import { deleteReportDefinition, generateReport } from '#/data/queries'
+import { deleteReportDefinitionWrite, generateReportWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { GeneratedReport, ReportDefinition } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
@@ -32,7 +33,8 @@ export const Route = createFileRoute('/_layout/reports/library')({
 /** Saved definitions: generate one now, reopen it in the wizard, or drop it. */
 function LibraryPage() {
   const data = usePageQuery(reportsQuery())
-  const router = useRouter()
+  const generate = useDataMutation(generateReportWrite())
+  const deleteDefinition = useDataMutation(deleteReportDefinitionWrite())
   const [busy, setBusy] = useState<string | null>(null)
   const { error, guard } = useGuardedAction()
   const [confirm, setConfirm] = useState<ReportDefinition | null>(null)
@@ -43,10 +45,8 @@ function LibraryPage() {
   const act = async (id: string, write: () => Promise<unknown>) => {
     setBusy(id)
     try {
-      await guard(async () => {
-        await write()
-        await router.invalidate()
-      })
+      // Each write invalidates the reports read (data/writes.ts).
+      await guard(write)
     } finally {
       setBusy(null)
     }
@@ -73,7 +73,7 @@ function LibraryPage() {
       width: pixel(256),
       renderCell: (row) => (
         <HStack gap={1}>
-          {isAdmin && <Button label="Generate now" size="sm" isLoading={busy === row.id} onClick={() => void act(row.id, async () => setGenerated(await generateReport(row.id)))} />}
+          {isAdmin && <Button label="Generate now" size="sm" isLoading={busy === row.id} onClick={() => void act(row.id, async () => setGenerated(await generate.mutateAsync([row.id])))} />}
           <Button label="Edit" size="sm" variant="secondary" href={`/reports/generate?from=${row.id}`} />
           {isAdmin && <Button label="Delete" size="sm" variant="ghost" onClick={() => setConfirm(row)} />}
         </HStack>
@@ -118,7 +118,7 @@ function LibraryPage() {
         isActionLoading={busy === confirm?.id}
         onAction={async () => {
           if (!confirm) return
-          await act(confirm.id, () => deleteReportDefinition(confirm.id))
+          await act(confirm.id, () => deleteDefinition.mutateAsync([confirm.id]))
           setConfirm(null)
         }}
       />

@@ -41,8 +41,9 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { VisuallyHidden } from '@astryxdesign/core/VisuallyHidden'
 import { useMediaQuery } from '@astryxdesign/core/hooks'
 import { CalendarDaysIcon, DocumentTextIcon, FunnelIcon, PaintBrushIcon, Squares2X2Icon } from '@heroicons/react/24/outline'
-import { useRouter } from '@tanstack/react-router'
-import { generateReportFrom, previewReport } from '#/data/queries'
+import { previewReport } from '#/data/queries'
+import { generateReportFromWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { Facets, GeneratedReport, ReportDefinition, ReportFrequency, ReportPreview, ReportsData } from '#/data/types'
 import { formatNumber } from '#/lib/format'
 import { isBackendGap } from '#/lib/backendGap'
@@ -155,7 +156,8 @@ export function automaticChecks(
 const facetOptions = (facets: Facets | BackendGap, key: keyof Facets): Facets[keyof Facets] => (isBackendGap(facets) ? [] : facets[key])
 
 export function ReportWizard({ data, facets, initial, onRestart }: { data: ReportsData; facets: Facets | BackendGap; initial: ReportDefinition; onRestart: () => void }) {
-  const router = useRouter()
+  // Generating invalidates the reports read (data/writes.ts).
+  const generate = useDataMutation(generateReportFromWrite())
   // Generating (and keeping the definition) is an admin's; a viewer can
   // still compose and preview.
   const isAdmin = useIsAdmin()
@@ -268,11 +270,10 @@ export function ReportWizard({ data, facets, initial, onRestart }: { data: Repor
     if (active === STEP_META.length - 1) {
       setGenerating(true)
       try {
-        const generated = await guard(() => generateReportFrom(draft, keep || draft.schedule !== null))
+        const generated = await guard(() => generate.mutateAsync([draft, keep || draft.schedule !== null]))
         // A failed generate stays on this step, saying why.
         if (!generated) return
         setResult(generated)
-        await router.invalidate()
       } finally {
         setGenerating(false)
       }

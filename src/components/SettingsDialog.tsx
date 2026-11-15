@@ -32,12 +32,14 @@ import { Token } from '@astryxdesign/core/Token'
 import { IconButton } from '@astryxdesign/core/IconButton'
 import { Icon } from '@astryxdesign/core/Icon'
 import { useMediaQuery } from '@astryxdesign/core/hooks'
-import { useNavigate, useRouter } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { ContainerStateLabel } from './FeedState'
 import { CONTROL_WIDTH, PanelColumn, PanelRow, PinnedClose, SettingsCard, SettingsPanelHeading, SettingsPanelTabs, SettingsRow, SettingsSearchInput, SettingsGrid, SettingsSearchResults, SettingsSideNav, ThemeChoiceCards, useSettingsSearch } from './settings/parts'
 import { isAdminPanel, panelOf } from './settings/registry'
 import type { PaneId } from './settings/registry'
-import { getServiceLogs, getSettings, rollbackConfig, runServiceAction, saveConfigSection, savePreferences, validateConfig } from '#/data/queries'
+import { getServiceLogs, validateConfig } from '#/data/queries'
+import { rollbackConfigWrite, runServiceActionWrite, saveConfigSectionWrite, savePreferencesWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { AuditEntry, ConfigProblems, ConfigRevision, ConfigSection, DashboardConfig, EsStorage, Palette, Preferences, ServiceLogs, ServiceStatus, SettingsData, AstryxTheme } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { NAV_SECTIONS } from '#/lib/nav'
@@ -50,7 +52,7 @@ import { prefetchEnabled, setPrefetchEnabled } from '#/lib/prefetch'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { DEFAULT_TITLE_FORMAT, formatTitle } from '#/lib/title'
 import { useQueryClient } from '@tanstack/react-query'
-import { preferencesQuery } from '#/data/resources'
+import { settingsQuery } from '#/data/resources'
 import { useIsAdmin, useShellConfig } from '#/lib/session'
 import { accountLinks } from '#/lib/toolLinks'
 import { useGuardedAction } from '#/lib/useGuardedAction'
@@ -79,7 +81,9 @@ const useSettings = () => useContext(SettingsContext)!
  * (the config store's persist-nothing preview), revert and save. */
 function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: TSection) {
   const { data, reload, setDirty } = useSettings()
-  const router = useRouter()
+  // Saving invalidates the settings and shell configuration reads, then the
+  // routes re-run (data/writes.ts): the shell renders with it at once.
+  const save = useDataMutation(saveConfigSectionWrite())
   const saved = data.config[section]
   const [form, setForm] = useState(saved)
   const [problems, setProblems] = useState<ConfigProblems>({})
@@ -133,9 +137,8 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
             setBusy(true)
             try {
               await guard(async () => {
-                const result = await saveConfigSection(section, form, fields)
-                // The shell renders with this config too: refresh it at once.
-                if (result.ok) await Promise.all([reload(), router.invalidate()])
+                const result = await save.mutateAsync([section, form, fields])
+                if (result.ok) await reload()
                 else setProblems(result.problems)
               })
             } finally {
@@ -692,6 +695,7 @@ function ServiceLogsDialog({ name, onClose }: { name: string | null; onClose: ()
 
 function ServicesPanel() {
   const { data, reload } = useSettings()
+  const runService = useDataMutation(runServiceActionWrite())
   const [busy, setBusy] = useState<string | null>(null)
   const [logsOf, setLogsOf] = useState<string | null>(null)
   const { error, guard } = useGuardedAction()
@@ -700,7 +704,7 @@ function ServicesPanel() {
     setBusy(name)
     try {
       await guard(async () => {
-        await runServiceAction(name, action)
+        await runService.mutateAsync([name, action])
         await reload()
       })
     } finally {
@@ -742,7 +746,7 @@ function ServicesPanel() {
 }
 
 function HistoryPanel() {
-  const router = useRouter()
+  const rollback = useDataMutation(rollbackConfigWrite())
   const { data, reload } = useSettings()
   const [target, setTarget] = useState<ConfigRevision | null>(null)
   const [busy, setBusy] = useState(false)
@@ -781,8 +785,8 @@ function HistoryPanel() {
                         setBusy(true)
                         try {
                           await guard(async () => {
-                            await rollbackConfig(target.id)
-                            await Promise.all([reload(), router.invalidate()])
+                            await rollback.mutateAsync([target.id])
+                            await reload()
                           })
                         } finally {
                           setBusy(false)
@@ -879,9 +883,11 @@ export function AdminPanelView({ pane, initial }: { pane: PaneId; initial: Setti
   // The route loaded it; saving reloads it here.
   const [data, setData] = useState<SettingsData>(initial)
   useEffect(() => setData(initial), [initial])
+  const queryClient = useQueryClient()
+  // Through the cache: a write has just invalidated it, so this asks again.
   const reload = useCallback(async () => {
-    setData(await getSettings())
-  }, [])
+    setData(await queryClient.query(settingsQuery()))
+  }, [queryClient])
   // Administration changes save per panel (Save / Revert); nothing personal
   // is edited here.
   const noop = useCallback(() => {}, [])
@@ -906,8 +912,8 @@ export function AdminPanelView({ pane, initial }: { pane: PaneId; initial: Setti
 export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId; onPane: (pane: PaneId) => void; onClose: () => void }) {
   const titleId = useId()
   const navigate = useNavigate()
-  const router = useRouter()
   const queryClient = useQueryClient()
+  const savePrefs = useDataMutation(savePreferencesWrite())
   // The administration panels live on their own page (/admin): an old link
   // to one takes an admin there, and anyone else to their own account.
   const isAdmin = useIsAdmin()
@@ -925,10 +931,10 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
   const saveTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const reload = useCallback(async () => {
-    const next = await getSettings()
+    const next = await queryClient.query(settingsQuery())
     setData(next)
     setPrefs((current) => current ?? next.preferences)
-  }, [])
+  }, [queryClient])
   useEffect(() => {
     void reload()
   }, [reload])
@@ -951,15 +957,13 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
       clearTimeout(saveTimer.current)
       setSaveState('saving')
       saveTimer.current = setTimeout(() => {
-        void savePreferences(next)
-          .then(async () => {
-            setSaveState('saved')
-            // The whole app renders with these: apply them now, the
-            // navigation guard's copy included.
-            await queryClient.invalidateQueries({ queryKey: preferencesQuery().queryKey })
-            await router.invalidate()
-          })
-          .catch(() => setSaveState('failed'))
+        // The whole app shows them at once (an optimistic write to the
+        // cached preferences, rolled back if the save is refused), then the
+        // routes re-run with them (data/writes.ts).
+        savePrefs.mutateAsync(next).then(
+          () => setSaveState('saved'),
+          () => setSaveState('failed'),
+        )
       }, 400)
       return next
     })

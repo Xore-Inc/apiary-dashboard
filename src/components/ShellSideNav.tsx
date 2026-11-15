@@ -18,7 +18,10 @@ import { useLocation } from '@tanstack/react-router'
 import type { SessionUser, ShellConfig } from '#/data/types'
 import { NAV_SECTIONS, navHrefFor } from '#/lib/nav'
 import { usePreferences } from '#/lib/prefs'
-import { savePreferences } from '#/data/queries'
+import { useQueryClient } from '@tanstack/react-query'
+import { preferencesQuery } from '#/data/resources'
+import { savePreferencesWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { hrefForRecent, labelForRecent, useRecentInvestigations } from '#/lib/recent'
 
 function AccountMenu({ user, onOpenSettings }: { user: SessionUser; onOpenSettings: () => void }) {
@@ -47,6 +50,14 @@ function AccountMenu({ user, onOpenSettings }: { user: SessionUser; onOpenSettin
 
 export function ShellSideNav({ user, config, onOpenSettings, actions }: { user: SessionUser; config: ShellConfig; onOpenSettings: () => void; actions?: ReactNode }) {
   const prefs = usePreferences()
+  const queryClient = useQueryClient()
+  const savePrefs = useDataMutation(savePreferencesWrite())
+  // The stored preferences, not usePreferences' resolved view (its "browser"
+  // time zone is already a zone): saving that would pin the zone.
+  const collapse = (collapsedSidebar: boolean) => {
+    const stored = queryClient.getQueryData(preferencesQuery().queryKey)
+    if (stored) savePrefs.mutate({ ...stored, collapsedSidebar })
+  }
   const pathname = useLocation({ select: (location) => location.pathname })
   const activeHref = navHrefFor(pathname)
   const recent = useRecentInvestigations()
@@ -56,7 +67,7 @@ export function ShellSideNav({ user, config, onOpenSettings, actions }: { user: 
     <SideNav
       // Collapsing is remembered: it is the same preference as Settings'
       // "Start with the sidebar collapsed".
-      collapsible={{ defaultIsCollapsed: prefs?.collapsedSidebar ?? false, onCollapsedChange: (collapsedSidebar) => prefs && void savePreferences({ ...prefs, collapsedSidebar }) }}
+      collapsible={{ defaultIsCollapsed: prefs?.collapsedSidebar ?? false, onCollapsedChange: collapse }}
       resizable={{ defaultWidth: 260, minWidth: 220, maxWidth: 360 }}
       footer={
         <SideNavSection title="Account" isHeaderHidden>

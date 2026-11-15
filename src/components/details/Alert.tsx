@@ -1,22 +1,22 @@
 import { ActionLink } from '#/components/ActionLink'
-import { useState } from 'react'
 import { Button } from '@astryxdesign/core/Button'
 import { List, ListItem } from '@astryxdesign/core/List'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { HStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { useRouter } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
-import { setAlertsAcknowledged } from '#/data/queries'
+import { acknowledgeAlertsWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { AlertGroup } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 
 export function AckButton({ group }: { group: AlertGroup }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
+  // Shown at once (the lists, the detail and the bell), rolled back if the
+  // backend refuses (lib/mutation.ts).
+  const acknowledge = useDataMutation(acknowledgeAlertsWrite())
   const { error, guard } = useGuardedAction()
   const keys = group.members.map((m) => m.key)
   const button = (
@@ -30,18 +30,8 @@ export function AckButton({ group }: { group: AlertGroup }) {
       }
       size="sm"
       variant="secondary"
-      isLoading={busy}
-      onClick={async () => {
-        setBusy(true)
-        try {
-          await guard(async () => {
-            await setAlertsAcknowledged(keys, !group.acknowledged)
-            await router.invalidate()
-          })
-        } finally {
-          setBusy(false)
-        }
-      }}
+      isLoading={acknowledge.isPending}
+      onClick={() => void guard(() => acknowledge.mutateAsync({ keys, acknowledged: !group.acknowledged }))}
     />
   )
   return error ? (

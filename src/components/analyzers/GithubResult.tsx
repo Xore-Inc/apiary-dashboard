@@ -13,7 +13,8 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { Panel, StatTile } from '../DashboardBlocks'
 import { AnalyzerSection } from './AnalyzerSection'
-import { queuePayloadAction } from '#/data/queries'
+import { queuePayloadActionWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { GithubStatus, GithubAnalysis } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { EntityLink } from '../EntityLink'
@@ -29,6 +30,8 @@ const STATUS_BANNER: Record<Exclude<GithubStatus, 'published'>, { title: string;
 const VERDICT_COLOR = { malicious: 'red', suspicious: 'orange', undetected: 'gray' } as const
 
 export function GithubResult({ g }: { g: GithubAnalysis }) {
+  // Queuing invalidates the payload's analysis reads (data/writes.ts).
+  const queue = useDataMutation(queuePayloadActionWrite())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const isAdmin = useIsAdmin()
   const { error, guard, clearError } = useGuardedAction()
@@ -120,7 +123,7 @@ export function GithubResult({ g }: { g: GithubAnalysis }) {
         actionLabel="Resubmit"
         onAction={async () => {
           setConfirmOpen(false)
-          setQueued((await guard(() => queuePayloadAction(g.sha, 'github'))) ?? null)
+          setQueued((await guard(() => queue.mutateAsync([g.sha, 'github']))) ?? null)
         }}
       />
     </AnalyzerSection>

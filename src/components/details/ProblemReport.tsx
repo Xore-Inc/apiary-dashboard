@@ -4,14 +4,14 @@ import { List, ListItem } from '@astryxdesign/core/List'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { Selector } from '@astryxdesign/core/Selector'
 import { VStack } from '@astryxdesign/core/Stack'
-import { useRouter } from '@tanstack/react-router'
-import { setProblemStatus } from '#/data/queries'
+import { setProblemStatusWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { describeError } from '#/lib/actionError'
 import { useIsAdmin } from '#/lib/session'
 import type { ProblemReport, ProblemStatus } from '#/data/types'
 
 export function ReportInspector({ report }: { report: ProblemReport }) {
-  const router = useRouter()
+  const setStatus = useDataMutation(setProblemStatusWrite())
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
   const isAdmin = useIsAdmin()
@@ -27,8 +27,7 @@ export function ReportInspector({ report }: { report: ProblemReport }) {
           setBusy(true)
           setError(undefined)
           try {
-            await setProblemStatus(report.id, status as ProblemStatus)
-            await router.invalidate()
+            await setStatus.mutateAsync([report.id, status as ProblemStatus])
           } catch (e) {
             setError(describeError(e))
           } finally {
