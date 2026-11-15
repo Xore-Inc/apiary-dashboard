@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EvidenceLink } from '#/components/details/LlmAnalysis'
@@ -9,14 +8,15 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getLlmAnalysis } from '#/data/queries'
 import { formatDateTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { llmAnalysisQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/llm-analysis/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'LLM analysis views', basePath: (params) => `/llm-analysis/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getLlmAnalysis(params.id)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, llmAnalysisQuery(params.id))
     if (!detail) throw notFound()
     return detail
   },
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/_layout/llm-analysis/$id')({
 })
 
 function LlmLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(llmAnalysisQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const a = loaded?.analysis
   return (

@@ -10,7 +10,7 @@ const parent = getRouteApi('/_layout/asn/$asn')
 
 export const Route = createFileRoute('/_layout/asn/$asn/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context.queryClient, relatedQuery('asn', params.asn)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('asn', params.asn)),
   component: TabView,
   pendingComponent: TabView,
 })

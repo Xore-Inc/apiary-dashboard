@@ -1,5 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
+import { ensureAll, usePageQueries } from '#/lib/query'
 import { useState } from 'react'
 import { HStack } from '@astryxdesign/core/Stack'
 import { pixel, proportional } from '@astryxdesign/core/Table'
@@ -10,7 +10,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { IocLookup } from '#/components/IocLookup'
 import { RecordList } from '#/components/RecordList'
 import { searchTabs } from '#/components/ViewTabs'
-import { getIocCatalog, getNetworkCampaigns, getSourceProfiles } from '#/data/queries'
+import { iocCatalogQuery, networkCampaignsQuery, sourceProfilesQuery } from '#/data/resources'
 import type { IocHubKind, IocRow } from '#/data/types'
 import { iocHref } from '#/lib/entities'
 import { IOC_KINDS, iocKindTab } from '#/lib/navFamilies'
@@ -29,16 +29,21 @@ const LEDES: Record<(typeof IOC_KINDS)[number]['id'], string> = {
 const KINDS = IOC_KINDS.map((k) => ({ ...k, lede: LEDES[k.id] }))
 const isKind = (value: unknown): value is IocHubKind => KINDS.some((k) => k.id === value)
 
+const reads = () => [iocCatalogQuery(), sourceProfilesQuery(), networkCampaignsQuery()] as const
+
+/** The catalog, and a few values to try from the fleet's own data. */
+const withExamples = ([catalog, { sources }, { campaigns }]: Awaited<ReturnType<typeof ensureAll<ReturnType<typeof reads>>>>) => ({
+  catalog,
+  examples: [sources[0]?.ip, campaigns[0]?.cidr, catalog.hash[0]?.value, catalog.cve[0]?.value, catalog.credential[0]?.value].filter((v): v is string => Boolean(v)),
+})
+
 export const Route = createFileRoute('/_layout/iocs')({
   ssr: pageSsr,
   staticData: { viewTabs: searchTabs({ label: 'Indicator kinds', param: 'kind', tabs: (loaded) => IOC_KINDS.map((k) => iocKindTab(k, (loaded as { catalog?: Record<string, unknown[]> } | undefined)?.catalog?.[k.id].length)) }) },
   validateSearch: (search: Record<string, unknown>): { kind?: IocHubKind } => ({
     kind: isKind(search.kind) && search.kind !== 'hash' ? search.kind : undefined,
   }),
-  loader: async () => {
-    const [catalog, { sources }, { campaigns }] = await Promise.all([getIocCatalog(), getSourceProfiles(), getNetworkCampaigns()])
-    return { catalog, examples: [sources[0]?.ip, campaigns[0]?.cidr, catalog.hash[0]?.value, catalog.cve[0]?.value, catalog.credential[0]?.value].filter((v): v is string => Boolean(v)) }
-  },
+  loader: async ({ context }) => withExamples(await ensureAll(context, reads())),
   component: IocsPage,
   pendingComponent: IocsPage,
 })
@@ -53,7 +58,7 @@ const columns: TableColumn<IocRow>[] = [
 
 /** Every indicator in one place, by kind; each opens its own page. */
 function IocsPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQueries(reads(), withExamples)
   const { kind = 'hash' } = Route.useSearch()
   const [filter, setFilter] = useState('')
   const current = KINDS.find((k) => k.id === kind)!

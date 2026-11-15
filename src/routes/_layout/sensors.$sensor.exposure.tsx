@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
@@ -8,6 +7,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
+import { useSensorPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_layout/sensors/$sensor/exposure')({ ssr:
 
 /** How the internet reaches this sensor: ingress path, names, and ports. */
 function SensorExposure() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = useSensorPage(parent.useParams().sensor)
   const exposure = loaded?.exposure
   if (!exposure) return <Text type="supporting">This sensor is not in the fleet topology.</Text>
   return (

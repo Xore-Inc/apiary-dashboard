@@ -1,28 +1,27 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
-import { getRelated } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { GroupOverview } from '#/components/EntityBlocks'
+import { ensure, usePageQuery } from '#/lib/query'
+import { campaignQuery, relatedQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/campaigns/$cidr')
 
 export const Route = createFileRoute('/_layout/campaigns/$cidr/')({
   ssr: pageSsr,
-  loader: ({ params }) => backendGapOf(getRelated('campaign', params.cidr)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('campaign', params.cidr)),
   component: CampaignOverview,
   pendingComponent: CampaignOverview,
 })
 
 function CampaignOverview() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = usePageQuery(campaignQuery(parent.useParams().cidr))
   const c = loaded?.campaign
   const { cidr } = parent.useParams()
   const group = loaded?.group
@@ -46,7 +45,7 @@ function CampaignOverview() {
         </HStack>
       </Panel>
       <GroupOverview group={group} base={`/campaigns/${encodeURIComponent(cidr)}`} sourcesTab="sources" />
-      <RelatedPanel center={cidr} groups={orPending(Route.useLoaderData())} />
+      <RelatedPanel center={cidr} groups={usePageQuery(relatedQuery('campaign', Route.useParams().cidr))} />
     </VStack>
   )
 }

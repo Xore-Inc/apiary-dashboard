@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { VStack } from '@astryxdesign/core/Stack'
@@ -8,18 +7,19 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { SourcesTable } from '#/components/EntityBlocks'
 import { EntityLink } from '#/components/EntityLink'
-import { getSourceNetwork } from '#/data/queries'
 import { formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sourceNetworkQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/sources/$ip/network')({
   ssr: pageSsr,
-  loader: ({ params }) => getSourceNetwork(params.ip),
+  loader: ({ params, context }) => ensure(context, sourceNetworkQuery(params.ip)),
   component: SourceNetworkTab,
   pendingComponent: SourceNetworkTab,
 })
 
 function SourceNetworkTab() {
-  const net = orPending(Route.useLoaderData())
+  const net = usePageQuery(sourceNetworkQuery(Route.useParams().ip))
   if (!net) return <Text type="supporting">No network data for this address.</Text>
   return (
     <VStack gap={4}>

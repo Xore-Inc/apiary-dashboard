@@ -12,15 +12,15 @@ import { ContainerStateLabel, FeedStateLabel } from '#/components/FeedState'
 import { PageFrame } from '#/components/PageFrame'
 import { SkeletonBlock, SkeletonPanels } from '#/components/EntityBlocks'
 import { SkeletonTable } from '#/components/SkeletonTable'
-import { orPending } from '#/lib/pending'
 import { Pending } from '#/components/Pending'
-import { getTopology } from '#/data/queries'
 import type { TopologySensor } from '#/data/types'
 import { EntityLink } from '#/components/EntityLink'
+import { ensure, usePageQuery } from '#/lib/query'
+import { topologyQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/topology')({
   ssr: pageSsr,
-  loader: () => getTopology(),
+  loader: ({ context }) => ensure(context, topologyQuery()),
   component: TopologyPage,
   pendingComponent: TopologyPage,
 })
@@ -66,7 +66,7 @@ const exposureColumns: TableColumn<TopologySensor>[] = [
 ]
 
 function TopologyPage() {
-  const topology = orPending(Route.useLoaderData())
+  const topology = usePageQuery(topologyQuery())
   const containers = topology?.stacks.reduce((sum, s) => sum + s.containers.length, 0)
 
   return (

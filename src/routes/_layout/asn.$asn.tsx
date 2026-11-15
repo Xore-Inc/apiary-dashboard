@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_layout/asn/$asn')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Autonomous system views', basePath: (params) => `/asn/${encodeURIComponent(params.asn)}`, tabs: tabsFor }) },
   loader: async ({ params, context }) => {
-    const asn = await ensure(context.queryClient, asnQuery(params.asn))
+    const asn = await ensure(context, asnQuery(params.asn))
     if (!asn) throw notFound()
     return asn
   },

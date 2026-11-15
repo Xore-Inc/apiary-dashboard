@@ -1,11 +1,12 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
+import { usePageQuery } from '#/lib/query'
+import { anomalyQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/ml-anomalies/$id')
 
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_layout/ml-anomalies/$id/scores')({
 
 /** Each detector's say in the composite score. */
 function AnomalyScores() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = usePageQuery(anomalyQuery(parent.useParams().id))
   if (!loaded) return <SkeletonPanels count={1} lines={4} />
   const a = loaded.anomaly
   const rows = [

@@ -1,20 +1,20 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getCluster } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { clusterQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/clusters/$kind/$value')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Infrastructure cluster views', basePath: (params) => `/clusters/${params.kind}/${encodeURIComponent(params.value)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const cluster = await getCluster(params.kind, params.value)
+  loader: async ({ params, context }) => {
+    const cluster = await ensure(context, clusterQuery(params.kind, params.value))
     if (!cluster) throw notFound()
     return cluster
   },
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/_layout/clusters/$kind/$value')({
 })
 
 function ClusterLayout() {
-  const c = orPending(Route.useLoaderData())
+  const c = usePageQuery(clusterQuery(Route.useParams().kind, Route.useParams().value))
   const { value } = Route.useParams()
   return (
     <EntityFrame

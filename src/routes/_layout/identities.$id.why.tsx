@@ -1,25 +1,25 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { FusionRadar } from '#/components/charts'
 import { Panel } from '#/components/DashboardBlocks'
 import { SharedSignalsTable } from '#/components/EntityBlocks'
-import { getIdentityFusion } from '#/data/queries'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
+import { ensure, usePageQuery } from '#/lib/query'
+import { identityFusionQuery, identityQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/identities/$id')
 
 export const Route = createFileRoute('/_layout/identities/$id/why')({
   ssr: pageSsr,
-  loader: ({ params }) => getIdentityFusion(params.id),
+  loader: ({ params, context }) => ensure(context, identityFusionQuery(params.id)),
   component: TabView,
   pendingComponent: TabView,
 })
 
 function TabView() {
-    const d = orPending(parent.useLoaderData())
-    const fusion = Route.useLoaderData()
+    const d = usePageQuery(identityQuery(parent.useParams().id))
+    const fusion = usePageQuery(identityFusionQuery(parent.useParams().id))
     return (
       <VStack gap={4}>
         <Panel title="Fingerprint fusion: why these addresses merged">

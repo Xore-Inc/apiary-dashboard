@@ -1,11 +1,12 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable, Panel, StatTile } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
+import { usePageQuery } from '#/lib/query'
+import { replayDetailQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/recordings/$shasum')
 
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_layout/recordings/$shasum/attacker')({
 
 /** Everything else the address behind this recording did. */
 function RecordingAttacker() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = usePageQuery(replayDetailQuery(parent.useParams().shasum))
   const attacker = loaded?.attacker
   if (!attacker)
     return (

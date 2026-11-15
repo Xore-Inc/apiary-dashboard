@@ -1,18 +1,22 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { ReportInspector } from '#/components/details/ProblemReport'
-import { getProblemReports } from '#/data/queries'
+import { problemReportsQuery } from '#/data/resources'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
 import { formatDateTime } from '#/lib/format'
 
+/** The report the page is about, from the list's read. */
+const pick = (data: ResourceData<typeof problemReportsQuery>, id: string) => data.find((r) => r.id === id)
+
 export const Route = createFileRoute('/_layout/problem-reports/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const row = (await getProblemReports()).find((r) => r.id === params.id)
+  loader: async ({ params, context }) => {
+    const row = pick(await ensure(context, problemReportsQuery()), params.id)
     if (!row) throw notFound()
     return row
   },
@@ -27,8 +31,9 @@ export const Route = createFileRoute('/_layout/problem-reports/$id')({
 })
 
 function ProblemReportPage() {
-  const d = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const list = usePageQuery(problemReportsQuery())
+  const d = list && pick(list, id)
   return (
     <EntityFrame
       kind="Problem report"

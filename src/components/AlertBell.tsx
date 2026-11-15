@@ -1,23 +1,25 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Badge } from '@astryxdesign/core/Badge'
 import { Button } from '@astryxdesign/core/Button'
 import { Icon } from '@astryxdesign/core/Icon'
 import { HStack } from '@astryxdesign/core/Stack'
 import { BellIcon } from '@heroicons/react/24/outline'
 import { useLocation } from '@tanstack/react-router'
-import { getOpenAlertCount } from '#/data/queries'
+import { openAlertCountQuery } from '#/data/resources'
 import { useLiveInterval } from '#/lib/live'
 
 /** Open alerts, as the canonical bell counts them: every minute while live
- * is on, and after each navigation (acknowledging on /alerts lowers it). */
+ * is on, and on a navigation once the count is older than its freshness
+ * window (lib/query.ts). Acknowledging invalidates it, so it drops at once. */
 function useOpenAlertCount(pathname: string): number | null {
-  const [count, setCount] = useState<number | null>(null)
-  const refresh = useCallback(() => {
-    getOpenAlertCount().then(setCount, () => setCount(null))
-  }, [])
+  const queryClient = useQueryClient()
+  const { data, isError } = useQuery(openAlertCountQuery())
+  const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: openAlertCountQuery().queryKey }, { cancelRefetch: false }), [queryClient])
   useLiveInterval(refresh, 60_000)
-  useEffect(refresh, [refresh, pathname])
-  return count
+  // query() is a no-op while the count is fresh.
+  useEffect(() => void queryClient.query(openAlertCountQuery()).catch(() => {}), [queryClient, pathname])
+  return isError || data === undefined ? null : data
 }
 
 /** The top bar's bell: the open-alert count, and the way to Alerts. */

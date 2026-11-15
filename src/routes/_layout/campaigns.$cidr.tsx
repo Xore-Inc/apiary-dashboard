@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
@@ -7,14 +6,15 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
-import { getCampaign } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { campaignQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/campaigns/$cidr')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Campaign views', basePath: (params) => `/campaigns/${encodeURIComponent(params.cidr)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const campaign = await getCampaign(params.cidr)
+  loader: async ({ params, context }) => {
+    const campaign = await ensure(context, campaignQuery(params.cidr))
     if (!campaign) throw notFound()
     return campaign
   },
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/_layout/campaigns/$cidr')({
 })
 
 function CampaignLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(campaignQuery(Route.useParams().cidr))
   const { cidr } = Route.useParams()
   const c = loaded?.campaign
   return (

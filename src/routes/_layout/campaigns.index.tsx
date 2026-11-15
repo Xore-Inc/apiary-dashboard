@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Button } from '@astryxdesign/core/Button'
 import { Icon } from '@astryxdesign/core/Icon'
 import { Link } from '@astryxdesign/core/Link'
@@ -14,14 +13,15 @@ import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
-import { getNetworkCampaigns } from '#/data/queries'
 import type { CredEdge, NetworkCampaign } from '#/data/types'
 import { apiHref } from '#/lib/apiHref'
 import { formatNumber, formatTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { networkCampaignsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/campaigns/')({
   ssr: pageSsr,
-  loader: () => getNetworkCampaigns(),
+  loader: ({ context }) => ensure(context, networkCampaignsQuery()),
   component: CampaignsPage,
   pendingComponent: CampaignsPage,
 })
@@ -53,7 +53,7 @@ const credColumns: TableColumn<CredEdge>[] = [
 
 
 function CampaignsPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(networkCampaignsQuery())
   const campaigns = data?.campaigns
   const credReuse = data?.credReuse ?? []
   return (

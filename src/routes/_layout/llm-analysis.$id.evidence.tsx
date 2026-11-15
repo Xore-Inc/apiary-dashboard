@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { EventsPanel } from '#/components/DetailBlocks'
+import { usePageQuery } from '#/lib/query'
+import { llmAnalysisQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/llm-analysis/$id')
 
@@ -15,7 +16,7 @@ function TabView() {
   return (
     <EventsPanel
       title="The events the model read"
-      events={orPending(parent.useLoaderData())?.events}
+      events={usePageQuery(llmAnalysisQuery(parent.useParams().id))?.events}
       showSource
       empty="This analysis aggregates many sources; it has no single set of events."
     />

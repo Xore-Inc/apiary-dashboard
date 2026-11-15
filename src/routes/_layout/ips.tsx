@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { Button } from '@astryxdesign/core/Button'
 import { Grid } from '@astryxdesign/core/Grid'
@@ -15,15 +14,16 @@ import { createFileRoute } from '@tanstack/react-router'
 import { CountTable, Panel, StatTile } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
 import { WorldMap } from '#/components/WorldMap'
-import { getSourceProfiles } from '#/data/queries'
 import type { SourceProfile } from '#/data/types'
 import { entityHref } from '#/lib/entities'
 import { apiHref } from '#/lib/apiHref'
 import { formatNumber, formatTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sourceProfilesQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/ips')({
   ssr: pageSsr,
-  loader: () => getSourceProfiles(),
+  loader: ({ context }) => ensure(context, sourceProfilesQuery()),
   component: SourcesPage,
   pendingComponent: SourcesPage,
 })
@@ -42,7 +42,7 @@ const columns: TableColumn<SourceProfile>[] = [
 /** Where attacks come from, then every source as one scannable row that
  * opens its page. */
 function SourcesPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(sourceProfilesQuery())
   const sources = data?.sources
   const mapPoints = data?.mapPoints
   const [filter, setFilter] = useState('')

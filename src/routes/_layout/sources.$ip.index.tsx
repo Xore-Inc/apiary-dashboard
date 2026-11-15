@@ -1,27 +1,26 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { Grid } from '@astryxdesign/core/Grid'
 import { VStack } from '@astryxdesign/core/Stack'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
-import { getRelated } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
 import { StatTile } from '#/components/DashboardBlocks'
 import { EventsPanel } from '#/components/DetailBlocks'
 import { osGuessCaption } from '#/components/EntityBlocks'
+import { ensure, usePageQuery } from '#/lib/query'
+import { ipProfileQuery, relatedQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/sources/$ip')
 
 export const Route = createFileRoute('/_layout/sources/$ip/')({
   ssr: pageSsr,
-  loader: ({ params }) => backendGapOf(getRelated('source', params.ip)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('source', params.ip)),
   component: SourceOverview,
   pendingComponent: SourceOverview,
 })
 
 function SourceOverview() {
-  const p = orPending(parent.useLoaderData())
+  const p = usePageQuery(ipProfileQuery(parent.useParams().ip))
   const { ip } = parent.useParams()
   const base = `/sources/${ip}`
   return (
@@ -35,7 +34,7 @@ function SourceOverview() {
         <StatTile label="ATT&CK techniques" value={p?.techniques.length} href={`${base}/behavior`} />
       </Grid>
       <EventsPanel title="Newest events" events={p?.events.slice(0, 5)} action={<ActionLink href={`${base}/events`}>All events</ActionLink>} />
-      <RelatedPanel center={parent.useParams().ip} groups={orPending(Route.useLoaderData())} />
+      <RelatedPanel center={parent.useParams().ip} groups={usePageQuery(relatedQuery('source', Route.useParams().ip))} />
     </VStack>
   )
 }

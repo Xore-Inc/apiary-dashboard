@@ -3,6 +3,7 @@
 // metadata, never offered as bytes, so this is neither a script sink nor a
 // malware source.
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
 import { CodeBlock } from '@astryxdesign/core/CodeBlock'
@@ -16,7 +17,7 @@ import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { EnvelopeIcon } from '@heroicons/react/24/outline'
-import { getMail } from '#/data/queries'
+import { mailQuery } from '#/data/resources'
 import type { CapturedMail, MailAddress } from '#/data/types'
 import { formatNumber } from '#/lib/format'
 
@@ -73,28 +74,19 @@ export function MailMessage({ mail }: { mail: CapturedMail }) {
 type Loaded = { state: 'mail'; mail: CapturedMail } | { state: 'missing' } | { state: 'failed' }
 
 /** Fetched when asked for: the body lives behind a separate index, and a
- * list of sessions should not pay for every message nobody opens. */
+ * list of sessions should not pay for every message nobody opens. Once
+ * fetched it is kept with the session page's own read of it. */
 export function CapturedMailInline({ sessionId, openInitially = false }: { sessionId: string; openInitially?: boolean }) {
-  const [loaded, setLoaded] = useState<Loaded | 'loading' | null>(null)
-  const load = async () => {
-    setLoaded('loading')
-    try {
-      const mail = await getMail(sessionId)
-      setLoaded(mail ? { state: 'mail', mail } : { state: 'missing' })
-    } catch {
-      setLoaded({ state: 'failed' })
-    }
-  }
+  const [asked, setAsked] = useState(openInitially)
+  const { data, isError, refetch } = useQuery({ ...mailQuery(sessionId), enabled: asked })
+  const load = () => (asked ? void refetch() : setAsked(true))
+  const loaded: Loaded | 'loading' | null = !asked ? null : isError ? { state: 'failed' } : data === undefined ? 'loading' : data ? { state: 'mail', mail: data } : { state: 'missing' }
   if (loaded === null) {
-    if (openInitially) {
-      void load()
-      return <Skeleton height={160} />
-    }
-    return <Button label="Show captured message" size="sm" variant="secondary" icon={<Icon icon={EnvelopeIcon} size="sm" />} onClick={() => void load()} />
+    return <Button label="Show captured message" size="sm" variant="secondary" icon={<Icon icon={EnvelopeIcon} size="sm" />} onClick={() => load()} />
   }
   if (loaded === 'loading') return <Skeleton height={160} />
   if (loaded.state === 'failed')
-    return <EmptyState title="The captured message failed to load" description="The request failed. This says nothing either way about whether a body was captured." actions={<Button label="Try again" size="sm" onClick={() => void load()} />} />
+    return <EmptyState title="The captured message failed to load" description="The request failed. This says nothing either way about whether a body was captured." actions={<Button label="Try again" size="sm" onClick={() => load()} />} />
   if (loaded.state === 'missing') return <Text type="supporting">No message body was captured for this session: the client stopped after the envelope.</Text>
   return <MailMessage mail={loaded.mail} />
 }

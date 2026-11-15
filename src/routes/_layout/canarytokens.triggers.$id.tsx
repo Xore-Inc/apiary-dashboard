@@ -1,22 +1,24 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { TriggerInspector } from '#/components/details/Canary'
-import { getCanarytokens } from '#/data/queries'
+import { canarytokensQuery } from '#/data/resources'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
 import { formatDateTime } from '#/lib/format'
 
+/** The trigger the page is about, from the tokens' read. */
+const pick = (data: ResourceData<typeof canarytokensQuery>, id: string) => data.triggers.find((t) => t.id === id)
+
 export const Route = createFileRoute('/_layout/canarytokens/triggers/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const trigger = (await getCanarytokens()).triggers.find(
-      (t) => t.id === params.id,
-    )
-    if (!trigger) throw notFound()
-    return trigger
+  loader: async ({ params, context }) => {
+    const row = pick(await ensure(context, canarytokensQuery()), params.id)
+    if (!row) throw notFound()
+    return row
   },
   notFoundComponent: () => (
     <NotFound
@@ -29,8 +31,9 @@ export const Route = createFileRoute('/_layout/canarytokens/triggers/$id')({
 })
 
 function CanaryTriggerPage() {
-  const d = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const list = usePageQuery(canarytokensQuery())
+  const d = list && pick(list, id)
   return (
     <EntityFrame
       kind="Canarytoken trigger"

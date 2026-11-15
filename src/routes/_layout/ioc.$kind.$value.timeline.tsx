@@ -1,18 +1,17 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { createFileRoute } from '@tanstack/react-router'
 import { Timeline } from '#/components/EntityBlocks'
-import { getEntityTimeline } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
+import { ensure, usePageQuery } from '#/lib/query'
+import { entityTimelineQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/ioc/$kind/$value/timeline')({
   ssr: pageSsr,
   loaderDeps: ({ search }) => ({ range: search.range }),
-  loader: ({ params, deps }) => backendGapOf(getEntityTimeline('ioc', `${params.kind}:${params.value}`, deps.range)),
+  loader: ({ params, deps, context }) => ensure(context, entityTimelineQuery('ioc', `${params.kind}:${params.value}`, deps.range)),
   component: TabView,
   pendingComponent: TabView,
 })
 
 function TabView() {
-  return <Timeline items={orPending(Route.useLoaderData())} />
+  return <Timeline items={usePageQuery(entityTimelineQuery('ioc', `${Route.useParams().kind}:${Route.useParams().value}`, Route.useLoaderDeps().range))} />
 }

@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { CodeBlock } from '@astryxdesign/core/CodeBlock'
 import { Grid } from '@astryxdesign/core/Grid'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
@@ -9,27 +8,27 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
-import { getRelated } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
 import { Panel } from '#/components/DashboardBlocks'
 import { EventsPanel, attckUrl } from '#/components/DetailBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { CredentialStateToken } from '#/components/CredentialStateToken'
 import { credentialStateOf } from '#/lib/credentialState'
 import { fieldBlock, readField } from '#/lib/sensorFields'
+import { ensure, usePageQuery } from '#/lib/query'
+import { eventDetailQuery, relatedQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/events/$id')
 
 export const Route = createFileRoute('/_layout/events/$id/')({
   ssr: pageSsr,
-  loader: ({ params }) => backendGapOf(getRelated('event', params.id)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('event', params.id)),
   component: EventOverview,
   pendingComponent: EventOverview,
 })
 
 function EventOverview() {
-  const loaded = orPending(parent.useLoaderData())
-  const related = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(eventDetailQuery(parent.useParams().id))
+  const related = usePageQuery(relatedQuery('event', Route.useParams().id))
   // Its panels as skeletons until the event is here.
   if (!loaded) return <SkeletonPanels count={4} />
   const event = loaded.event

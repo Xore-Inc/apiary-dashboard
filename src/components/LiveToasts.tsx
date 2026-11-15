@@ -12,7 +12,8 @@ import { Link } from '@astryxdesign/core/Link'
 import { HStack } from '@astryxdesign/core/Stack'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { useToast } from '@astryxdesign/core/Toast'
-import { getSettings, getSourceHealth } from '#/data/queries'
+import { settingsQuery, sourceHealthQuery } from '#/data/resources'
+import { useQueryClient } from '@tanstack/react-query'
 import { HEALTH_CHANGED } from '#/data/incidents'
 import type { SourceHealth } from '#/data/types'
 import { conditionsFrom, transitions } from '#/lib/healthConditions'
@@ -27,18 +28,20 @@ const TOAST_MS = 12_000
 const DOT = { warning: 'warning', danger: 'error', success: 'success' } as const
 
 export function LiveToasts() {
+  const queryClient = useQueryClient()
   const toast = useToast()
   const known = useRef<Map<string, Condition>>(new Map())
   const primed = useRef(false)
   const prefs = useRef({ enabled: true, seconds: 60 })
 
   useEffect(() => {
-    void getSettings()
+    void queryClient
+      .query(settingsQuery())
       .then((s) => {
         prefs.current = { enabled: s.preferences.liveToasts, seconds: s.preferences.liveToastSeconds }
       })
       .catch(() => {})
-  }, [])
+  }, [queryClient])
 
   const show = useCallback(
     (condition: Condition, message: string, severity: Severity) =>
@@ -60,7 +63,9 @@ export function LiveToasts() {
     if (!prefs.current.enabled) return
     let health: SourceHealth
     try {
-      health = await getSourceHealth()
+      // Through the cache, so an open source-health page shows the same
+      // read, and an answer seconds old (that page just loaded it) is reused.
+      health = await queryClient.query({ ...sourceHealthQuery(), staleTime: 5_000 })
     } catch {
       // The dashboard's own backend failing is the page's to show, not a
       // toast per blip.
@@ -77,7 +82,7 @@ export function LiveToasts() {
     }
     primed.current = true
     known.current = new Map(current.map((c) => [c.key, c]))
-  }, [show])
+  }, [show, queryClient])
 
   useLiveInterval(poll, Math.max(MIN_POLL_MS, prefs.current.seconds * 1000), { leading: true })
 

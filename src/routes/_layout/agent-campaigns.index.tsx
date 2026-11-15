@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
@@ -12,18 +11,19 @@ import { createFileRoute } from '@tanstack/react-router'
 import { SkeletonTiles, StatTile } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getAgentCampaigns } from '#/data/queries'
 import type { AgentCampaign } from '#/data/types'
 import { formatNumber, formatTime } from '#/lib/format'
 import { categoryLabel } from '#/components/details/AgentCampaign'
 import { entityHref } from '#/lib/entities'
+import { ensure, usePageQuery } from '#/lib/query'
+import { agentCampaignsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/agent-campaigns/')({
   ssr: pageSsr,
   validateSearch: (search: Record<string, unknown>): { category?: string } => ({
     category: typeof search.category === 'string' && search.category ? search.category : undefined,
   }),
-  loader: () => getAgentCampaigns(),
+  loader: ({ context }) => ensure(context, agentCampaignsQuery()),
   component: AgentCampaignsPage,
   pendingComponent: AgentCampaignsPage,
 })
@@ -48,7 +48,7 @@ const columns: TableColumn<AgentCampaign>[] = [
 ]
 
 function AgentCampaignsPage() {
-  const campaigns = orPending(Route.useLoaderData())
+  const campaigns = usePageQuery(agentCampaignsQuery())
   const { category } = Route.useSearch()
 
   const counts = new Map<string, number>()

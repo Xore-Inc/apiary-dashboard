@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { VStack } from '@astryxdesign/core/Stack'
 import { pixel, proportional } from '@astryxdesign/core/Table'
@@ -10,14 +9,15 @@ import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { CountTable, Panel, StatTile, windowTitle } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
-import { getAuthEvents } from '#/data/queries'
 import type { AuthFailure } from '#/data/types'
 import { formatTime } from '#/lib/format'
 import { SourceIp } from '#/components/details/AuthFailure'
+import { ensure, usePageQuery } from '#/lib/query'
+import { authEventsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/auth-events/')({
   ssr: pageSsr,
-  loader: () => getAuthEvents(),
+  loader: ({ context }) => ensure(context, authEventsQuery()),
   component: AuthEventsPage,
   pendingComponent: AuthEventsPage,
 })
@@ -32,7 +32,7 @@ const columns: TableColumn<AuthFailure>[] = [
 ]
 
 function AuthEventsPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(authEventsQuery())
   return (
     <RecordList
       title="Auth-failure events"

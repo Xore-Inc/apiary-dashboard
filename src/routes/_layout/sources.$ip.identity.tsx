@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
@@ -9,18 +8,19 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { ValueList } from '#/components/EntityBlocks'
-import { getSourceIdentity } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sourceIdentityQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/sources/$ip/identity')({
   ssr: pageSsr,
-  loader: ({ params }) => getSourceIdentity(params.ip),
+  loader: ({ params, context }) => ensure(context, sourceIdentityQuery(params.ip)),
   component: SourceIdentityTab,
   pendingComponent: SourceIdentityTab,
 })
 
 function SourceIdentityTab() {
-  const identity = orPending(Route.useLoaderData())
+  const identity = usePageQuery(sourceIdentityQuery(Route.useParams().ip))
   if (!identity)
     return <Text type="supporting">This address has not been linked to an attacker identity. Identities join addresses that share fingerprints, payloads or credentials.</Text>
   return (

@@ -1,6 +1,7 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { Button } from '@astryxdesign/core/Button'
 import { Link } from '@astryxdesign/core/Link'
 import { Token } from '@astryxdesign/core/Token'
@@ -8,21 +9,22 @@ import { createFileRoute, notFound } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
-import { getReports } from '#/data/queries'
+import { reportsQuery } from '#/data/resources'
 import { reportPdfHref } from '#/lib/reportPdf'
 import { formatDateTime } from '#/lib/format'
 
+/** The report the page is about, with its definition and template, from the reports read. */
+const pick = (data: ResourceData<typeof reportsQuery>, id: string) => {
+  const report = data.generated.find((g) => g.id === id)
+  return report && { report, definition: data.definitions.find((d) => d.id === report.definitionId), template: data.templates.find((t) => t.id === report.template) }
+}
+
 export const Route = createFileRoute('/_layout/reports/generated/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const data = await getReports()
-    const report = data.generated.find((g) => g.id === params.id)
-    if (!report) throw notFound()
-    return {
-      report,
-      definition: data.definitions.find((d) => d.id === report.definitionId),
-      template: data.templates.find((t) => t.id === report.template),
-    }
+  loader: async ({ params, context }) => {
+    const page = pick(await ensure(context, reportsQuery()), params.id)
+    if (!page) throw notFound()
+    return page
   },
   notFoundComponent: () => (
     <NotFound
@@ -35,8 +37,9 @@ export const Route = createFileRoute('/_layout/reports/generated/$id')({
 })
 
 function GeneratedReportPage() {
-  const loaded = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const reports = usePageQuery(reportsQuery())
+  const loaded = reports && pick(reports, id)
   const r = loaded?.report
   const definition = loaded?.definition
   const template = loaded?.template

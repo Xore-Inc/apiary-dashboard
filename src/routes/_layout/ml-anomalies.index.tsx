@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { ConfirmDialog } from '#/components/AppDialog'
 import { Button } from '@astryxdesign/core/Button'
@@ -16,7 +15,7 @@ import { TimeLines } from '#/components/charts'
 import { Panel, StatTile, MiniTable, windowTitle } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { acknowledgeAllAnomalies, getMlAnomalies } from '#/data/queries'
+import { acknowledgeAllAnomalies } from '#/data/queries'
 import { DISPOSITIONS } from '#/data/types'
 import type { AnomalyStatus, MlAnomaly, ModelHealth, Severity } from '#/data/types'
 import { formatClock, formatNumber, formatTime } from '#/lib/format'
@@ -30,6 +29,8 @@ import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { ZoneHeader } from '#/components/ZoneHeader'
 import { useIsAdmin } from '#/lib/session'
+import { ensure, usePageQuery } from '#/lib/query'
+import { mlAnomaliesQuery } from '#/data/resources'
 
 const SEVERITIES: Severity[] = ['critical', 'high', 'medium', 'low']
 const STATUSES: AnomalyStatus[] = ['open', 'acknowledged', ...DISPOSITIONS]
@@ -55,7 +56,7 @@ export const Route = createFileRoute('/_layout/ml-anomalies/')({
     eventType: toParam(listParam(search.eventType)),
     status: toParam(listParam(search.status).filter((v) => STATUSES.includes(v as AnomalyStatus))),
   }),
-  loader: () => getMlAnomalies(),
+  loader: ({ context }) => ensure(context, mlAnomaliesQuery()),
   component: MlAnomaliesPage,
   pendingComponent: MlAnomaliesPage,
 })
@@ -155,7 +156,7 @@ function ModelHealthView({ data }: { data: ReturnType<typeof Route.useLoaderData
 }
 
 function MlAnomaliesPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(mlAnomaliesQuery())
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()

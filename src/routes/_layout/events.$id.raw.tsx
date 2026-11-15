@@ -1,8 +1,9 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { JsonBlock } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
+import { usePageQuery } from '#/lib/query'
+import { eventDetailQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/events/$id')
 
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/_layout/events/$id/raw')({
 function TabView() {
   return (
     <Panel title="The complete record">
-      <JsonBlock value={orPending(parent.useLoaderData())?.event} />
+      <JsonBlock value={usePageQuery(eventDetailQuery(parent.useParams().id))?.event} />
     </Panel>
   )
 }

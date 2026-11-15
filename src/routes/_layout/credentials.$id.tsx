@@ -1,21 +1,27 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { CredentialInspector } from '#/components/details/BaitCredential'
-import { getCredentials } from '#/data/queries'
+import { credentialsQuery } from '#/data/resources'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
 import { formatDateTime } from '#/lib/format'
 
+/** The credential the page is about, with the tokens it can link to, from the list's read. */
+const pick = (data: ResourceData<typeof credentialsQuery>, id: string) => {
+  const credential = data.credentials.find((c) => c.id === id)
+  return credential && { ...credential, tokens: data.tokens }
+}
+
 export const Route = createFileRoute('/_layout/credentials/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const { credentials, tokens } = await getCredentials()
-    const credential = credentials.find((c) => c.id === params.id)
-    if (!credential) throw notFound()
-    return { ...credential, tokens }
+  loader: async ({ params, context }) => {
+    const row = pick(await ensure(context, credentialsQuery()), params.id)
+    if (!row) throw notFound()
+    return row
   },
   notFoundComponent: () => (
     <NotFound
@@ -28,8 +34,9 @@ export const Route = createFileRoute('/_layout/credentials/$id')({
 })
 
 function BaitCredentialPage() {
-  const d = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const list = usePageQuery(credentialsQuery())
+  const d = list && pick(list, id)
   return (
     <EntityFrame
       kind="Bait credential"

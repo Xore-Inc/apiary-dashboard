@@ -9,19 +9,20 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { PageFrame } from '#/components/PageFrame'
 import { SkeletonLines } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { Skeleton } from '@astryxdesign/core/Skeleton'
-import { getSandboxLiveStatus, getSandboxVncBridge } from '#/data/queries'
+import { getSandboxVncBridge } from '#/data/queries'
 import { formatDateTime } from '#/lib/format'
 import { analysisTabs } from '#/lib/navFamilies'
 import { useIsAdmin } from '#/lib/session'
 import { useEffect, useState } from 'react'
 import { VncViewer } from '#/components/VncViewer'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sandboxLiveStatusQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/sandbox/vnc')({
   ssr: pageSsr,
   staticData: { viewTabs: analysisTabs() },
-  loader: () => getSandboxLiveStatus(),
+  loader: ({ context }) => ensure(context, sandboxLiveStatusQuery()),
   component: SandboxLivePage,
   pendingComponent: SandboxLivePage,
 })
@@ -46,7 +47,7 @@ function useVncBridge(running: boolean) {
 }
 
 function SandboxLivePage() {
-  const status = orPending(Route.useLoaderData())
+  const status = usePageQuery(sandboxLiveStatusQuery())
   const { isAdmin, bridge } = useVncBridge(!!status?.running)
   return (
     <PageFrame title="Sandbox live view" description="A read-only view of the isolated Windows guest while a captured sample detonates. Admin only.">

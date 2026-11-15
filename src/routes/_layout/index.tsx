@@ -18,14 +18,14 @@ import { Histogram, ProtocolTimeline, RankBars, SensorHeatmap, SeriesLines } fro
 import { CountTable, MiniTable, NotAvailable, Panel, SkeletonTiles, StatTile } from '#/components/DashboardBlocks'
 import { SkeletonBlock, SkeletonPanels } from '#/components/EntityBlocks'
 import { SkeletonTable } from '#/components/SkeletonTable'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { FeedStateLabel } from '#/components/FeedState'
 import { PageFrame } from '#/components/PageFrame'
 import { SeverityToken } from '#/components/SeverityToken'
 import { BugAntIcon, ChartBarIcon, CpuChipIcon, FingerPrintIcon, KeyIcon, UserGroupIcon } from '@heroicons/react/24/outline'
 import { searchTabs, sectionOf } from '#/components/ViewTabs'
 import { WorldMap } from '#/components/WorldMap'
-import { getOverview, getOverviewViews } from '#/data/queries'
+import { overviewQuery, overviewViewsQuery } from '#/data/resources'
 import type { AttackVectors, CapturedPayload, HoneypotEvent, NetworkCampaign, OverviewViews, SensorFeed, SeriesPoint, TimeBucket, Unavailable } from '#/data/types'
 import { formatClock, formatDateTime, formatNumber, formatTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
@@ -76,8 +76,8 @@ export const Route = createFileRoute('/_layout/')({
     view: VIEWS.some((v) => v.id === search.view) && search.view !== 'live' ? (search.view as View) : undefined,
     section: typeof search.section === 'string' && search.section ? search.section : undefined,
   }),
-  loader: async () => {
-    const [overview, views] = await Promise.all([getOverview(), getOverviewViews()])
+  loader: async ({ context }) => {
+    const [overview, views] = await Promise.all([ensure(context, overviewQuery()), ensure(context, overviewViewsQuery())])
     return { overview, views }
   },
   component: OverviewPage,
@@ -369,7 +369,8 @@ function EvidenceView({ views }: { views: OverviewViews }) {
 // ---- Page --------------------------------------------------------------------
 
 function OverviewPage() {
-  const { overview, views } = orPending(Route.useLoaderData()) ?? {}
+  const overview = usePageQuery(overviewQuery())
+  const views = usePageQuery(overviewViewsQuery())
   const { view = 'live', section } = Route.useSearch()
   // The numbers follow the live stream, at most every refresh interval.
   useLiveRefresh((usePreferences()?.refreshSeconds ?? 10) * 1000)

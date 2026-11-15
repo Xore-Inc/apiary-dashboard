@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
@@ -15,16 +14,18 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getLlmAnalyses, semanticSearch } from '#/data/queries'
+import { semanticSearch } from '#/data/queries'
 import type { LlmAnalysis, SemanticHit, SemanticSearchResult } from '#/data/types'
 import { formatTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
 import { EvidenceLink } from '#/components/details/LlmAnalysis'
 import { useShellConfig } from '#/lib/session'
+import { ensure, usePageQuery } from '#/lib/query'
+import { llmAnalysesQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/llm-analysis/')({
   ssr: pageSsr,
-  loader: () => getLlmAnalyses(),
+  loader: ({ context }) => ensure(context, llmAnalysesQuery()),
   component: LlmAnalysisPage,
   pendingComponent: LlmAnalysisPage,
 })
@@ -114,7 +115,7 @@ function SemanticSearch() {
 
 function LlmAnalysisPage() {
   const aiDisclaimer = useShellConfig().presentation.aiDisclaimer
-  const rows = orPending(Route.useLoaderData())
+  const rows = usePageQuery(llmAnalysesQuery())
   return (
     <RecordList
       title="LLM analysis"

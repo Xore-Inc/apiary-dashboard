@@ -1,21 +1,21 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Text } from '@astryxdesign/core/Text'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getProblemReports } from '#/data/queries'
 import type { ProblemReport, ProblemStatus } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { healthTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { problemReportsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/problem-reports/')({
   ssr: pageSsr,
   staticData: { viewTabs: healthTabs },
-  loader: () => getProblemReports(),
+  loader: ({ context }) => ensure(context, problemReportsQuery()),
   component: ProblemReportsPage,
   pendingComponent: ProblemReportsPage,
 })
@@ -32,7 +32,7 @@ const columns: TableColumn<ProblemReport>[] = [
 ]
 
 function ProblemReportsPage() {
-  const reports = orPending(Route.useLoaderData())
+  const reports = usePageQuery(problemReportsQuery())
   return (
     <RecordList
       title="Problem reports"

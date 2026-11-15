@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { GroupOverview, SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { attckUrl } from '#/components/DetailBlocks'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
@@ -9,23 +8,23 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
-import { getRelated } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
 import { Panel } from '#/components/DashboardBlocks'
+import { ensure, usePageQuery } from '#/lib/query'
+import { identityQuery, relatedQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/identities/$id')
 
 export const Route = createFileRoute('/_layout/identities/$id/')({
   ssr: pageSsr,
-  loader: ({ params }) => backendGapOf(getRelated('identity', params.id)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('identity', params.id)),
   component: IdentityOverview,
   pendingComponent: IdentityOverview,
 })
 
 
 function IdentityOverview() {
-  const loaded = orPending(parent.useLoaderData())
-  const related = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(identityQuery(parent.useParams().id))
+  const related = usePageQuery(relatedQuery('identity', Route.useParams().id))
   if (!loaded) return <SkeletonPanels count={3} />
   const a = loaded.identity
   const group = loaded.group

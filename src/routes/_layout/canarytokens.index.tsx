@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { useState } from 'react'
 import { Banner } from '@astryxdesign/core/Banner'
@@ -12,10 +11,11 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { searchTabs } from '#/components/ViewTabs'
 import { CanaryTokenDialog } from '#/components/dialogs/CanaryTokenDialog'
 import { RecordList } from '#/components/RecordList'
-import { getCanarytokens } from '#/data/queries'
 import type { CanaryToken, CanaryTrigger } from '#/data/types'
 import { formatDateTime, formatTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
+import { ensure, usePageQuery } from '#/lib/query'
+import { canarytokensQuery } from '#/data/resources'
 
 type View = 'deployed' | 'fired'
 
@@ -25,7 +25,7 @@ export const Route = createFileRoute('/_layout/canarytokens/')({
   validateSearch: (search: Record<string, unknown>): { view?: View } => ({
     view: search.view === 'fired' ? 'fired' : undefined,
   }),
-  loader: () => getCanarytokens(),
+  loader: ({ context }) => ensure(context, canarytokensQuery()),
   component: CanarytokensPage,
   pendingComponent: CanarytokensPage,
 })
@@ -55,7 +55,7 @@ const triggerColumns: TableColumn<CanaryTrigger>[] = [
 ]
 
 function CanarytokensPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(canarytokensQuery())
   const types = data?.types ?? []
   const { view = 'deployed' } = Route.useSearch()
   const router = useRouter()

@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable } from '#/components/DashboardBlocks'
-import { orPending } from '#/lib/pending'
+import { usePageQuery } from '#/lib/query'
+import { replayDetailQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/recordings/$shasum')
 
@@ -12,7 +13,7 @@ export const Route = createFileRoute('/_layout/recordings/$shasum/sessions')({
 })
 
 function SessionsTab() {
-  const sessions = orPending(parent.useLoaderData())?.sessions
+  const sessions = usePageQuery(replayDetailQuery(parent.useParams().shasum))?.sessions
   return (
     <MiniTable
       title="Sessions that produced this recording"

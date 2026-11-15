@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Link } from '@astryxdesign/core/Link'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
@@ -7,17 +6,18 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getRevDeckRuns } from '#/data/queries'
 import type { RevDeckRun } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { analysisTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { revDeckRunsQuery } from '#/data/resources'
 
 // An index leaf, not revdeck.tsx: a parent route with a component would
 // swallow revdeck/$sha.
 export const Route = createFileRoute('/_layout/revdeck/')({
   ssr: pageSsr,
   staticData: { viewTabs: analysisTabs() },
-  loader: () => getRevDeckRuns(),
+  loader: ({ context }) => ensure(context, revDeckRunsQuery()),
   component: RevDeckIndexPage,
   pendingComponent: RevDeckIndexPage,
 })
@@ -30,7 +30,7 @@ const columns: TableColumn<RevDeckRun>[] = [
 ]
 
 function RevDeckIndexPage() {
-  const runs = orPending(Route.useLoaderData())
+  const runs = usePageQuery(revDeckRunsQuery())
   return (
     <RecordList
       title="RevDeck"

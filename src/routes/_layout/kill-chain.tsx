@@ -7,18 +7,18 @@ import { CampaignTimeline, CoverageHeatmap, FlowSankey } from '#/components/char
 import { Panel } from '#/components/DashboardBlocks'
 import { SkeletonBlock } from '#/components/EntityBlocks'
 import { PageFrame } from '#/components/PageFrame'
-import { orPending } from '#/lib/pending'
-import { getKillChain } from '#/data/queries'
+import { ensure, usePageQuery } from '#/lib/query'
+import { killChainQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/kill-chain')({
   ssr: pageSsr,
-  loader: () => getKillChain(),
+  loader: ({ context }) => ensure(context, killChainQuery()),
   component: KillChainPage,
   pendingComponent: KillChainPage,
 })
 
 function KillChainPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(killChainQuery())
   return (
     <PageFrame
       title="Kill-chain analytics"

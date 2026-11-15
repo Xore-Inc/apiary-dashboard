@@ -1,8 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable } from '#/components/DashboardBlocks'
+import { useSensorPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
@@ -13,7 +13,7 @@ export const Route = createFileRoute('/_layout/sensors/$sensor/sources')({
 })
 
 function TabView() {
-    const loaded = orPending(parent.useLoaderData())
+    const loaded = useSensorPage(parent.useParams().sensor)
     const detail = loaded?.detail
     return (
       <Grid columns={{ minWidth: 300, repeat: 'fit' }} gap={4}>

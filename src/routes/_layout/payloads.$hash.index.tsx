@@ -1,7 +1,6 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Skeleton } from '@astryxdesign/core/Skeleton'
 import { MetaItem } from '#/components/MetaItem'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { Link } from '@astryxdesign/core/Link'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
@@ -9,22 +8,23 @@ import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
-import { getRelated } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
 import { Panel, StatTile } from '#/components/DashboardBlocks'
 import { formatDateTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { relatedQuery } from '#/data/resources'
+import { usePayloadPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/payloads/$hash')
 
 export const Route = createFileRoute('/_layout/payloads/$hash/')({
   ssr: pageSsr,
-  loader: ({ params }) => backendGapOf(getRelated('payload', params.hash)),
+  loader: ({ params, context }) => ensure(context, relatedQuery('payload', params.hash)),
   component: PayloadOverview,
   pendingComponent: PayloadOverview,
 })
 
 function PayloadOverview() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = usePayloadPage(parent.useParams().hash)
   const a = loaded?.analysis
   const cape = loaded?.cape
   const revdeck = loaded?.revdeck
@@ -79,7 +79,7 @@ function PayloadOverview() {
           </MetadataList>
         </Panel>
       </Grid>
-      <RelatedPanel center={`${hash.slice(0, 16)}…`} groups={orPending(Route.useLoaderData())} />
+      <RelatedPanel center={`${hash.slice(0, 16)}…`} groups={usePageQuery(relatedQuery('payload', Route.useParams().hash))} />
     </VStack>
   )
 }

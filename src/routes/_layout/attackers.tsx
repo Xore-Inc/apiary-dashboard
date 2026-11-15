@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { HStack } from '@astryxdesign/core/Stack'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
@@ -8,14 +7,15 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getAttackers } from '#/data/queries'
 import type { AttackerEntity } from '#/data/types'
 import { entityHref } from '#/lib/entities'
 import { formatNumber, formatTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { attackersQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/attackers')({
   ssr: pageSsr,
-  loader: () => getAttackers(),
+  loader: ({ context }) => ensure(context, attackersQuery()),
   component: AttackersPage,
   pendingComponent: AttackersPage,
 })
@@ -61,7 +61,7 @@ const columns: TableColumn<AttackerEntity>[] = [
 ]
 
 function AttackersPage() {
-  const attackers = orPending(Route.useLoaderData())
+  const attackers = usePageQuery(attackersQuery())
   const merged = attackers?.filter((a) => a.ips.length > 1).length
   return (
     <RecordList

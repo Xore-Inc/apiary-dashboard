@@ -3,7 +3,7 @@ import { credentialStateOf } from '#/lib/credentialState'
 import { VisuallyHidden } from '@astryxdesign/core/VisuallyHidden'
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { textParam } from '#/lib/searchParams'
 import { Button } from '@astryxdesign/core/Button'
 import { Icon } from '@astryxdesign/core/Icon'
@@ -18,8 +18,8 @@ import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getEvents, getFacets } from '#/data/queries'
-import { isBackendGap, backendGapOf } from '#/lib/backendGap'
+import { eventsQuery, facetsQuery } from '#/data/resources'
+import { isBackendGap } from '#/lib/backendGap'
 import { FilterSelect, listParam, toNumericParam, toParam } from '#/components/FilterSelect'
 import type { FilterOption } from '#/components/FilterSelect'
 import type { EventFilters, EventKind, EventsPage, Facets, HoneypotEvent } from '#/data/types'
@@ -33,7 +33,7 @@ import { ZoneHeader } from '#/components/ZoneHeader'
 import { OpenInMenu } from '#/components/OpenInMenu'
 import { useShellConfig } from '#/lib/session'
 import { eventToolLinks } from '#/lib/toolLinks'
-import { pageParam, pageRequest } from '#/lib/paging'
+import { pageParam, pageRequest, usePageRequest } from '#/lib/paging'
 
 const KINDS: EventKind[] = ['connection', 'login', 'login-success', 'command', 'download', 'http', 'protocol', 'alert']
 const SINCE = ['1h', '6h', '24h']
@@ -54,6 +54,10 @@ const FILTERS: Array<{ key: 'ip' | 'sensor' | 'persona' | 'provider' | 'country'
   { key: 'port', label: 'Port', width: 110, options: (f) => f.ports },
   { key: 'kind', label: 'Kind', width: 130, options: (f) => f.kinds },
 ]
+
+/** The search keys the events read takes (FILTER_KEYS but `since`, which
+ * falls back to the app-wide range). */
+const filtersOf = (search: EventFilters): EventFilters => Object.fromEntries(FILTER_KEYS.filter((key) => key !== 'since').map((key) => [key, search[key]]))
 
 export const Route = createFileRoute('/_layout/events/')({
   ssr: pageSsr,
@@ -81,13 +85,16 @@ export const Route = createFileRoute('/_layout/events/')({
       page: pageParam(search.page),
     }
   },
-  // An explicit ?since= wins; otherwise the app-wide range applies.
-  loaderDeps: ({ search }) => ({ ...search, since: search.since ?? search.range }),
+  // Only what the read takes: the filters and the page. An explicit ?since=
+  // wins; otherwise the app-wide range applies. (Not the whole search: the
+  // settings modal or the mock switch would refetch the events.)
+  loaderDeps: ({ search }) => ({ ...filtersOf(search), since: search.since ?? search.range, page: search.page }),
   // One page at a time: the query filters and pages, as the real API does.
-  loader: async ({ deps: { page, ...filters } }) => {
-    // The counted facets are unavailable until the backend serves them
-    // (#3524); the explorer still runs without them, on the vocabulary the rows carry.
-    const [events, facets] = await Promise.all([pageRequest(page).then((request) => getEvents({ ...filters, ...request })), backendGapOf(getFacets())])
+  // The counted facets are unavailable until the backend serves them
+  // (#3524); the explorer still runs without them, on the vocabulary the
+  // rows carry (facetsQuery answers a gap).
+  loader: async ({ deps: { page, ...filters }, context }) => {
+    const [events, facets] = await Promise.all([pageRequest(context, page).then((request) => ensure(context, eventsQuery({ ...filters, ...request }))), ensure(context, facetsQuery())])
     return { ...events, facets }
   },
   component: EventsPage,
@@ -166,7 +173,11 @@ function EventOpenIn({ event }: { event: HoneypotEvent }) {
 
 
 function EventsPage() {
-  const data = orPending(Route.useLoaderData())
+  const { page, ...filters } = Route.useLoaderDeps()
+  const request = usePageRequest(page)
+  const events = usePageQuery(request && eventsQuery({ ...filters, ...request }))
+  const facets = usePageQuery(facetsQuery())
+  const data = events && facets && { ...events, facets }
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   // New events join the list as they arrive, a few seconds at a time.

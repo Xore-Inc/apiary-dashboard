@@ -1,6 +1,6 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { Button } from '@astryxdesign/core/Button'
 import { Icon } from '@astryxdesign/core/Icon'
 import { pixel, proportional } from '@astryxdesign/core/Table'
@@ -11,14 +11,14 @@ import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getCommands } from '#/data/queries'
+import { commandsQuery } from '#/data/resources'
 import type { HoneypotEvent } from '#/data/types'
 import { apiHref } from '#/lib/apiHref'
 import { formatClock, formatNumber } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
 import { ZoneHeader } from '#/components/ZoneHeader'
 import { indicatorTabs } from '#/lib/navFamilies'
-import { pageParam, pageRequest } from '#/lib/paging'
+import { pageParam, pageRequest, usePageRequest } from '#/lib/paging'
 
 export const Route = createFileRoute('/_layout/commands')({
   ssr: pageSsr,
@@ -26,7 +26,7 @@ export const Route = createFileRoute('/_layout/commands')({
   validateSearch: (search: Record<string, unknown>): { page?: number } => ({ page: pageParam(search.page) }),
   loaderDeps: ({ search }) => ({ page: search.page }),
   // One page at a time: every execution is unbounded.
-  loader: async ({ deps }) => getCommands(await pageRequest(deps.page)),
+  loader: async ({ deps, context }) => ensure(context, commandsQuery(await pageRequest(context, deps.page))),
   component: CommandsPage,
   pendingComponent: CommandsPage,
 })
@@ -40,7 +40,8 @@ const columns: TableColumn<HoneypotEvent>[] = [
 
 
 function CommandsPage() {
-  const commands = orPending(Route.useLoaderData())
+  const request = usePageRequest(Route.useLoaderDeps().page)
+  const commands = usePageQuery(request && commandsQuery(request))
   return (
     <RecordList
       title="Executed commands"

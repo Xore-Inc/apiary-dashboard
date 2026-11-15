@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { Token } from '@astryxdesign/core/Token'
 import { Tooltip } from '@astryxdesign/core/Tooltip'
@@ -10,8 +9,9 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
-import { getIpProfile } from '#/data/queries'
 import { formatAs, formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { ipProfileQuery } from '#/data/resources'
 
 /** Old tabs folded into Breakdown; each route only redirects there. */
 const FOLDED_TABS = { alerts: 'breakdown', commands: 'breakdown', credentials: 'breakdown' }
@@ -19,8 +19,8 @@ const FOLDED_TABS = { alerts: 'breakdown', commands: 'breakdown', credentials: '
 export const Route = createFileRoute('/_layout/sources/$ip')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Source IP views', basePath: (params) => `/sources/${encodeURIComponent(params.ip)}`, tabs: tabsFor, aliases: FOLDED_TABS }) },
-  loader: async ({ params }) => {
-    const profile = await getIpProfile(params.ip)
+  loader: async ({ params, context }) => {
+    const profile = await ensure(context, ipProfileQuery(params.ip))
     if (!profile) throw notFound()
     return profile
   },
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/_layout/sources/$ip')({
 })
 
 function SourceLayout() {
-  const p = orPending(Route.useLoaderData())
+  const p = usePageQuery(ipProfileQuery(Route.useParams().ip))
   const { ip } = Route.useParams()
 
   return (

@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Link } from '@astryxdesign/core/Link'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
@@ -7,16 +6,17 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getGithubAnalyses } from '#/data/queries'
 import type { GithubAnalysis, GithubStatus } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { analysisTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { githubAnalysesQuery } from '#/data/resources'
 
 // Index leaf so github-analysis/$sha is not swallowed by a parent component.
 export const Route = createFileRoute('/_layout/github-analysis/')({
   ssr: pageSsr,
   staticData: { viewTabs: analysisTabs() },
-  loader: () => getGithubAnalyses(),
+  loader: ({ context }) => ensure(context, githubAnalysesQuery()),
   component: GithubIndexPage,
   pendingComponent: GithubIndexPage,
 })
@@ -32,7 +32,7 @@ const columns: TableColumn<GithubAnalysis>[] = [
 ]
 
 function GithubIndexPage() {
-  const rows = orPending(Route.useLoaderData())
+  const rows = usePageQuery(githubAnalysesQuery())
   return (
     <RecordList
       title="GitHub analysis"

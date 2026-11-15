@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
@@ -7,14 +6,15 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
-import { getSessionDetail } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sessionDetailQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/sessions/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Session views', basePath: (params) => `/sessions/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getSessionDetail(params.id)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, sessionDetailQuery(params.id))
     if (!detail) throw notFound()
     return detail
   },
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/_layout/sessions/$id')({
 })
 
 function SessionLayout() {
-  const s = orPending(Route.useLoaderData())
+  const s = usePageQuery(sessionDetailQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const minutes = s ? Math.max(1, Math.round((Date.parse(s.last) - Date.parse(s.first)) / 60_000)) : 0
 

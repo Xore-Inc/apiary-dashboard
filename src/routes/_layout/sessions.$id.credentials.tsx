@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable } from '#/components/DashboardBlocks'
+import { usePageQuery } from '#/lib/query'
+import { sessionDetailQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/sessions/$id')
 
@@ -12,5 +13,5 @@ export const Route = createFileRoute('/_layout/sessions/$id/credentials')({
 })
 
 function TabView() {
-  return <MiniTable title="Credentials tried" header="user:password" rows={orPending(parent.useLoaderData())?.credentials} entity="credential" />
+  return <MiniTable title="Credentials tried" header="user:password" rows={usePageQuery(sessionDetailQuery(parent.useParams().id))?.credentials} entity="credential" />
 }

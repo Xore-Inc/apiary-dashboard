@@ -7,7 +7,7 @@ import { Timeline } from '#/components/EntityBlocks'
 export const Route = createFileRoute('/_layout/asn/$asn/timeline')({
   ssr: pageSsr,
   loaderDeps: ({ search }) => ({ range: search.range }),
-  loader: ({ params, deps, context }) => ensure(context.queryClient, entityTimelineQuery('asn', params.asn, deps.range)),
+  loader: ({ params, deps, context }) => ensure(context, entityTimelineQuery('asn', params.asn, deps.range)),
   component: TabView,
   pendingComponent: TabView,
 })
