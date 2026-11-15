@@ -3,7 +3,8 @@ import { Icon } from '@astryxdesign/core/Icon'
 import { BeakerIcon, CheckIcon } from '@heroicons/react/24/outline'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { HEALTH_CHANGED, INCIDENTS } from '#/data/incidents'
-import { resolveIncidents, simulateIncident } from '#/data/queries'
+import { resolveIncidentsWrite, simulateIncidentWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { SCENARIOS, isScenario } from '#/data/scenarios'
 
 const SIGN_IN_PAGES = [
@@ -21,6 +22,8 @@ const healthChanged = () => window.dispatchEvent(new Event(HEALTH_CHANGED))
  * (empty, failing, slow, viewer role) and every page follows, or simulate
  * an operational incident to see the toasts. */
 export function MockScenarioMenu({ compact = false }: { compact?: boolean }) {
+  const simulate = useDataMutation(simulateIncidentWrite())
+  const resolve = useDataMutation(resolveIncidentsWrite())
   const navigate = useNavigate()
   const raw = useSearch({ strict: false, select: (search: Record<string, unknown>) => search.mock })
   const current = isScenario(raw) ? raw : 'normal'
@@ -53,9 +56,9 @@ export function MockScenarioMenu({ compact = false }: { compact?: boolean }) {
       {/* Operational incidents: change source health in this tab, so the
           toasts and health pages can be seen raising and resolving. */}
       {INCIDENTS.map((incident) => (
-        <DropdownMenuItem key={incident.id} label={`Simulate: ${incident.label.toLowerCase()}`} onClick={() => void simulateIncident(incident.id).then(healthChanged)} />
+        <DropdownMenuItem key={incident.id} label={`Simulate: ${incident.label.toLowerCase()}`} onClick={() => void simulate.mutateAsync([incident.id]).then(healthChanged)} />
       ))}
-      <DropdownMenuItem label="Simulate: everything recovers" onClick={() => void resolveIncidents().then(healthChanged)} />
+      <DropdownMenuItem label="Simulate: everything recovers" onClick={() => void resolve.mutateAsync([]).then(healthChanged)} />
       <DropdownMenuDivider />
       {/* The pages outside the shell: sign-in and the ways it fails. */}
       {SIGN_IN_PAGES.map((page) => (

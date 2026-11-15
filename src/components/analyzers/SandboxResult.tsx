@@ -22,7 +22,8 @@ import { MiniTable, Panel, StatTile } from '../DashboardBlocks'
 import { TechniquesPanel } from '../DetailBlocks'
 import type { GoldenImageStatus, SandboxRun, WindowsForensics } from '#/data/types'
 import { AnalyzerSection } from './AnalyzerSection'
-import { queuePayloadAction } from '#/data/queries'
+import { queuePayloadActionWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { EntityLink } from '../EntityLink'
 import { useIsAdmin } from '#/lib/session'
@@ -357,6 +358,8 @@ function GoldenImageNote({ image }: { image: GoldenImageStatus }) {
 }
 
 export function SandboxResult({ run, section }: { run: SandboxRun; section: SandboxSection }) {
+  // Queuing invalidates the payload's analysis reads (data/writes.ts).
+  const queue = useDataMutation(queuePayloadActionWrite())
   const [confirmOpen, setConfirmOpen] = useState(false)
   const isAdmin = useIsAdmin()
   const { error, guard, clearError } = useGuardedAction()
@@ -401,7 +404,7 @@ export function SandboxResult({ run, section }: { run: SandboxRun; section: Sand
         actionVariant="primary"
         onAction={async () => {
           setConfirmOpen(false)
-          setQueued((await guard(() => queuePayloadAction(run.hash, 'sandbox'))) ?? null)
+          setQueued((await guard(() => queue.mutateAsync([run.hash, 'sandbox']))) ?? null)
         }}
       />
     </AnalyzerSection>

@@ -19,7 +19,9 @@ import { Spinner } from '@astryxdesign/core/Spinner'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { getAnalysisResults, getAnalyzerCatalog, getPayloads, startAnalysisRun } from '#/data/queries'
+import { getAnalysisResults, getAnalyzerCatalog, getPayloads } from '#/data/queries'
+import { startAnalysisRunWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { AnalysisRunConfig, AnalyzerCatalog, AnalyzerId, AnalyzerInfo, AnalyzerOptions, CapturedPayload, WorkbenchRecipe, WorkbenchRun } from '#/data/types'
 import { formatNumber } from '#/lib/format'
 import { FilterSelect } from '../FilterSelect'
@@ -53,6 +55,8 @@ function optionProblems(id: AnalyzerId, own: AnalyzerOptions, info: AnalyzerInfo
 const size = (bytes: number) => (bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`)
 
 export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued }: { isOpen: boolean; onOpenChange: (open: boolean) => void; initialHash?: string; onQueued?: (queued: { run: WorkbenchRun; reused: boolean }) => void }) {
+  // Queuing invalidates the workbench and the payload's analysis reads (data/writes.ts).
+  const startRun = useDataMutation(startAnalysisRunWrite())
   const [catalog, setCatalog] = useState<{ payloads: CapturedPayload[]; recipes: WorkbenchRecipe[] } | null>(null)
   const [config, setConfig] = useState<AnalysisRunConfig>(() => defaults(initialHash ?? ''))
   // Which analyzers apply to the picked sample, and why not: the backend's
@@ -152,7 +156,7 @@ export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued 
           const own = optionsOf(id)
           if (own) options[id] = own
         }
-        const queued = await startAnalysisRun({ hash: config.hash, analyzers: config.analyzers, options })
+        const queued = await startRun.mutateAsync([{ hash: config.hash, analyzers: config.analyzers, options }])
         if (queued) onQueued?.(queued)
       }}
       steps={[

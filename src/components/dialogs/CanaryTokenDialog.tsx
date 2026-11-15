@@ -12,7 +12,8 @@ import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { canaryImageProblem } from '#/data/adapters/tools'
-import { createCanarytoken } from '#/data/queries'
+import { createCanarytokenWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { CanaryToken, CanaryTokenType } from '#/data/types'
 import { WizardDialog, statusOf } from '../WizardDialog'
 
@@ -29,6 +30,8 @@ async function base64Of(file: File): Promise<string> {
 const sizeOf = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KiB` : `${(bytes / (1024 * 1024)).toFixed(1)} MiB`)
 
 export function CanaryTokenDialog({ types, isOpen, onOpenChange, onCreated }: { types: CanaryTokenType[]; isOpen: boolean; onOpenChange: (open: boolean) => void; onCreated: (token: CanaryToken) => void }) {
+  // Minting invalidates the token and credential reads (data/writes.ts).
+  const create = useDataMutation(createCanarytokenWrite())
   const [type, setType] = useState(types[0].type)
   const [memo, setMemo] = useState('')
   const [snippet, setSnippet] = useState('')
@@ -54,12 +57,12 @@ export function CanaryTokenDialog({ types, isOpen, onOpenChange, onCreated }: { 
       finishLabel="Create token"
       onFinish={async () =>
         onCreated(
-          await createCanarytoken({
+          await create.mutateAsync([{
             type,
             memo: memo.trim(),
             ...(selected.supportsSnippet && snippet.trim() ? { snippet: snippet.trim() } : {}),
             ...(selected.requiresUpload && image ? { image: { name: image.name, contentType: image.type, base64: await base64Of(image) } } : {}),
-          }),
+          }]),
         )
       }
       steps={[

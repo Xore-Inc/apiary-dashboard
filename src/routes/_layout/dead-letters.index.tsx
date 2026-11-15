@@ -9,9 +9,10 @@ import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { purgeDeadLetters } from '#/data/queries'
+import { purgeDeadLettersWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { describeError } from '#/lib/actionError'
 import { useIsAdmin } from '#/lib/session'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
@@ -43,7 +44,7 @@ function DeadLettersPage() {
   const rows = usePageQuery(deadLettersQuery(Route.useLoaderDeps().q))
   const { q } = Route.useSearch()
   const navigate = Route.useNavigate()
-  const router = useRouter()
+  const purge = useDataMutation(purgeDeadLettersWrite())
   const [draft, setDraft] = useState(q ?? '')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -88,8 +89,7 @@ function DeadLettersPage() {
           try {
             // The query, not the rows: the backend purges the `q` scope its
             // own list searched, which is what the dialog describes.
-            await purgeDeadLetters(q ?? '')
-            await router.invalidate()
+            await purge.mutateAsync([q ?? ''])
           } catch (e) {
             setError(describeError(e))
           } finally {

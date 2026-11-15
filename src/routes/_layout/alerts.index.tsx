@@ -8,11 +8,13 @@ import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { TextInput } from '@astryxdesign/core/TextInput'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { searchTabs } from '#/components/ViewTabs'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { acknowledgeAllAlerts, alertKeyOf } from '#/data/queries'
+import { alertKeyOf } from '#/data/queries'
+import { acknowledgeAllAlertsWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { AlertGroup } from '#/data/types'
 import { formatNumber, formatTime } from '#/lib/format'
 import { AckButton } from '#/components/details/Alert'
@@ -59,7 +61,7 @@ function AlertsPage() {
   // pending state).
   const groups: AlertGroup[] | undefined = usePageQuery(alertsQuery())
   const { view = 'new' } = Route.useSearch()
-  const router = useRouter()
+  const acknowledgeAll = useDataMutation(acknowledgeAllAlertsWrite())
   const [filter, setFilter] = useState('')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const { error, guard } = useGuardedAction()
@@ -117,8 +119,7 @@ function AlertsPage() {
           setAcking(true)
           try {
             await guard(async () => {
-              await acknowledgeAllAlerts()
-              await router.invalidate()
+              await acknowledgeAll.mutateAsync()
             })
           } finally {
             setAcking(false)

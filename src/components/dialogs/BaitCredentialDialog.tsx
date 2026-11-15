@@ -14,12 +14,16 @@ import { HStack, StackItem } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { TextArea } from '@astryxdesign/core/TextArea'
 import { TextInput } from '@astryxdesign/core/TextInput'
-import { generatePassword, provisionCredential } from '#/data/queries'
+import { generatePassword } from '#/data/queries'
+import { provisionCredentialWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import { WizardDialog, statusOf } from '../WizardDialog'
 
 const DEFAULT_TEMPLATE = 'username={{username}}\npassword={{password}}'
 
 export function BaitCredentialDialog({ targets, isOpen, onOpenChange }: { targets: string[]; isOpen: boolean; onOpenChange: (open: boolean) => void }) {
+  // Planting invalidates the credential and token reads (data/writes.ts).
+  const provision = useDataMutation(provisionCredentialWrite())
   const blank = () => ({ target: targets[0] ?? '', path: '', username: '', password: generatePassword(), memo: '', template: '' })
   const [form, setForm] = useState(blank)
   const set = (patch: Partial<ReturnType<typeof blank>>) => setForm((f) => ({ ...f, ...patch }))
@@ -36,7 +40,7 @@ export function BaitCredentialDialog({ targets, isOpen, onOpenChange }: { target
       onOpenChange={reset}
       finishLabel="Plant credential"
       onFinish={async () => {
-        await provisionCredential(form)
+        await provision.mutateAsync([form])
       }}
       steps={[
         {

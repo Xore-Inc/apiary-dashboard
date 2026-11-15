@@ -12,10 +12,12 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { Token } from '@astryxdesign/core/Token'
 import { useMediaQuery } from '@astryxdesign/core/hooks'
 import { entityHref } from '#/lib/entities'
-import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { PageFrame } from '#/components/PageFrame'
 import { RecordList } from '#/components/RecordList'
-import { abortGpuJob } from '#/data/queries'
+import { abortGpuJobWrite } from '#/data/writes'
+import { useQueryClient } from '@tanstack/react-query'
+import { useDataMutation } from '#/lib/mutation'
 import { AnalysisRunDialog } from '#/components/dialogs/AnalysisRunDialog'
 import type { AnalysisResult, AnalysisResultsData, AnalyzerTab, GpuJob, ResultVerdict, WorkbenchRun } from '#/data/types'
 import { SkeletonTable } from '#/components/SkeletonTable'
@@ -128,7 +130,7 @@ function resultHref(row: AnalysisResult): string {
 }
 
 function GpuQueue({ jobs }: { jobs: GpuJob[] | undefined }) {
-  const router = useRouter()
+  const abort = useDataMutation(abortGpuJobWrite())
   const [busy, setBusy] = useState<string | null>(null)
   const isAdmin = useIsAdmin()
   const { error, guard, clearError } = useGuardedAction()
@@ -159,8 +161,7 @@ function GpuQueue({ jobs }: { jobs: GpuJob[] | undefined }) {
             onClick={async () => {
               setBusy(row.jobId)
               try {
-                await guard(() => abortGpuJob(row.jobId))
-                await router.invalidate()
+                await guard(() => abort.mutateAsync([row.jobId]))
               } finally {
                 setBusy(null)
               }
@@ -185,7 +186,7 @@ function GpuQueue({ jobs }: { jobs: GpuJob[] | undefined }) {
 
 function NewRunAction({ onQueued }: { onQueued: (run: { run: WorkbenchRun; reused: boolean }) => void }) {
   const isAdmin = useIsAdmin()
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [creating, setCreating] = useState(false)
   if (!isAdmin) return null
   return (
@@ -196,7 +197,7 @@ function NewRunAction({ onQueued }: { onQueued: (run: { run: WorkbenchRun; reuse
         onOpenChange={setCreating}
         onQueued={(run) => {
           onQueued(run)
-          void router.invalidate()
+          void queryClient.invalidateQueries({ queryKey: analysisResultsQuery.key })
         }}
       />
     </>

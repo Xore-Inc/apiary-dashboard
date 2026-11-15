@@ -6,8 +6,8 @@ import { List, ListItem } from '@astryxdesign/core/List'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { useRouter } from '@tanstack/react-router'
-import { setRunChild } from '#/data/queries'
+import { setRunChildWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { RunState, WorkbenchRun, WorkbenchRunChild } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
@@ -25,14 +25,13 @@ export function queuedMessage({ run, reused }: { run: WorkbenchRun; reused: bool
 }
 
 function ChildRow({ run, child }: { run: WorkbenchRun; child: WorkbenchRunChild }) {
-  const router = useRouter()
+  const setChild = useDataMutation(setRunChildWrite())
   const { error, guard, clearError } = useGuardedAction()
   const [busy, setBusy] = useState(false)
   const act = async (action: 'retry' | 'cancel') => {
     setBusy(true)
     try {
-      await guard(() => setRunChild(run.id, child.analyzerId, action))
-      await router.invalidate()
+      await guard(() => setChild.mutateAsync([run.id, child.analyzerId, action]))
     } finally {
       setBusy(false)
     }

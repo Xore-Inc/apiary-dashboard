@@ -8,10 +8,11 @@ import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { FilterSelect, listParam, toParam } from '#/components/FilterSelect'
 import { RecordList } from '#/components/RecordList'
-import { deleteGeneratedReport } from '#/data/queries'
+import { deleteGeneratedReportWrite } from '#/data/writes'
+import { useDataMutation } from '#/lib/mutation'
 import type { GeneratedReport } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
@@ -41,7 +42,7 @@ function HistoryPage() {
   const origins = listParam(origin)
   const templates = listParam(template)
   const setFilter = (patch: { origin?: string; template?: string }) => void navigate({ search: (prev) => ({ ...prev, ...patch }) })
-  const router = useRouter()
+  const deleteReport = useDataMutation(deleteGeneratedReportWrite())
   const [confirm, setConfirm] = useState<GeneratedReport | null>(null)
   const [busy, setBusy] = useState(false)
   const { error, guard } = useGuardedAction()
@@ -127,8 +128,7 @@ function HistoryPage() {
           setBusy(true)
           try {
             await guard(async () => {
-              await deleteGeneratedReport(confirm.id)
-              await router.invalidate()
+              await deleteReport.mutateAsync([confirm.id])
             })
           } finally {
             setBusy(false)

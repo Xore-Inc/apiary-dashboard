@@ -95,9 +95,9 @@ export type ResourceOptions<TData> = {
  * and its arguments, so every page asking for the same thing shares it. A
  * panel's "the backend does not serve this yet" answer (lib/backendGap) is
  * never reused: the next visit asks again. */
-export function resource<TArgs extends unknown[], TData>(name: string, read: (...args: TArgs) => Promise<TData>, freshness: Freshness): (...args: TArgs) => ResourceOptions<TData> {
+export function resource<TArgs extends unknown[], TData>(name: string, read: (...args: TArgs) => Promise<TData>, freshness: Freshness): Resource<TArgs, TData> {
   const { staleTime, ...rest } = FRESHNESS[freshness]
-  return (...args) =>
+  const options = (...args: TArgs) =>
     queryOptions({
       queryKey: [name, ...args] as QueryKey,
       queryFn: () => read(...args),
@@ -105,7 +105,13 @@ export function resource<TArgs extends unknown[], TData>(name: string, read: (..
       staleTime: (query: Query<TData, Error, TData, QueryKey>) => (isBackendGap(query.state.data) ? 0 : staleTime),
       meta: { freshness },
     }) as ResourceOptions<TData>
+  // Every entry of this resource, whatever its arguments: what a write
+  // invalidates (lib/mutation.ts).
+  return Object.assign(options, { key: [name] as QueryKey })
 }
+
+/** A resource: its options for some arguments, and `key` for all of them. */
+export type Resource<TArgs extends unknown[], TData> = ((...args: TArgs) => ResourceOptions<TData>) & { key: QueryKey }
 
 const noop = () => {}
 
