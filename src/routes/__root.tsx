@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HeadContent, Scripts, createRootRouteWithContext, useRouter, useRouterState } from '@tanstack/react-router'
+import { HeadContent, Scripts, createRootRouteWithContext, useRouter } from '@tanstack/react-router'
 import type { QueryClient } from '@tanstack/react-query'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
@@ -13,6 +13,8 @@ import type { Preferences } from '#/data/types'
 import { browserTimeZone, rememberBrowserZone } from '#/lib/browserZone'
 import { configureTime } from '#/lib/format'
 import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
+import { usePreferences } from '#/lib/prefs'
+import type { RootPreferences } from '#/lib/prefs'
 
 import appCss from '../styles.css?url'
 
@@ -51,12 +53,13 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   // The operator's preferences shape the whole document: theme mode,
-  // palette, contrast, motion, evidence text, and how times read.
-  // A "browser" time zone is resolved here, so the server renders it too.
+  // palette, contrast, motion, evidence text, and how times read. They and
+  // the mock clock go to the data cache (and so to the browser with the
+  // HTML, once); the loader's own data is the browser's time zone, resolved
+  // here so the server renders it too (lib/prefs.ts).
   loader: async ({ context: { queryClient } }) => {
-    const [prefs, mockClock] = await Promise.all([ensure(queryClient, preferencesQuery()), ensure(queryClient, mockClockQuery())])
-    const followsBrowser = prefs.timezone === 'browser'
-    return { ...prefs, timezone: followsBrowser ? browserTimeZone() : prefs.timezone, followsBrowser, mockClock }
+    await Promise.all([ensure(queryClient, preferencesQuery()), ensure(queryClient, mockClockQuery())])
+    return { browserZone: browserTimeZone() }
   },
   shellComponent: RootDocument,
 })
@@ -75,7 +78,7 @@ function rootAttributes(prefs: Preferences | undefined): Record<string, string |
  * a router refresh, so every page re-renders with it. On a first visit the
  * server cannot know the browser's zone and renders UTC; once mounted the
  * zone is left in a cookie and the router refreshes once, when idle. */
-function useTimePreferences(prefs: (Preferences & { followsBrowser: boolean; mockClock: number | null }) | undefined) {
+function useTimePreferences(prefs: RootPreferences | undefined) {
   const router = useRouter()
   const rendered = prefs?.followsBrowser ? prefs.timezone : undefined
   useEffect(() => {
@@ -93,7 +96,7 @@ function useTimePreferences(prefs: (Preferences & { followsBrowser: boolean; moc
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
-  const prefs = useRouterState({ select: (s) => s.matches.find((m) => m.routeId === '__root__')?.loaderData })
+  const prefs = usePreferences()
   useTimePreferences(prefs)
   return (
     <html lang="en" {...rootAttributes(prefs)}>

@@ -75,7 +75,7 @@
       "loadMs": 507
     },
     "/auth/login": {
-      "htmlKb": 12.1,
+      "htmlKb": 17.3,
       "jsKb": 538.3,
       "cssKb": 52.2,
       "requests": 83,
