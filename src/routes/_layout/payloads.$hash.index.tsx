@@ -10,15 +10,17 @@ import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
 import { Panel, StatTile } from '#/components/DashboardBlocks'
 import { formatDateTime } from '#/lib/format'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery } from '#/lib/query'
 import { relatedQuery } from '#/data/resources'
 import { usePayloadPage } from '#/data/pageData'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/payloads/$hash')
 
 export const Route = createFileRoute('/_layout/payloads/$hash/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('payload', params.hash)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('payload', params.hash)),
   component: PayloadOverview,
   pendingComponent: PayloadOverview,
 })
@@ -79,7 +81,7 @@ function PayloadOverview() {
           </MetadataList>
         </Panel>
       </Grid>
-      <RelatedPanel center={`${hash.slice(0, 16)}…`} groups={usePageQuery(relatedQuery('payload', Route.useParams().hash))} />
+      <Deferred query={relatedQuery('payload', Route.useParams().hash)}>{(groups) => <RelatedPanel center={`${hash.slice(0, 16)}…`} groups={groups} />}</Deferred>
     </VStack>
   )
 }

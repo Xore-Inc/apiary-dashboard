@@ -7,14 +7,16 @@ import { RelatedPanel } from '#/components/Related'
 import { StatTile } from '#/components/DashboardBlocks'
 import { EventsPanel } from '#/components/DetailBlocks'
 import { osGuessCaption } from '#/components/EntityBlocks'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery, usePageQuery } from '#/lib/query'
 import { ipProfileQuery, relatedQuery } from '#/data/resources'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/sources/$ip')
 
 export const Route = createFileRoute('/_layout/sources/$ip/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('source', params.ip)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('source', params.ip)),
   component: SourceOverview,
   pendingComponent: SourceOverview,
 })
@@ -34,7 +36,7 @@ function SourceOverview() {
         <StatTile label="ATT&CK techniques" value={p?.techniques.length} href={`${base}/behavior`} />
       </Grid>
       <EventsPanel title="Newest events" events={p?.events.slice(0, 5)} action={<ActionLink href={`${base}/events`}>All events</ActionLink>} />
-      <RelatedPanel center={parent.useParams().ip} groups={usePageQuery(relatedQuery('source', Route.useParams().ip))} />
+      <Deferred query={relatedQuery('source', Route.useParams().ip)}>{(groups) => <RelatedPanel center={parent.useParams().ip} groups={groups} />}</Deferred>
     </VStack>
   )
 }

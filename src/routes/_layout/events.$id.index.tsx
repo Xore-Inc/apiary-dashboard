@@ -14,21 +14,23 @@ import { EntityLink } from '#/components/EntityLink'
 import { CredentialStateToken } from '#/components/CredentialStateToken'
 import { credentialStateOf } from '#/lib/credentialState'
 import { fieldBlock, readField } from '#/lib/sensorFields'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery, usePageQuery } from '#/lib/query'
 import { eventDetailQuery, relatedQuery } from '#/data/resources'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/events/$id')
 
 export const Route = createFileRoute('/_layout/events/$id/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('event', params.id)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('event', params.id)),
   component: EventOverview,
   pendingComponent: EventOverview,
 })
 
 function EventOverview() {
   const loaded = usePageQuery(eventDetailQuery(parent.useParams().id))
-  const related = usePageQuery(relatedQuery('event', Route.useParams().id))
+  const related = relatedQuery('event', Route.useParams().id)
   // Its panels as skeletons until the event is here.
   if (!loaded) return <SkeletonPanels count={4} />
   const event = loaded.event
@@ -159,7 +161,7 @@ function EventOverview() {
         </Panel>
       )}
       <EventsPanel title="Around it in this session" events={session.slice(0, 8)} action={event.sessionId ? <EntityLink kind="session" id={event.sessionId}>Full session</EntityLink> : undefined} empty="This event is the whole session." />
-      <RelatedPanel center={event.summary ?? event.eventName} groups={related} />
+      <Deferred query={related}>{(groups) => <RelatedPanel center={event.summary ?? event.eventName} groups={groups} />}</Deferred>
     </VStack>
   )
 }

@@ -32,13 +32,13 @@ describe('page routes', () => {
     expect(missing).toEqual([])
   })
 
-  // usePageQuery/usePageQueries (lib/query.ts) and the combined page reads
-  // of data/pageData.ts (usePayloadPage, useSensorPage) are orPending over
-  // the data cache.
+  // usePageQuery/usePageQueries (lib/query.ts), the combined page reads of
+  // data/pageData.ts and the slow panels (components/Deferred.tsx) are
+  // orPending over the data cache.
   it('read their data through orPending, so "Loading forever" holds them on their skeleton', () => {
     const direct = routes.filter((file) => {
       const source = readFileSync(join(dir, file), 'utf8')
-      return source.includes('ssr: pageSsr') && !/\b(orPending|usePageQuery|usePageQueries|use[A-Z]\w*Page)\(/.test(source)
+      return source.includes('ssr: pageSsr') && !/\b(orPending|usePageQuery|usePageQueries|use[A-Z]\w*Page)\(|<Deferred\b/.test(source)
     })
     expect(direct).toEqual([])
   })

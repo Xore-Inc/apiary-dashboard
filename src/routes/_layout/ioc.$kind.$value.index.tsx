@@ -6,14 +6,16 @@ import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { RelatedPanel } from '#/components/Related'
 import { StatTile } from '#/components/DashboardBlocks'
 import { EventsPanel } from '#/components/DetailBlocks'
-import { ensure, usePageQuery } from '#/lib/query'
+import { startQuery, usePageQuery } from '#/lib/query'
 import { iocQuery, relatedQuery } from '#/data/resources'
+import { Deferred } from '#/components/Deferred'
 
 const parent = getRouteApi('/_layout/ioc/$kind/$value')
 
 export const Route = createFileRoute('/_layout/ioc/$kind/$value/')({
   ssr: pageSsr,
-  loader: ({ params, context }) => ensure(context, relatedQuery('ioc', `${params.kind}:${params.value}`)),
+  // The slow read starts here and the page renders without waiting for it.
+  loader: ({ params, context }) => startQuery(context, relatedQuery('ioc', `${params.kind}:${params.value}`)),
   component: IocOverview,
   pendingComponent: IocOverview,
 })
@@ -31,7 +33,7 @@ function IocOverview() {
         <StatTile label="Payloads after it" value={ioc?.payloads.length} href={`${base}/payloads`} />
       </Grid>
       <EventsPanel title="Newest events" events={ioc?.events.slice(0, 5)} showSource action={<ActionLink href={`${base}/events`}>All events</ActionLink>} />
-      <RelatedPanel center={value} groups={usePageQuery(relatedQuery('ioc', `${Route.useParams().kind}:${Route.useParams().value}`))} />
+      <Deferred query={relatedQuery('ioc', `${Route.useParams().kind}:${Route.useParams().value}`)}>{(groups) => <RelatedPanel center={value} groups={groups} />}</Deferred>
     </VStack>
   )
 }
