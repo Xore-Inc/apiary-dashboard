@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Button } from '@astryxdesign/core/Button'
 import { Icon } from '@astryxdesign/core/Icon'
 import { Link } from '@astryxdesign/core/Link'
@@ -12,14 +11,15 @@ import { Token } from '@astryxdesign/core/Token'
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getInfraClusters } from '#/data/queries'
 import type { InfraCluster } from '#/data/types'
 import { apiHref } from '#/lib/apiHref'
 import { formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { infraClustersQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/clusters/')({
   ssr: pageSsr,
-  loader: () => getInfraClusters(),
+  loader: ({ context }) => ensure(context, infraClustersQuery()),
   component: ClustersPage,
   pendingComponent: ClustersPage,
 })
@@ -45,7 +45,7 @@ const columns: TableColumn<InfraCluster>[] = [
 
 
 function ClustersPage() {
-  const clusters = orPending(Route.useLoaderData())
+  const clusters = usePageQuery(infraClustersQuery())
   return (
     <RecordList
       title="Infrastructure clusters"

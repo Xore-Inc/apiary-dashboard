@@ -3,11 +3,10 @@ import { useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { PageFrame } from '#/components/PageFrame'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { REPORT_WIDE, ReportWizard, emptyDraft } from '#/components/reports/ReportWizard'
 import { useMediaQuery } from '@astryxdesign/core/hooks'
-import { getFacets, getReports } from '#/data/queries'
-import { backendGapOf } from '#/lib/backendGap'
+import { facetsQuery, reportsQuery } from '#/data/resources'
 import { reportTabs } from '#/lib/navFamilies'
 
 export const Route = createFileRoute('/_layout/reports/generate')({
@@ -18,9 +17,10 @@ export const Route = createFileRoute('/_layout/reports/generate')({
     template: typeof search.template === 'string' && search.template ? search.template : undefined,
     from: typeof search.from === 'string' && search.from ? search.from : undefined,
   }),
-  loader: async () => {
-    // The pickers run without the counted facets until the backend serves them (#3524).
-    const [data, facets] = await Promise.all([getReports(), backendGapOf(getFacets())])
+  // The pickers run without the counted facets until the backend serves
+  // them (#3524): facetsQuery answers a gap.
+  loader: async ({ context }) => {
+    const [data, facets] = await Promise.all([ensure(context, reportsQuery()), ensure(context, facetsQuery())])
     return { data, facets }
   },
   component: GeneratePage,
@@ -28,7 +28,8 @@ export const Route = createFileRoute('/_layout/reports/generate')({
 })
 
 function GeneratePage() {
-  const { data, facets } = orPending(Route.useLoaderData()) ?? {}
+  const data = usePageQuery(reportsQuery())
+  const facets = usePageQuery(facetsQuery())
   const { template, from } = Route.useSearch()
   // Bumping the key starts a fresh wizard after a report was generated.
   const [run, setRun] = useState(0)

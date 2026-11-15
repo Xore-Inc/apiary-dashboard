@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { textParam } from '#/lib/searchParams'
 import { useState } from 'react'
 import { ConfirmDialog } from '#/components/AppDialog'
@@ -12,13 +11,15 @@ import { TextInput } from '@astryxdesign/core/TextInput'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getDeadLetters, purgeDeadLetters } from '#/data/queries'
+import { purgeDeadLetters } from '#/data/queries'
 import { describeError } from '#/lib/actionError'
 import { useIsAdmin } from '#/lib/session'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import type { DeadLetter } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { healthTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { deadLettersQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/dead-letters/')({
   ssr: pageSsr,
@@ -27,7 +28,7 @@ export const Route = createFileRoute('/_layout/dead-letters/')({
     q: textParam(search.q),
   }),
   loaderDeps: ({ search }) => ({ q: search.q ?? '' }),
-  loader: ({ deps }) => getDeadLetters(deps.q),
+  loader: ({ deps, context }) => ensure(context, deadLettersQuery(deps.q)),
   component: DeadLettersPage,
   pendingComponent: DeadLettersPage,
 })
@@ -39,7 +40,7 @@ const columns: TableColumn<DeadLetter>[] = [
 ]
 
 function DeadLettersPage() {
-  const rows = orPending(Route.useLoaderData())
+  const rows = usePageQuery(deadLettersQuery(Route.useLoaderDeps().q))
   const { q } = Route.useSearch()
   const navigate = Route.useNavigate()
   const router = useRouter()

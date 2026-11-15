@@ -1,8 +1,9 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable } from '#/components/DashboardBlocks'
+import { usePageQuery } from '#/lib/query'
+import { ipProfileQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/sources/$ip')
 
@@ -10,7 +11,7 @@ export const Route = createFileRoute('/_layout/sources/$ip/breakdown')({ ssr: pa
 
 /** What this address reached and what it tried, as leaderboards. */
 function SourceBreakdown() {
-  const p = orPending(parent.useLoaderData())
+  const p = usePageQuery(ipProfileQuery(parent.useParams().ip))
   return (
     <Grid columns={{ minWidth: 300, repeat: 'fit' }} gap={4}>
       <MiniTable title="Credential pairs tried" header="user:password" rows={p?.credentials} entity="credential" />

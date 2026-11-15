@@ -1,11 +1,11 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute } from '@tanstack/react-router'
 import { GHIDRA_SECTIONS, GhidraResult } from '#/components/analyzers/GhidraResult'
 import type { GhidraSection } from '#/components/analyzers/GhidraResult'
 import { sectionOf } from '#/components/ViewTabs'
-import { getGhidraAnalysis } from '#/data/queries'
+import { ensure, usePageQuery } from '#/lib/query'
+import { ghidraAnalysisQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/payloads/$hash/ghidra')({
   ssr: pageSsr,
@@ -15,13 +15,13 @@ export const Route = createFileRoute('/_layout/payloads/$hash/ghidra')({
     fn: typeof search.fn === 'string' && search.fn ? search.fn : undefined,
     section: GHIDRA_SECTIONS.some((s) => s.id === search.section) && search.section !== 'overview' ? (search.section as GhidraSection) : undefined,
   }),
-  loader: ({ params }) => getGhidraAnalysis(params.hash),
+  loader: ({ params, context }) => ensure(context, ghidraAnalysisQuery(params.hash)),
   component: TabView,
   pendingComponent: TabView,
 })
 
 function TabView() {
-    const g = orPending(Route.useLoaderData())
+    const g = usePageQuery(ghidraAnalysisQuery(Route.useParams().hash))
     const { fn, section } = Route.useSearch()
     return g ? <GhidraResult g={g} fn={fn} section={sectionOf(GHIDRA_SECTIONS, section) as GhidraSection} /> : <Text type="supporting">No Ghidra decompilation. Shell scripts are not decompiled.</Text>
   }

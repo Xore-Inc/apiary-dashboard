@@ -1,18 +1,22 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { createFileRoute, notFound } from '@tanstack/react-router'
 import { AuthInspector } from '#/components/details/AuthFailure'
-import { getAuthEvents } from '#/data/queries'
+import { authEventsQuery } from '#/data/resources'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
 import { formatDateTime } from '#/lib/format'
 
+/** The failure the page is about, from the list's read. */
+const pick = (data: ResourceData<typeof authEventsQuery>, id: string) => data.events.find((e) => e.id === id)
+
 export const Route = createFileRoute('/_layout/auth-events/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const row = (await getAuthEvents()).events.find((e) => e.id === params.id)
+  loader: async ({ params, context }) => {
+    const row = pick(await ensure(context, authEventsQuery()), params.id)
     if (!row) throw notFound()
     return row
   },
@@ -24,8 +28,9 @@ export const Route = createFileRoute('/_layout/auth-events/$id')({
 })
 
 function AuthFailurePage() {
-  const d = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const list = usePageQuery(authEventsQuery())
+  const d = list && pick(list, id)
   return (
     <EntityFrame
       kind="Auth failure"

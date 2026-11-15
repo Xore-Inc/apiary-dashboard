@@ -1,8 +1,9 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Grid } from '@astryxdesign/core/Grid'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { ValueList } from '#/components/EntityBlocks'
+import { usePageQuery } from '#/lib/query'
+import { identityQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/identities/$id')
 
@@ -13,7 +14,7 @@ export const Route = createFileRoute('/_layout/identities/$id/indicators')({
 })
 
 function TabView() {
-    const a = orPending(parent.useLoaderData())?.identity
+    const a = usePageQuery(identityQuery(parent.useParams().id))?.identity
     return (
       <Grid columns={{ minWidth: 300, repeat: 'fit' }} gap={4}>
         <ValueList title="Fingerprints" kind="fingerprint" values={a?.fingerprints} />

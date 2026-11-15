@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
@@ -8,15 +7,16 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
-import { getNetwork } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { networkQuery } from '#/data/resources'
 
 // {cidr} carries a literal "/", so every link percent-encodes it.
 export const Route = createFileRoute('/_layout/networks/$cidr')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Network views', basePath: (params) => `/networks/${encodeURIComponent(params.cidr)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const network = await getNetwork(params.cidr)
+  loader: async ({ params, context }) => {
+    const network = await ensure(context, networkQuery(params.cidr))
     if (!network) throw notFound()
     return network
   },
@@ -26,7 +26,7 @@ export const Route = createFileRoute('/_layout/networks/$cidr')({
 })
 
 function NetworkLayout() {
-  const n = orPending(Route.useLoaderData())
+  const n = usePageQuery(networkQuery(Route.useParams().cidr))
   const { cidr } = Route.useParams()
   return (
     <EntityFrame

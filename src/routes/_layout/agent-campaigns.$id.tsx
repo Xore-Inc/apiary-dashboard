@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { HStack } from '@astryxdesign/core/Stack'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
@@ -10,14 +9,16 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getAgentCampaign } from '#/data/queries'
+import type { ResourceData } from '#/lib/query'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { agentCampaignQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/agent-campaigns/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Agent campaign views', basePath: (params) => `/agent-campaigns/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getAgentCampaign(params.id)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, agentCampaignQuery(params.id))
     if (!detail) throw notFound()
     return detail
   },
@@ -32,7 +33,7 @@ export const Route = createFileRoute('/_layout/agent-campaigns/$id')({
 })
 
 function AgentCampaignLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(agentCampaignQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const c = loaded?.campaign
   return (
@@ -61,7 +62,7 @@ function AgentCampaignLayout() {
 /** The top-bar tabs: static until the loader data arrives, then with counts. */
 function tabsFor(loaded: unknown): ViewTab[] {
   if (!loaded) return [{ id: 'overview', label: 'Overview' }, { id: 'evidence', label: 'Evidence timeline' }, { id: 'rules', label: 'Rules & decode chains' }, { id: 'events', label: 'Events' }]
-  const { campaign: c, events } = loaded as NonNullable<Awaited<ReturnType<typeof getAgentCampaign>>>
+  const { campaign: c, events } = loaded as NonNullable<ResourceData<typeof agentCampaignQuery>>
   const rules = new Set(c.events.flatMap((e) => e.matchedRules.map((r) => r.rule)))
   return [
     { id: 'overview', label: 'Overview' },

@@ -1,11 +1,12 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { formatDateTime } from '#/lib/format'
+import { usePageQuery } from '#/lib/query'
+import { anomalyQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/ml-anomalies/$id')
 
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/_layout/ml-anomalies/$id/event')({
 
 /** The raw event the models scored. */
 function AnomalyEvent() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = usePageQuery(anomalyQuery(parent.useParams().id))
   const a = loaded?.anomaly
   const event = loaded?.event
   if (!event)

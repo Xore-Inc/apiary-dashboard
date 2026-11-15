@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Button } from '@astryxdesign/core/Button'
 import { HStack } from '@astryxdesign/core/Stack'
 import { pixel, proportional } from '@astryxdesign/core/Table'
@@ -8,14 +7,15 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getReports } from '#/data/queries'
 import type { ReportTemplate } from '#/data/types'
 import { reportTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { reportsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/reports/templates')({
   ssr: pageSsr,
   staticData: { viewTabs: reportTabs },
-  loader: () => getReports(),
+  loader: ({ context }) => ensure(context, reportsQuery()),
   component: TemplatesPage,
   pendingComponent: TemplatesPage,
 })
@@ -24,7 +24,7 @@ type Row = ReportTemplate & Record<string, unknown>
 
 /** The starting points: what each template includes, and a way to use it. */
 function TemplatesPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(reportsQuery())
   const label = (id: string) => data?.elements.find((e) => e.id === id)?.label ?? id
   const inUse = (id: string) => data?.definitions.filter((d) => d.template === id).length ?? 0
   const use = (id: string) => `/reports/generate?template=${id}`

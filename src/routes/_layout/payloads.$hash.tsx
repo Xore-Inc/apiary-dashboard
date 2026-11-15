@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { PayloadOperatorMenu, VERDICT_COLOR } from '#/components/analyzers/PayloadBlocks'
@@ -10,7 +9,7 @@ import { virusTotalLink } from '#/lib/toolLinks'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getCapeRun, getGithubAnalysis, getPayloadAnalysis, getPayloadDelivery, getRevDeckRun } from '#/data/queries'
+import { loadPayloadPage, usePayloadPage } from '#/data/pageData'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { GHIDRA_SECTIONS } from '#/components/analyzers/GhidraResult'
 import { SANDBOX_SECTIONS } from '#/components/analyzers/SandboxResult'
@@ -20,16 +19,10 @@ const LINUX_SANDBOX = SANDBOX_SECTIONS.filter((s) => s.id !== 'file')
 export const Route = createFileRoute('/_layout/payloads/$hash')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Payload views', basePath: (params) => `/payloads/${params.hash}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const [analysis, cape, revdeck, github, delivery] = await Promise.all([
-      getPayloadAnalysis(params.hash),
-      getCapeRun(params.hash),
-      getRevDeckRun(params.hash),
-      getGithubAnalysis(params.hash),
-      getPayloadDelivery(params.hash),
-    ])
-    if (!analysis) throw notFound()
-    return { analysis, cape, revdeck, github, delivery }
+  loader: async ({ params, context }) => {
+    const page = await loadPayloadPage(context, params.hash)
+    if (!page) throw notFound()
+    return page
   },
   notFoundComponent: () => <NotFound title="Payload" description="No captured payload has this hash." />,
   component: PayloadLayout,
@@ -38,7 +31,7 @@ export const Route = createFileRoute('/_layout/payloads/$hash')({
 
 /** One captured file and every analysis of it, in one place (epic #25). */
 function PayloadLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePayloadPage(Route.useParams().hash)
   // The hash is in the address: the title and the actions need no data.
   const { hash } = Route.useParams()
   const a = loaded?.analysis

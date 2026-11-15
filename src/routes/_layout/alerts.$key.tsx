@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { AckButton } from '#/components/details/Alert'
@@ -9,14 +8,15 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getAlertDetail } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { alertDetailQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/alerts/$key')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Alert views', basePath: (params) => `/alerts/${encodeURIComponent(params.key)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getAlertDetail(params.key)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, alertDetailQuery(params.key))
     if (!detail) throw notFound()
     return detail
   },
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/_layout/alerts/$key')({
 })
 
 function AlertLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(alertDetailQuery(Route.useParams().key))
   const { key } = Route.useParams()
   const group = loaded?.group
   return (

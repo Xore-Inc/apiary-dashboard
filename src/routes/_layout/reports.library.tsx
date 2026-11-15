@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { useState } from 'react'
 import { ConfirmDialog } from '#/components/AppDialog'
@@ -12,25 +11,27 @@ import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { describeSchedule } from '#/components/details/Report'
 import { RecordList } from '#/components/RecordList'
-import { deleteReportDefinition, generateReport, getReports } from '#/data/queries'
+import { deleteReportDefinition, generateReport } from '#/data/queries'
 import type { GeneratedReport, ReportDefinition } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { reportTabs } from '#/lib/navFamilies'
 import { useIsAdmin } from '#/lib/session'
+import { ensure, usePageQuery } from '#/lib/query'
+import { reportsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/reports/library')({
   ssr: pageSsr,
   staticData: { viewTabs: reportTabs },
-  loader: () => getReports(),
+  loader: ({ context }) => ensure(context, reportsQuery()),
   component: LibraryPage,
   pendingComponent: LibraryPage,
 })
 
 /** Saved definitions: generate one now, reopen it in the wizard, or drop it. */
 function LibraryPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(reportsQuery())
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const { error, guard } = useGuardedAction()

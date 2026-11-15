@@ -1,11 +1,12 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Panel } from '#/components/DashboardBlocks'
 import { EntityLink } from '#/components/EntityLink'
 import { formatNumber } from '#/lib/format'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
+import { usePageQuery } from '#/lib/query'
+import { networkQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/networks/$cidr')
 
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/_layout/networks/$cidr/campaign')({
 })
 
 function TabView() {
-    const n = orPending(parent.useLoaderData())
+    const n = usePageQuery(networkQuery(parent.useParams().cidr))
     return n?.campaign ? (
       <Panel title="Detected campaign">
         <VStack gap={2}>

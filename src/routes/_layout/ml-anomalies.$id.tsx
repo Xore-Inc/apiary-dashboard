@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { StatusToken } from '#/components/details/Anomaly'
 import { EntityFrame } from '#/components/EntityFrame'
@@ -9,14 +8,15 @@ import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getAnomaly } from '#/data/queries'
 import { formatDateTime } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { anomalyQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/ml-anomalies/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'ML anomaly views', basePath: (params) => `/ml-anomalies/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getAnomaly(params.id)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, anomalyQuery(params.id))
     if (!detail) throw notFound()
     return detail
   },
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/_layout/ml-anomalies/$id')({
 })
 
 function AnomalyLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(anomalyQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const a = loaded?.anomaly
   return (

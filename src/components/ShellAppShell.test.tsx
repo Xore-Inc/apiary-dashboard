@@ -18,6 +18,8 @@ import { NAV_SECTIONS } from '#/lib/nav'
 import { neutralTheme } from '#/themes/neutral/neutral-family'
 import { RouterLink } from './RouterLink'
 import { ShellAppShell } from './ShellAppShell'
+import { QueryClientProvider } from '@tanstack/react-query'
+import { createQueryClient } from '#/lib/query'
 import { searchTabs } from './ViewTabs'
 import { CONFIG, DEPLOYMENT_LINKS } from '#/data/mock/details'
 
@@ -63,11 +65,13 @@ function renderShell(path: string, { mockScenarios = false }: { mockScenarios?: 
     history: createMemoryHistory({ initialEntries: [path] }),
   })
   render(
-    <Theme theme={neutralTheme}>
-      <LinkProvider component={RouterLink}>
-        <RouterProvider router={router} />
-      </LinkProvider>
-    </Theme>,
+    <QueryClientProvider client={createQueryClient()}>
+      <Theme theme={neutralTheme}>
+        <LinkProvider component={RouterLink}>
+          <RouterProvider router={router} />
+        </LinkProvider>
+      </Theme>
+    </QueryClientProvider>,
   )
   return router
 }

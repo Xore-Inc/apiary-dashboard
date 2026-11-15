@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { MiniTable } from '#/components/DashboardBlocks'
+import { usePageQuery } from '#/lib/query'
+import { ipProfileQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/sources/$ip')
 
@@ -12,5 +13,5 @@ export const Route = createFileRoute('/_layout/sources/$ip/payloads')({
 })
 
 function TabView() {
-  return <MiniTable title="Payloads delivered" header="SHA-256" rows={orPending(parent.useLoaderData())?.payloads} entity="payload" />
+  return <MiniTable title="Payloads delivered" header="SHA-256" rows={usePageQuery(ipProfileQuery(parent.useParams().ip))?.payloads} entity="payload" />
 }

@@ -27,7 +27,7 @@ export const Route = createFileRoute('/_layout')({
   search: { middlewares: [retainSearchParams(['range', 'mock'])] },
   // Before any loader below runs: the navigation's mock scenario (every
   // query of it carries that), then the landing and default-range redirects.
-  beforeLoad: async ({ search, location, context: { queryClient } }) => {
+  beforeLoad: async ({ search, location, preload, context: { queryClient } }) => {
     // A switch of mock scenario changes every answer: drop the cached ones
     // (development only; production has no scenarios).
     if (setNavigationScenario(search.mock)) queryClient.removeQueries()
@@ -51,7 +51,9 @@ export const Route = createFileRoute('/_layout')({
       const saved = rememberedSearch(location.pathname)
       if (saved) throw redirect({ href: `${location.pathname}${saved}` })
     }
-    return { user }
+    // Every page's loader reads through `context` (lib/query.ts ensure): a
+    // preload answers from the cache without revalidating it.
+    return { user, preload }
   },
   loader: async ({ context }) => {
     const [config, mockScenarios] = await Promise.all([ensure(context.queryClient, shellConfigQuery()), ensure(context.queryClient, mockScenariosAllowedQuery())])

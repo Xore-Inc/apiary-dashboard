@@ -1,5 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
+import { useQueryClient } from '@tanstack/react-query'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Grid } from '@astryxdesign/core/Grid'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
@@ -9,14 +9,12 @@ import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { Table, pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Heading, Text } from '@astryxdesign/core/Text'
-import { createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { Panel, StatTile } from '#/components/DashboardBlocks'
 import { FeedStateLabel } from '#/components/FeedState'
 import { PageFrame } from '#/components/PageFrame'
 import { Pending } from '#/components/Pending'
 import { SkeletonTable } from '#/components/SkeletonTable'
-import { orPending } from '#/lib/pending'
-import { getSourceHealth } from '#/data/queries'
 import type { SensorFeed, SourceHealth } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
@@ -25,11 +23,13 @@ import { HEALTH_CHANGED } from '#/data/incidents'
 import { useLiveInterval } from '#/lib/live'
 import { usePreferences } from '#/lib/prefs'
 import { healthTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { sourceHealthQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/source-health')({
   ssr: pageSsr,
   staticData: { viewTabs: healthTabs },
-  loader: () => getSourceHealth(),
+  loader: ({ context }) => ensure(context, sourceHealthQuery()),
   component: SourceHealthPage,
   pendingComponent: SourceHealthPage,
 })
@@ -64,11 +64,11 @@ const feedColumns: TableColumn<SensorFeed>[] = [
 ]
 
 function SourceHealthPage() {
-  const health = orPending(Route.useLoaderData())
-  const router = useRouter()
+  const health = usePageQuery(sourceHealthQuery())
+  const queryClient = useQueryClient()
   // Health moves in minutes: re-read it on the live interval, and at once
   // when a simulated incident changes it.
-  const refresh = useCallback(() => refreshWhenSettled(router), [router])
+  const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: sourceHealthQuery().queryKey }, { cancelRefetch: false }), [queryClient])
   useLiveInterval(refresh, (usePreferences()?.refreshSeconds ?? 30) * 1000)
   useEffect(() => {
     window.addEventListener(HEALTH_CHANGED, refresh)

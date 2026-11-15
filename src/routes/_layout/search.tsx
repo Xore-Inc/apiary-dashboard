@@ -16,9 +16,9 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 import { createFileRoute } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import { PageFrame } from '#/components/PageFrame'
-import { searchAll } from '#/data/queries'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import { searchAllQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/search')({
   ssr: pageSsr,
@@ -26,13 +26,13 @@ export const Route = createFileRoute('/_layout/search')({
     q: textParam(search.q),
   }),
   loaderDeps: ({ search }) => ({ q: search.q ?? '' }),
-  loader: ({ deps }) => searchAll(deps.q, 50),
+  loader: ({ deps, context }) => ensure(context, searchAllQuery(deps.q, 50)),
   component: SearchPage,
   pendingComponent: SearchPage,
 })
 
 function SearchPage() {
-  const groups = orPending(Route.useLoaderData())
+  const groups = usePageQuery(searchAllQuery(Route.useLoaderDeps().q, 50))
   const { q } = Route.useSearch()
   const navigate = Route.useNavigate()
   const [draft, setDraft] = useState(q ?? '')

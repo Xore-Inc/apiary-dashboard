@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { GroupBreakdown, SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
+import { usePageQuery } from '#/lib/query'
+import { iocQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/ioc/$kind/$value')
 
@@ -12,6 +13,6 @@ export const Route = createFileRoute('/_layout/ioc/$kind/$value/breakdown')({
 })
 
 function TabView() {
-  const rec = orPending(parent.useLoaderData())?.group
+  const rec = usePageQuery(iocQuery(parent.useParams().kind, parent.useParams().value))?.group
   return rec ? <GroupBreakdown group={rec} /> : <SkeletonPanels />
 }

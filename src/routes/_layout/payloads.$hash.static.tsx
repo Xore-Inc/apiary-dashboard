@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { CodeBlock } from '@astryxdesign/core/CodeBlock'
 import { Grid } from '@astryxdesign/core/Grid'
 import { VStack } from '@astryxdesign/core/Stack'
@@ -9,6 +8,7 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
+import { usePayloadPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/payloads/$hash')
 
@@ -16,7 +16,7 @@ export const Route = createFileRoute('/_layout/payloads/$hash/static')({ ssr: pa
 
 /** Bounded static analysis. The sample is never executed here. */
 function PayloadStatic() {
-  const a = orPending(parent.useLoaderData())?.analysis
+  const a = usePayloadPage(parent.useParams().hash)?.analysis
   if (!a) return <SkeletonPanels count={3} />
   return (
     <VStack gap={4}>

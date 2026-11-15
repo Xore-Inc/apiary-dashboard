@@ -31,7 +31,7 @@
 // right after a cold load). Nothing polls. Focus and reconnect refetch only
 // the live class, where the answer is expected to move while the tab sat in
 // the background and the read is one cheap call.
-import { QueryClient, queryOptions, useQuery } from '@tanstack/react-query'
+import { QueryClient, queryOptions, skipToken, useQueries, useQuery } from '@tanstack/react-query'
 import type { DataTag, Query, QueryKey } from '@tanstack/react-query'
 import { isBackendGap } from '#/lib/backendGap'
 import { orPending } from '#/lib/pending'
@@ -42,10 +42,16 @@ const MINUTE = 60 * SECOND
 /** How fast a resource's answer moves, and so how long it is reused. */
 export type Freshness = 'live' | 'normal' | 'slow' | 'static'
 
-export const FRESHNESS: Record<Freshness, { staleTime: number; gcTime: number; refetchOnWindowFocus: boolean; refetchOnReconnect: boolean }> = {
-  /** The live feed, alerts, the alert count: asked again on every visit and
-   * when the tab comes back. */
-  live: { staleTime: 0, gcTime: 5 * MINUTE, refetchOnWindowFocus: true, refetchOnReconnect: true },
+type Refocus = boolean | ((query: { state: { dataUpdatedAt: number } }) => boolean)
+
+/** Asked again when the tab comes back or the network returns, unless the
+ * answer is only seconds old (the page has just loaded it). */
+const olderThan10s: Refocus = (query) => Date.now() - query.state.dataUpdatedAt > 10 * SECOND
+
+export const FRESHNESS: Record<Freshness, { staleTime: number; gcTime: number; refetchOnWindowFocus: Refocus; refetchOnReconnect: Refocus }> = {
+  /** The live feed, alerts, source health: asked again on every visit, and
+   * when the tab comes back or the network returns. */
+  live: { staleTime: 0, gcTime: 5 * MINUTE, refetchOnWindowFocus: olderThan10s, refetchOnReconnect: olderThan10s },
   /** Lists and aggregates: reused for 30 s (the backend's own shared read
    * cache, BACKEND_READ_CACHE_TTL_MS, is 15 s). */
   normal: { staleTime: 30 * SECOND, gcTime: 10 * MINUTE, refetchOnWindowFocus: false, refetchOnReconnect: false },
@@ -80,8 +86,8 @@ export type ResourceOptions<TData> = {
   queryFn: () => Promise<TData>
   staleTime: (query: Query<TData, Error, TData, QueryKey>) => number
   gcTime: number
-  refetchOnWindowFocus: boolean
-  refetchOnReconnect: boolean
+  refetchOnWindowFocus: Refocus
+  refetchOnReconnect: Refocus
   meta: { freshness: Freshness }
 }
 
@@ -103,12 +109,23 @@ export function resource<TArgs extends unknown[], TData>(name: string, read: (..
 
 const noop = () => {}
 
+/** Where a loader reads: the router's data cache, and whether this load is
+ * a preload (a hover, a predicted next page) rather than the navigation
+ * itself. The layout puts `preload` in every page's router context. */
+export type LoaderCache = QueryClient | { queryClient: QueryClient; preload?: boolean }
+
+const clientOf = (cache: LoaderCache): QueryClient => (cache instanceof QueryClient ? cache : cache.queryClient)
+
 /** What a loader awaits: the cached answer at once when there is one (asked
- * again in the background when stale), else the fetch. */
-export function ensure<TData>(queryClient: QueryClient, options: ResourceOptions<TData>): Promise<TData> {
+ * again in the background when stale), else the fetch. A preload of a page
+ * whose answer is cached revalidates nothing: the navigation that follows
+ * does, so hovering over or predicting a live page costs no call. */
+export function ensure<TData>(cache: LoaderCache, options: ResourceOptions<TData>): Promise<TData> {
+  const queryClient = clientOf(cache)
+  const preload = !(cache instanceof QueryClient) && cache.preload === true
   // query() with the resource's own staleTime is a no-op on a fresh answer
   // and a fetch on a stale one; a failure shows on the page's observer.
-  if (queryClient.getQueryData(options.queryKey) !== undefined) void queryClient.query(options).catch(noop)
+  if (!preload && queryClient.getQueryData(options.queryKey) !== undefined) void queryClient.query(options).catch(noop)
   return queryClient.query({ ...options, staleTime: 'static' })
 }
 
@@ -122,7 +139,58 @@ export function startQuery<TData>(queryClient: QueryClient, options: ResourceOpt
 
 /** A page's read of what its loader put in the cache: undefined while the
  * page is its own pending state (lib/pending.ts), else the current answer,
- * kept current by every refetch and invalidation. */
-export function usePageQuery<TData>(options: ResourceOptions<TData>): TData | undefined {
-  return orPending(useQuery(options).data)
+ * kept current by every refetch and invalidation. Undefined options (a read
+ * whose arguments are not known yet) read nothing. */
+export function usePageQuery<TData>(options: ResourceOptions<TData> | undefined): TData | undefined {
+  const { data } = useQuery<TData, Error, TData, QueryKey>(options ?? { queryKey: NOTHING, queryFn: skipToken })
+  return orPending(options ? data : undefined)
+}
+
+const NOTHING = ['nothing'] as const
+
+type DataOf<T> = T extends ResourceOptions<infer D> ? D : never
+
+/** The answer type of a resource of src/data/resources.ts. */
+export type ResourceData<TResource> = TResource extends (...args: never[]) => ResourceOptions<infer D> ? D : never
+
+/** Any resource's options. `any`, not `unknown`: Query's options are
+ * invariant in their data type (staleTime takes the typed Query), so a
+ * list of differently typed reads has no narrower common type. */
+type AnyResource = ResourceOptions<any>
+
+/** Several reads a page combines (a payload's analyses, a sensor's detail
+ * with the fleet's health): the combination once every one has answered,
+ * undefined until then and while the page is its own pending state. The
+ * loader awaits the same reads and combines them the same way. */
+export function usePageQueries<TQueries extends readonly AnyResource[], TResult>(
+  queries: readonly [...TQueries],
+  combine: (data: { [K in keyof TQueries]: DataOf<TQueries[K]> }) => TResult,
+): TResult | undefined {
+  const combined = useQueries({
+    queries,
+    combine: (results) => (results.every((r) => r.data !== undefined) ? combine(results.map((r) => r.data) as { [K in keyof TQueries]: DataOf<TQueries[K]> }) : undefined),
+  })
+  return orPending(combined)
+}
+
+/** The loader's side of usePageQueries: every read ensured, then combined. */
+export async function ensureAll<TQueries extends readonly AnyResource[]>(cache: LoaderCache, queries: readonly [...TQueries]): Promise<{ [K in keyof TQueries]: DataOf<TQueries[K]> }> {
+  return (await Promise.all(queries.map((q) => ensure(cache, q)))) as { [K in keyof TQueries]: DataOf<TQueries[K]> }
+}
+
+/** The shell's reads (session, preferences, configuration, the bell's
+ * count): refreshed by the navigation guard and the bell's own minute, not
+ * by a page's live refresh. */
+const SHELL_READS = new Set(['getSessionUser', 'getPreferences', 'getShellConfig', 'getMockClock', 'getMockScenariosAllowed', 'getOpenAlertCount'])
+
+/** A live page's refresh (a live event, the live interval, live resuming):
+ * every read the page shows is asked again in the background, the cached
+ * answer staying on screen until the new one arrives. A read still running
+ * is joined, not restarted, so a slow read always gets to answer (the
+ * reason lib/refreshWhenSettled exists for router reloads). */
+export function refreshPageData(queryClient: QueryClient): Promise<void> {
+  return queryClient.invalidateQueries(
+    { type: 'active', predicate: (query) => !SHELL_READS.has(String(query.queryKey[0])) && query.meta?.freshness !== 'static' },
+    { cancelRefetch: false },
+  )
 }

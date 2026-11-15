@@ -1,7 +1,8 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { EventsPanel } from '#/components/DetailBlocks'
+import { usePageQuery } from '#/lib/query'
+import { agentCampaignQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/agent-campaigns/$id')
 
@@ -15,7 +16,7 @@ function TabView() {
   return (
     <EventsPanel
       title="Sensor events in this campaign"
-      events={orPending(parent.useLoaderData())?.events}
+      events={usePageQuery(agentCampaignQuery(parent.useParams().id))?.events}
       showSource
       empty="The events sit in agent-sensor indices; open them from the evidence timeline."
     />

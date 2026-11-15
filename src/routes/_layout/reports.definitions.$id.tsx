@@ -2,7 +2,8 @@ import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonTable } from '#/components/SkeletonTable'
 import { SkeletonLines } from '#/components/EntityBlocks'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
+import type { ResourceData } from '#/lib/query'
 import { ActionLink } from '#/components/ActionLink'
 import { Table, pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
@@ -15,21 +16,22 @@ import { Panel } from '#/components/DashboardBlocks'
 import { ReviewStep, describeSchedule } from '#/components/details/Report'
 import { EntityFrame } from '#/components/EntityFrame'
 import { NotFound } from '#/components/NotFound'
-import { getReports } from '#/data/queries'
+import { reportsQuery } from '#/data/resources'
 import type { GeneratedReport } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 
+/** The definition the page is about, with its reports, from the reports read. */
+const pick = (data: ResourceData<typeof reportsQuery>, id: string) => {
+  const definition = data.definitions.find((d) => d.id === id)
+  return definition && { data, definition, generated: data.generated.filter((g) => g.definitionId === id) }
+}
+
 export const Route = createFileRoute('/_layout/reports/definitions/$id')({
   ssr: pageSsr,
-  loader: async ({ params }) => {
-    const data = await getReports()
-    const definition = data.definitions.find((d) => d.id === params.id)
-    if (!definition) throw notFound()
-    return {
-      data,
-      definition,
-      generated: data.generated.filter((g) => g.definitionId === params.id),
-    }
+  loader: async ({ params, context }) => {
+    const page = pick(await ensure(context, reportsQuery()), params.id)
+    if (!page) throw notFound()
+    return page
   },
   notFoundComponent: () => (
     <NotFound
@@ -80,8 +82,9 @@ const generatedColumns: TableColumn<GeneratedReport>[] = [
 ]
 
 function DefinitionPage() {
-  const loaded = orPending(Route.useLoaderData())
   const { id } = Route.useParams()
+  const reports = usePageQuery(reportsQuery())
+  const loaded = reports && pick(reports, id)
   const data = loaded?.data
   const d = loaded?.definition
   const generated = loaded?.generated

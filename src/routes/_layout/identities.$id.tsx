@@ -1,19 +1,19 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getIdentity } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { identityQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/identities/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Attacker identity views', basePath: (params) => `/identities/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const identity = await getIdentity(params.id)
+  loader: async ({ params, context }) => {
+    const identity = await ensure(context, identityQuery(params.id))
     if (!identity) throw notFound()
     return identity
   },
@@ -23,7 +23,7 @@ export const Route = createFileRoute('/_layout/identities/$id')({
 })
 
 function IdentityLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(identityQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const a = loaded?.identity
   return (

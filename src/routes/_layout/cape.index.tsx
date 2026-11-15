@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Link } from '@astryxdesign/core/Link'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
@@ -7,16 +6,17 @@ import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getCapeRuns } from '#/data/queries'
 import type { CapeRun } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { analysisTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { capeRunsQuery } from '#/data/resources'
 
 // Index leaf so cape/$sha is not swallowed by a parent component.
 export const Route = createFileRoute('/_layout/cape/')({
   ssr: pageSsr,
   staticData: { viewTabs: analysisTabs() },
-  loader: () => getCapeRuns(),
+  loader: ({ context }) => ensure(context, capeRunsQuery()),
   component: CapeIndexPage,
   pendingComponent: CapeIndexPage,
 })
@@ -29,7 +29,7 @@ const columns: TableColumn<CapeRun>[] = [
 ]
 
 function CapeIndexPage() {
-  const runs = orPending(Route.useLoaderData())
+  const runs = usePageQuery(capeRunsQuery())
   return (
     <RecordList
       title="CAPE"

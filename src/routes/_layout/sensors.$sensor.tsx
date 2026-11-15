@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { HStack } from '@astryxdesign/core/Stack'
 import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { Text } from '@astryxdesign/core/Text'
@@ -10,7 +9,7 @@ import { FilterSelect } from '#/components/FilterSelect'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getSensorCatalog, getSensorDetail, getSourceHealth, getTopology } from '#/data/queries'
+import { loadSensorPage, useSensorPage } from '#/data/pageData'
 import type { SensorStatus } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { sensorSubtitle } from '#/lib/sensorText'
@@ -18,15 +17,10 @@ import { sensorSubtitle } from '#/lib/sensorText'
 export const Route = createFileRoute('/_layout/sensors/$sensor')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Sensor views', basePath: (params) => `/sensors/${encodeURIComponent(params.sensor)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const [detail, catalog, health, topology] = await Promise.all([getSensorDetail(params.sensor), getSensorCatalog(), getSourceHealth(), getTopology()])
-    if (!detail) throw notFound()
-    return {
-      detail,
-      catalog,
-      feed: health.feeds.find((f) => f.sensor === params.sensor),
-      exposure: topology.sensors.find((s) => s.sensor === params.sensor),
-    }
+  loader: async ({ params, context }) => {
+    const page = await loadSensorPage(context, params.sensor)
+    if (!page) throw notFound()
+    return page
   },
   notFoundComponent: () => <NotFound title="Sensor detail" description="No sensor has this name." />,
   component: SensorLayout,
@@ -55,7 +49,7 @@ function SensorPicker({ current, sensors }: { current: string; sensors: string[]
 }
 
 function SensorLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = useSensorPage(Route.useParams().sensor)
   // The sensor's id is in the address: the title and the picker need no data.
   const { sensor: id } = Route.useParams()
   const detail = loaded?.detail

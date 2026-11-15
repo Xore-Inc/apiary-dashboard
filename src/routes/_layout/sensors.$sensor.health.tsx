@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { MetadataList, MetadataListItem } from '@astryxdesign/core/MetadataList'
 import { Text } from '@astryxdesign/core/Text'
@@ -9,6 +8,7 @@ import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { Panel } from '#/components/DashboardBlocks'
 import type { FeedState } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { useSensorPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/_layout/sensors/$sensor/health')({ ssr: p
 const FEED_COLOR = { fresh: 'green', delayed: 'orange', stale: 'orange', silent: 'red' } as const satisfies Record<FeedState, string>
 
 function SensorHealth() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = useSensorPage(parent.useParams().sensor)
   if (!loaded) return <SkeletonPanels count={2} />
   const detail = loaded.detail
   const feed = loaded.feed

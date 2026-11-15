@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { useState } from 'react'
 import { Banner } from '@astryxdesign/core/Banner'
@@ -13,19 +12,20 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { FilterSelect, listParam, toParam } from '#/components/FilterSelect'
 import { AnalysisRunDialog } from '#/components/dialogs/AnalysisRunDialog'
 import { RecordList } from '#/components/RecordList'
-import { getPayloads } from '#/data/queries'
 import type { CapturedPayload, WorkbenchRun } from '#/data/types'
 import { queuedMessage } from '#/components/analyzers/WorkbenchRuns'
 import { entityHref } from '#/lib/entities'
 import { formatTime } from '#/lib/format'
 import { useIsAdmin } from '#/lib/session'
+import { ensure, usePageQuery } from '#/lib/query'
+import { payloadsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/payloads/')({
   ssr: pageSsr,
   validateSearch: (search: Record<string, unknown>): { source?: string } => ({
     source: toParam(listParam(search.source)),
   }),
-  loader: () => getPayloads(),
+  loader: ({ context }) => ensure(context, payloadsQuery()),
   component: PayloadsPage,
   pendingComponent: PayloadsPage,
 })
@@ -65,7 +65,7 @@ const columns: TableColumn<CapturedPayload>[] = [
  * the payload's own page. */
 function PayloadsPage() {
   const isAdmin = useIsAdmin()
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(payloadsQuery())
   const payloads = data?.payloads
   const sources = data?.sources ?? []
   const { source } = Route.useSearch()

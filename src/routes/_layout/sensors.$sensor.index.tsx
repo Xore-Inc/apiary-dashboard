@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { Card } from '@astryxdesign/core/Card'
 import { Grid } from '@astryxdesign/core/Grid'
@@ -11,13 +10,14 @@ import { ProtocolTimeline } from '#/components/charts'
 import { CountTable, Panel } from '#/components/DashboardBlocks'
 import { formatDateTime, formatMeasure } from '#/lib/format'
 import { sensorSummary } from '#/lib/sensorText'
+import { useSensorPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
 export const Route = createFileRoute('/_layout/sensors/$sensor/')({ ssr: pageSsr, component: SensorOverview, pendingComponent: SensorOverview })
 
 function SensorOverview() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = useSensorPage(parent.useParams().sensor)
   if (!loaded) return <SkeletonPanels count={2} />
   const detail = loaded.detail
   const { sensor } = detail

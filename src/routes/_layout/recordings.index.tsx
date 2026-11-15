@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { pixel, proportional } from '@astryxdesign/core/Table'
 import type { TableColumn } from '@astryxdesign/core/Table'
 import { Text } from '@astryxdesign/core/Text'
@@ -8,10 +7,11 @@ import { Token } from '@astryxdesign/core/Token'
 import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { getRecordings } from '#/data/queries'
 import type { Recording } from '#/data/types'
 import { formatClock, formatNumber } from '#/lib/format'
 import { ZoneHeader } from '#/components/ZoneHeader'
+import { ensure, usePageQuery } from '#/lib/query'
+import { recordingsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/recordings/')({
   ssr: pageSsr,
@@ -19,7 +19,7 @@ export const Route = createFileRoute('/_layout/recordings/')({
     ip: typeof search.ip === 'string' && search.ip ? search.ip : undefined,
   }),
   loaderDeps: ({ search }) => ({ ip: search.ip }),
-  loader: ({ deps }) => getRecordings(deps.ip),
+  loader: ({ deps, context }) => ensure(context, recordingsQuery(deps.ip)),
   component: RecordingsPage,
   pendingComponent: RecordingsPage,
 })
@@ -35,7 +35,7 @@ const columns: TableColumn<Recording>[] = [
 
 
 function RecordingsPage() {
-  const recordings = orPending(Route.useLoaderData())
+  const recordings = usePageQuery(recordingsQuery(Route.useLoaderDeps().ip))
   const { ip } = Route.useSearch()
   return (
     <RecordList

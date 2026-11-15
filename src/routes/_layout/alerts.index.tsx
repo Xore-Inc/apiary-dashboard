@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { ConfirmDialog } from '#/components/AppDialog'
 import { Button } from '@astryxdesign/core/Button'
@@ -13,12 +12,14 @@ import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { searchTabs } from '#/components/ViewTabs'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { acknowledgeAllAlerts, alertKeyOf, getAlerts } from '#/data/queries'
+import { acknowledgeAllAlerts, alertKeyOf } from '#/data/queries'
 import type { AlertGroup } from '#/data/types'
 import { formatNumber, formatTime } from '#/lib/format'
 import { AckButton } from '#/components/details/Alert'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
+import { ensure, usePageQuery } from '#/lib/query'
+import { alertsQuery } from '#/data/resources'
 
 type View = 'new' | 'acknowledged'
 
@@ -28,7 +29,7 @@ export const Route = createFileRoute('/_layout/alerts/')({
   validateSearch: (search: Record<string, unknown>): { view?: View } => ({
     view: search.view === 'acknowledged' ? 'acknowledged' : undefined,
   }),
-  loader: () => getAlerts(),
+  loader: ({ context }) => ensure(context, alertsQuery()),
   component: AlertsPage,
   // The page itself while its data loads: its own layout, skeleton rows.
   pendingComponent: AlertsPage,
@@ -56,7 +57,7 @@ const columns: TableColumn<AlertGroup>[] = [
 function AlertsPage() {
   // Undefined while the route is pending (this component is its own
   // pending state).
-  const groups: AlertGroup[] | undefined = orPending(Route.useLoaderData())
+  const groups: AlertGroup[] | undefined = usePageQuery(alertsQuery())
   const { view = 'new' } = Route.useSearch()
   const router = useRouter()
   const [filter, setFilter] = useState('')

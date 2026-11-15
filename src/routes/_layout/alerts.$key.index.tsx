@@ -1,8 +1,9 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonPanels } from '#/components/EntityBlocks'
-import { orPending } from '#/lib/pending'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 import { AlertOverview } from '#/components/details/Alert'
+import { usePageQuery } from '#/lib/query'
+import { alertDetailQuery } from '#/data/resources'
 
 const parent = getRouteApi('/_layout/alerts/$key')
 
@@ -13,6 +14,6 @@ export const Route = createFileRoute('/_layout/alerts/$key/')({
 })
 
 function TabView() {
-  const rec = orPending(parent.useLoaderData())?.group
+  const rec = usePageQuery(alertDetailQuery(parent.useParams().key))?.group
   return rec ? <AlertOverview group={rec} /> : <SkeletonPanels />
 }

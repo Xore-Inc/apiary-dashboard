@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { RecordingDownloads } from '#/components/RecordingDownloads'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
@@ -9,18 +8,19 @@ import { EntityFrame } from '#/components/EntityFrame'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { SeverityToken } from '#/components/SeverityToken'
-import { getEventDetail } from '#/data/queries'
 import { formatDateTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
 import { OpenInMenu } from '#/components/OpenInMenu'
 import { useShellConfig } from '#/lib/session'
 import { eventToolLinks, virusTotalLink } from '#/lib/toolLinks'
+import { ensure, usePageQuery } from '#/lib/query'
+import { eventDetailQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/events/$id')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Event views', basePath: (params) => `/events/${encodeURIComponent(params.id)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getEventDetail(params.id)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, eventDetailQuery(params.id))
     if (!detail) throw notFound()
     return detail
   },
@@ -30,7 +30,7 @@ export const Route = createFileRoute('/_layout/events/$id')({
 })
 
 function EventLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(eventDetailQuery(Route.useParams().id))
   const { id } = Route.useParams()
   const event = loaded?.event
   const links = useShellConfig().links

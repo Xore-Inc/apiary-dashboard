@@ -1,6 +1,6 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { textParam } from '#/lib/searchParams'
 import { useState } from 'react'
 import { Button } from '@astryxdesign/core/Button'
@@ -15,11 +15,11 @@ import { ArrowDownTrayIcon } from '@heroicons/react/24/outline'
 import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
-import { searchHistory } from '#/data/queries'
+import { searchHistoryQuery } from '#/data/resources'
 import type { HoneypotEvent } from '#/data/types'
 import { apiHref } from '#/lib/apiHref'
 import { formatDateTime, formatNumber } from '#/lib/format'
-import { pageParam, pageRequest } from '#/lib/paging'
+import { pageParam, pageRequest, usePageRequest } from '#/lib/paging'
 
 export const Route = createFileRoute('/_layout/history')({
   ssr: pageSsr,
@@ -28,7 +28,7 @@ export const Route = createFileRoute('/_layout/history')({
     page: pageParam(search.page),
   }),
   loaderDeps: ({ search }) => ({ q: search.q ?? '', page: search.page }),
-  loader: async ({ deps }) => searchHistory(deps.q, await pageRequest(deps.page)),
+  loader: async ({ deps, context }) => ensure(context, searchHistoryQuery(deps.q, await pageRequest(context, deps.page))),
   component: HistoryPage,
   pendingComponent: HistoryPage,
 })
@@ -44,7 +44,9 @@ const columns: TableColumn<HoneypotEvent>[] = [
 ]
 
 function HistoryPage() {
-  const result = orPending(Route.useLoaderData())
+  const deps = Route.useLoaderDeps()
+  const request = usePageRequest(deps.page)
+  const result = usePageQuery(request && searchHistoryQuery(deps.q, request))
   const { q } = Route.useSearch()
   const navigate = Route.useNavigate()
   const [draft, setDraft] = useState(q ?? '')

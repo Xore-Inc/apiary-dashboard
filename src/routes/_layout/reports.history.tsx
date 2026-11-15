@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { reportPdfHref } from '#/lib/reportPdf'
 import { ConfirmDialog } from '#/components/AppDialog'
@@ -12,13 +11,15 @@ import { Token } from '@astryxdesign/core/Token'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { FilterSelect, listParam, toParam } from '#/components/FilterSelect'
 import { RecordList } from '#/components/RecordList'
-import { deleteGeneratedReport, getReports } from '#/data/queries'
+import { deleteGeneratedReport } from '#/data/queries'
 import type { GeneratedReport } from '#/data/types'
 import { formatDateTime } from '#/lib/format'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { reportTabs } from '#/lib/navFamilies'
 import { useIsAdmin } from '#/lib/session'
+import { ensure, usePageQuery } from '#/lib/query'
+import { reportsQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/reports/history')({
   ssr: pageSsr,
@@ -27,14 +28,14 @@ export const Route = createFileRoute('/_layout/reports/history')({
     origin: toParam(listParam(search.origin).filter((o) => o === 'manual' || o === 'schedule')),
     template: toParam(listParam(search.template)),
   }),
-  loader: () => getReports(),
+  loader: ({ context }) => ensure(context, reportsQuery()),
   component: HistoryPage,
   pendingComponent: HistoryPage,
 })
 
 /** Every PDF generated, newest first; a row opens the report. */
 function HistoryPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(reportsQuery())
   const { origin, template } = Route.useSearch()
   const navigate = Route.useNavigate()
   const origins = listParam(origin)

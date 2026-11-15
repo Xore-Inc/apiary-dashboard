@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { RecordingDownloads } from '#/components/RecordingDownloads'
 import { EntityFrame } from '#/components/EntityFrame'
@@ -7,14 +6,15 @@ import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { EntityLink } from '#/components/EntityLink'
 import { NotFound } from '#/components/NotFound'
-import { getReplayDetail } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { replayDetailQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/recordings/$shasum')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Session recording views', basePath: (params) => `/recordings/${params.shasum}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const detail = await getReplayDetail(params.shasum)
+  loader: async ({ params, context }) => {
+    const detail = await ensure(context, replayDetailQuery(params.shasum))
     if (!detail) throw notFound()
     return detail
   },
@@ -31,7 +31,7 @@ export const Route = createFileRoute('/_layout/recordings/$shasum')({
 /** One terminal recording, shared by every session that produced the same
  * bytes, since bot traffic repeats itself. */
 function RecordingLayout() {
-  const loaded = orPending(Route.useLoaderData())
+  const loaded = usePageQuery(replayDetailQuery(Route.useParams().shasum))
   const { shasum } = Route.useParams()
   const replay = loaded?.replay
   const sessions = loaded?.sessions

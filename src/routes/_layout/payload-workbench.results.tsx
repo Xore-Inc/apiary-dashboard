@@ -1,5 +1,4 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { useState } from 'react'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
@@ -16,7 +15,7 @@ import { entityHref } from '#/lib/entities'
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { PageFrame } from '#/components/PageFrame'
 import { RecordList } from '#/components/RecordList'
-import { abortGpuJob, getAnalysisResults } from '#/data/queries'
+import { abortGpuJob } from '#/data/queries'
 import { AnalysisRunDialog } from '#/components/dialogs/AnalysisRunDialog'
 import type { AnalysisResult, AnalysisResultsData, AnalyzerTab, GpuJob, ResultVerdict, WorkbenchRun } from '#/data/types'
 import { SkeletonTable } from '#/components/SkeletonTable'
@@ -25,6 +24,8 @@ import { formatDateTime, formatTime } from '#/lib/format'
 import { useIsAdmin } from '#/lib/session'
 import { useGuardedAction } from '#/lib/useGuardedAction'
 import { analysisTabs } from '#/lib/navFamilies'
+import { ensure, usePageQuery } from '#/lib/query'
+import { analysisResultsQuery } from '#/data/resources'
 
 const TABS: Array<{ id: AnalyzerTab; label: string; description: string }> = [
   { id: 'workbench', label: 'Workbench', description: 'Your analysis runs, each analyzer’s progress and result, and the GPU queue that Ghidra and RevDeck wait in.' },
@@ -59,7 +60,7 @@ export const Route = createFileRoute('/_layout/payload-workbench/results')({
   }),
   // Results follow the app-wide range, like every other list.
   loaderDeps: ({ search }) => ({ range: search.range }),
-  loader: ({ deps }) => getAnalysisResults(deps.range),
+  loader: ({ deps, context }) => ensure(context, analysisResultsQuery(deps.range)),
   component: AnalysisResultsPage,
   pendingComponent: AnalysisResultsPage,
 })
@@ -282,7 +283,7 @@ function ResultsView({ tab, data }: { tab: ResultsTab; data: AnalysisResultsData
 }
 
 function AnalysisResultsPage() {
-  const data = orPending(Route.useLoaderData())
+  const data = usePageQuery(analysisResultsQuery(Route.useLoaderDeps().range))
   const { tab = 'workbench' } = Route.useSearch()
   return tab === 'workbench' ? <WorkbenchView data={data} /> : <ResultsView tab={tab} data={data} />
 }

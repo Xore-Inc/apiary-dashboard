@@ -4,9 +4,9 @@
 // polling discipline. Paused persists in this browser, so the choice
 // survives a reload.
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { useRouter } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { openLiveStream } from '#/data/liveStream'
-import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
+import { refreshPageData } from '#/lib/query'
 import type { HoneypotEvent } from '#/data/types'
 
 type LiveState = { paused: boolean; connectionHealthy: boolean }
@@ -127,16 +127,22 @@ export function useLiveInterval(fn: () => void, ms: number, { leading = false, e
  * and at once when live resumes. Returns how many events arrived since the
  * page opened, for a quiet "N new" line. */
 export function useLiveRefresh(minMs = 5000): number {
-  const router = useRouter()
+  const queryClient = useQueryClient()
   const [arrived, setArrived] = useState(0)
+  // Counted from mount: the page has just loaded its data, so the first live
+  // event waits out `minMs` like every later one.
   const last = useRef(0)
+  useEffect(() => {
+    last.current = Date.now()
+  }, [])
   const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
   const refresh = useCallback(() => {
     last.current = Date.now()
     pending.current = undefined
-    // Never on top of a load still running: that would discard it (lib/refreshWhenSettled).
-    refreshWhenSettled(router)
-  }, [router])
+    // The page's reads, in the background; a read still running is joined,
+    // never restarted (lib/query.ts refreshPageData).
+    void refreshPageData(queryClient)
+  }, [queryClient])
   const onEvent = useCallback(() => {
     setArrived((n) => n + 1)
     if (Date.now() - last.current >= minMs) refresh()

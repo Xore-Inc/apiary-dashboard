@@ -1,19 +1,19 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
 import { Token } from '@astryxdesign/core/Token'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getIoc } from '#/data/queries'
 import { formatDateTime, formatNumber } from '#/lib/format'
+import { ensure, usePageQuery } from '#/lib/query'
+import { iocQuery } from '#/data/resources'
 
 export const Route = createFileRoute('/_layout/ioc/$kind/$value')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Indicator views', basePath: (params) => `/ioc/${params.kind}/${encodeURIComponent(params.value)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const ioc = await getIoc(params.kind, params.value)
+  loader: async ({ params, context }) => {
+    const ioc = await ensure(context, iocQuery(params.kind, params.value))
     if (!ioc) throw notFound()
     return ioc
   },
@@ -37,7 +37,7 @@ const NOUN: Record<string, string> = {
 
 /** One indicator and everything that carried it (epic #25). */
 function IocLayout() {
-  const ioc = orPending(Route.useLoaderData())
+  const ioc = usePageQuery(iocQuery(Route.useParams().kind, Route.useParams().value))
   // The kind and the value are in the address.
   const { kind, value } = Route.useParams()
   return (

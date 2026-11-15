@@ -74,6 +74,31 @@ describe('ensure', () => {
     await vi.waitFor(() => expect(client.getQueryData(live.queryKey)).toBe(2))
   })
 
+  it('a preload answers a cached live page without asking again; the navigation does', async () => {
+    const queryClient = createQueryClient()
+    const read = vi.fn(async () => 'events')
+    const live = resource('readPreloaded', read, 'live')()
+    await ensure(queryClient, live)
+    await ensure({ queryClient, preload: true }, live)
+    await ensure({ queryClient, preload: true }, live)
+    expect(read).toHaveBeenCalledTimes(1)
+    await ensure({ queryClient, preload: false }, live)
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('a preload of a page not cached yet fetches it, so the click finds it', async () => {
+    const queryClient = createQueryClient()
+    const read = vi.fn(async () => 'cold')
+    expect(await ensure({ queryClient, preload: true }, resource('readCold', read, 'live')())).toBe('cold')
+    expect(read).toHaveBeenCalledTimes(1)
+  })
+
+  it('live answers are asked again on focus unless only seconds old', () => {
+    const refocus = FRESHNESS.live.refetchOnWindowFocus as (q: { state: { dataUpdatedAt: number } }) => boolean
+    expect(refocus({ state: { dataUpdatedAt: Date.now() - 2_000 } })).toBe(false)
+    expect(refocus({ state: { dataUpdatedAt: Date.now() - 60_000 } })).toBe(true)
+  })
+
   it('a slow read is started without waiting, and shared with the next ask', async () => {
     const client = createQueryClient()
     const read = vi.fn(async () => 'slow')

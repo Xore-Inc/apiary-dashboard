@@ -1,6 +1,5 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { SkeletonTable } from '#/components/SkeletonTable'
-import { orPending } from '#/lib/pending'
 import { ActionLink } from '#/components/ActionLink'
 import { Divider } from '@astryxdesign/core/Divider'
 import { HStack, StackItem, VStack } from '@astryxdesign/core/Stack'
@@ -16,6 +15,7 @@ import type { HoneypotEvent, SensorReading } from '#/data/types'
 import { formatClock } from '#/lib/format'
 import { fieldText, readField } from '#/lib/sensorFields'
 import { ZoneHeader } from '#/components/ZoneHeader'
+import { useSensorPage } from '#/data/pageData'
 
 const parent = getRouteApi('/_layout/sensors/$sensor')
 
@@ -61,7 +61,7 @@ function columnsFor(reading: SensorReading): TableColumn<HoneypotEvent>[] {
 
 /** Every sensor, read in its own terms. */
 function SensorEvents() {
-  const loaded = orPending(parent.useLoaderData())
+  const loaded = useSensorPage(parent.useParams().sensor)
   // The sensor's id is in the address: the panel and its link need no data.
   const { sensor: id } = parent.useParams()
   const detail = loaded?.detail

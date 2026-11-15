@@ -27,6 +27,12 @@ export function getRouter() {
     // once and the click re-runs the loader, which answers from the cache
     // (the router docs' setting for an external cache).
     defaultPreloadStaleTime: 0,
+    // The loaders only ask the cache (lib/query.ts ensure), and Query decides
+    // what is stale. A loader that ran seconds ago is not re-run by a reload
+    // of the same address (the first-visit time zone refresh), which would
+    // ask the live reads again right after the page loaded them. Past that, a
+    // revisit re-runs the loaders, so live pages revalidate on every visit.
+    defaultStaleTime: 5_000,
     defaultNotFoundComponent: () => <NotFound />,
     defaultErrorComponent: DefaultCatchBoundary,
     // A navigation whose data is cached never shows a skeleton: its loaders
