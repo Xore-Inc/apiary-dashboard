@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from '@tanstack/react-router'
 import { routeTree } from '#/routeTree.gen'
+import { createQueryClient } from '#/lib/query'
 import { backend } from '#/data/backend'
 
 // The mock backend itself: tests and scripts call it directly; the routes'
@@ -12,7 +13,7 @@ const q = backend()
 vi.mock('#/data/queries', () => import('#/test/queriesOnBackend').then((m) => m.queriesOnBackend()))
 
 async function land(path: string): Promise<string> {
-  const router = createRouter({ routeTree, history: createMemoryHistory({ initialEntries: [path] }) })
+  const router = createRouter({ routeTree, context: { queryClient: createQueryClient() }, history: createMemoryHistory({ initialEntries: [path] }) })
   await router.load()
   return decodeURIComponent(router.state.location.pathname)
 }

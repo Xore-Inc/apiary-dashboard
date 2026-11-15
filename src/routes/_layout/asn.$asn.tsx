@@ -1,19 +1,19 @@
 import { pageSsr } from '#/lib/pageSsr'
 import { Pending } from '#/components/Pending'
-import { orPending } from '#/lib/pending'
+import { ensure, usePageQuery } from '#/lib/query'
 import { Outlet, createFileRoute, notFound } from '@tanstack/react-router'
 import { EntityFrame } from '#/components/EntityFrame'
 import { entityTabs } from '#/components/ViewTabs'
 import type { ViewTab } from '#/components/ViewTabs'
 import { NotFound } from '#/components/NotFound'
-import { getAsn } from '#/data/queries'
+import { asnQuery } from '#/data/resources'
 import { formatDateTime, formatNumber } from '#/lib/format'
 
 export const Route = createFileRoute('/_layout/asn/$asn')({
   ssr: pageSsr,
   staticData: { viewTabs: entityTabs({ label: 'Autonomous system views', basePath: (params) => `/asn/${encodeURIComponent(params.asn)}`, tabs: tabsFor }) },
-  loader: async ({ params }) => {
-    const asn = await getAsn(params.asn)
+  loader: async ({ params, context }) => {
+    const asn = await ensure(context.queryClient, asnQuery(params.asn))
     if (!asn) throw notFound()
     return asn
   },
@@ -23,8 +23,8 @@ export const Route = createFileRoute('/_layout/asn/$asn')({
 })
 
 function AsnLayout() {
-  const a = orPending(Route.useLoaderData())
   const { asn } = Route.useParams()
+  const a = usePageQuery(asnQuery(asn))
   return (
     <EntityFrame
       kind="Autonomous system"

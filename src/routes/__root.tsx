@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
-import { HeadContent, Scripts, createRootRoute, useRouter, useRouterState } from '@tanstack/react-router'
+import { HeadContent, Scripts, createRootRouteWithContext, useRouter, useRouterState } from '@tanstack/react-router'
+import type { QueryClient } from '@tanstack/react-query'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { LinkProvider } from '@astryxdesign/core/Link'
 import { Theme } from '@astryxdesign/core/theme'
 import { RouterLink } from '../components/RouterLink'
 import { appTheme } from '#/themes/appTheme'
-import { getPreferences } from '#/data/queries'
-import { getMockClock } from '#/data/serverFn'
+import { mockClockQuery, preferencesQuery } from '#/data/resources'
+import { ensure } from '#/lib/query'
 import type { Preferences } from '#/data/types'
 import { browserTimeZone, rememberBrowserZone } from '#/lib/browserZone'
 import { configureTime } from '#/lib/format'
@@ -15,7 +16,12 @@ import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
 
 import appCss from '../styles.css?url'
 
-export const Route = createRootRoute({
+/** What every loader gets: the router's data cache (lib/query.ts). */
+export interface RouterContext {
+  queryClient: QueryClient
+}
+
+export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
     meta: [
       {
@@ -47,8 +53,8 @@ export const Route = createRootRoute({
   // The operator's preferences shape the whole document: theme mode,
   // palette, contrast, motion, evidence text, and how times read.
   // A "browser" time zone is resolved here, so the server renders it too.
-  loader: async () => {
-    const [prefs, mockClock] = await Promise.all([getPreferences(), getMockClock()])
+  loader: async ({ context: { queryClient } }) => {
+    const [prefs, mockClock] = await Promise.all([ensure(queryClient, preferencesQuery()), ensure(queryClient, mockClockQuery())])
     const followsBrowser = prefs.timezone === 'browser'
     return { ...prefs, timezone: followsBrowser ? browserTimeZone() : prefs.timezone, followsBrowser, mockClock }
   },
@@ -76,7 +82,9 @@ function useTimePreferences(prefs: (Preferences & { followsBrowser: boolean; moc
     if (!rendered || !rememberBrowserZone(rendered)) return
     // Times are formatted from module state, so refresh only once the whole
     // page has hydrated with the zone the server used.
-    const idle = requestIdleCallback(() => refreshWhenSettled(router), { timeout: 2000 })
+    // Only the root's loader resolves the zone: the page's own reads stay
+    // as the server and the cache have them.
+    const idle = requestIdleCallback(() => refreshWhenSettled(router, { filter: (match) => match.routeId === '__root__' }), { timeout: 2000 })
     return () => cancelIdleCallback(idle)
   }, [rendered, router])
   if (!prefs) return

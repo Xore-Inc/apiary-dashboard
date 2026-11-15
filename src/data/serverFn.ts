@@ -14,9 +14,14 @@ import { sessionAwareFetch } from '#/lib/reauth'
 // navigation commits.
 let navigationScenario: MockScenario | undefined
 
-/** Called by the layout's beforeLoad with the destination's `?mock=`. */
-export function setNavigationScenario(scenario: MockScenario | undefined) {
-  if (typeof window !== 'undefined') navigationScenario = scenario ?? 'normal'
+/** Called by the layout's beforeLoad with the destination's `?mock=`. True
+ * when it switches the browser from one scenario to another (not on the
+ * first navigation), so the layout drops the answers of the old one. */
+export function setNavigationScenario(scenario: MockScenario | undefined): boolean {
+  if (typeof window === 'undefined') return false
+  const previous = navigationScenario
+  navigationScenario = scenario ?? 'normal'
+  return previous !== undefined && previous !== navigationScenario
 }
 
 const fromSearch = (search: URLSearchParams): MockScenario => {

@@ -1,5 +1,6 @@
 import { pageSsr } from '#/lib/pageSsr'
-import { orPending } from '#/lib/pending'
+import { usePageQuery } from '#/lib/query'
+import { asnQuery } from '#/data/resources'
 import { RangeEvents } from '#/components/EntityBlocks'
 import { createFileRoute, getRouteApi } from '@tanstack/react-router'
 
@@ -12,6 +13,6 @@ export const Route = createFileRoute('/_layout/asn/$asn/events')({
 })
 
 function TabView() {
-    const a = orPending(parent.useLoaderData())
+    const a = usePageQuery(asnQuery(parent.useParams().asn))
     return <RangeEvents events={a?.group.events} />
   }

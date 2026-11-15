@@ -32,10 +32,10 @@ describe('page routes', () => {
     expect(missing).toEqual([])
   })
 
-  it('read their data through orPending, so "Loading forever" holds them on their skeleton', () => {
+  it('read their data through orPending (or usePageQuery, which is it over the data cache), so "Loading forever" holds them on their skeleton', () => {
     const direct = routes.filter((file) => {
       const source = readFileSync(join(dir, file), 'utf8')
-      return source.includes('ssr: pageSsr') && !source.includes('orPending(')
+      return source.includes('ssr: pageSsr') && !source.includes('orPending(') && !source.includes('usePageQuery(')
     })
     expect(direct).toEqual([])
   })

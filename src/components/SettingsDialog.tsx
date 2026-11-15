@@ -49,7 +49,8 @@ import { resolveThemeTokens } from '@astryxdesign/core/theme/tokens'
 import { prefetchEnabled, setPrefetchEnabled } from '#/lib/prefetch'
 import { FieldStatus } from '@astryxdesign/core/FieldStatus'
 import { DEFAULT_TITLE_FORMAT, formatTitle } from '#/lib/title'
-import { forgetShellRead } from '#/lib/shellRead'
+import { useQueryClient } from '@tanstack/react-query'
+import { preferencesQuery } from '#/data/resources'
 import { useIsAdmin, useShellConfig } from '#/lib/session'
 import { accountLinks } from '#/lib/toolLinks'
 import { useGuardedAction } from '#/lib/useGuardedAction'
@@ -906,6 +907,7 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
   const titleId = useId()
   const navigate = useNavigate()
   const router = useRouter()
+  const queryClient = useQueryClient()
   // The administration panels live on their own page (/admin): an old link
   // to one takes an admin there, and anyone else to their own account.
   const isAdmin = useIsAdmin()
@@ -952,9 +954,9 @@ export function SettingsDialog({ pane: asked, onPane, onClose }: { pane: PaneId;
         void savePreferences(next)
           .then(async () => {
             setSaveState('saved')
-            // The whole app renders with these: apply them now, and let the
-            // navigation guard read them again.
-            forgetShellRead()
+            // The whole app renders with these: apply them now, the
+            // navigation guard's copy included.
+            await queryClient.invalidateQueries({ queryKey: preferencesQuery().queryKey })
             await router.invalidate()
           })
           .catch(() => setSaveState('failed'))
