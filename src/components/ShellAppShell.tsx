@@ -67,7 +67,7 @@ export function ShellAppShell({ user, config, mockScenarios = false, narrow = fa
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const isAdmin = user.roles.includes('admin')
   const searchSource = useMemo(() => paletteSource(isAdmin ? [...PAGES, { id: '/admin', label: 'Administration', auxiliaryData: { group: 'More', href: '/admin' } }] : PAGES, isAdmin), [isAdmin])
-  const location = useLocation()
+  const location = useLocation({ select: (l) => ({ pathname: l.pathname, searchStr: l.searchStr }) })
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

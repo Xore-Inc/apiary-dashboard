@@ -21,6 +21,11 @@ export function getRouter() {
     context: { queryClient },
     ssr: { nonce: csp?.current?.() },
     scrollRestoration: true,
+    // Search params and loader data are JSON (strings, numbers, plain
+    // objects; no Date or class instances cross the wire), so selectors may
+    // return new objects and still re-render only when their content
+    // changes (render optimizations, #309).
+    defaultStructuralSharing: true,
     defaultPreload: 'intent',
     // Query owns freshness: a preload's answer sits in its cache with its
     // resource's staleTime, so the router treats its own copy as stale at

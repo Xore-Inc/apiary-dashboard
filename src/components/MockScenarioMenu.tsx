@@ -25,7 +25,7 @@ export function MockScenarioMenu({ compact = false }: { compact?: boolean }) {
   const simulate = useDataMutation(simulateIncidentWrite())
   const resolve = useDataMutation(resolveIncidentsWrite())
   const navigate = useNavigate()
-  const raw = useSearch({ strict: false, select: (search: Record<string, unknown>) => search.mock })
+  const raw = useSearch({ strict: false, select: (search: Record<string, unknown>) => String(search.mock ?? '') })
   const current = isScenario(raw) ? raw : 'normal'
   const active = SCENARIOS.find((s) => s.id === current)!
   return (

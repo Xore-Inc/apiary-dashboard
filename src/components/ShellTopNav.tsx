@@ -25,7 +25,7 @@ import { usePreferences } from '#/lib/prefs'
  * shows the short names (24h, 7d). */
 export function RangePicker({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate()
-  const raw = useSearch({ strict: false, select: (search: Record<string, unknown>) => search.range })
+  const raw = useSearch({ strict: false, select: (search: Record<string, unknown>) => (typeof search.range === 'string' ? search.range : undefined) })
   const range: RangeId = isRange(raw) ? raw : DEFAULT_RANGE
   return (
     <Selector
