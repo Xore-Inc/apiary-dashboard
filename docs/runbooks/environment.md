@@ -24,7 +24,7 @@ Optional limits default to `BACKEND_TIMEOUT_MS=30000`, `BACKEND_MAX_INFLIGHT=25`
 
 `BFF_IDLE_TIMEOUT_S` is how long the Bun server keeps a connection open while no bytes flow. It defaults to four backend timeouts (120 s with the default `BACKEND_TIMEOUT_MS`), capped at Bun's 255 s. A value shorter than one backend timeout plus 5 s refuses to boot (`E-IDLE-TIMEOUT`). Bun's own default is 10 s. Before this setting existed, every server function that waited longer than that on the backend got an empty response, and a cold page stayed on its skeleton until a reload found the shared read cache warm.
 
-Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset. The server refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, `E-DEV-HTTP-COOKIE`, `E-EXPORT-TOKEN`, or `E-ACTOR-ASSERTION-KEY`.
+Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`, `OIDC_DISABLED`, and `OIDC_ALLOW_INSECURE` unset. The server refuses to start without a backend (`E-BACKEND-URL`) and refuses unsafe combinations with `E-SERVICE-TOKEN`, `E-OIDC-ISSUER`, `E-OIDC-DISABLED`, `E-DEV-HTTP-COOKIE`, `E-EXPORT-TOKEN`, or `E-ACTOR-ASSERTION-KEY`.
 
 ## Names carried over from the legacy frontend
 

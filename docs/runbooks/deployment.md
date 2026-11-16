@@ -24,7 +24,7 @@ Owner: deployment operator. This expands the system; it does not change canonica
    ```
 
 5. Sign in as one viewer and one admin. Verify a live list, detail, mutation, download, report, and `/api/live` stream. Confirm viewer mutations are refused.
-6. Record image digest, environment revision, Redis/Keycloak/backend health, smoke result, and timestamps in the change ticket.
+6. Record image digest, environment revision, Redis/Keycloak/backend health, the live-check result (`e2e/live/run.ts`), and timestamps in the change ticket.
 
 ## Failed deployment
 

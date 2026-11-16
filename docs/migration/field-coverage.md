@@ -144,7 +144,7 @@ Every field a canonical page reads (`routes.json`) against the data the rewrite 
 
 ## `sandbox.vnc.tsx`
 
-- `status.bridge_ws`: waived, the VNC bridge's WebSocket URL is transport for the live viewer, which the mock stands in for; wired with the sandbox slice (#78)
+- `status.bridge_ws`: waived, the VNC bridge's WebSocket URL is transport for the live viewer, carried by getSandboxVncBridge and never shown; wired with the sandbox slice (#78)
 
 ## `search.tsx`
 

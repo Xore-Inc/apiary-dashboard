@@ -6,7 +6,7 @@ The compatibility window keeps canonical and rewrite deployable together. Sessio
 
 ## Stop conditions
 
-Do not switch traffic when any release gate is red, any mock-only production query remains unaccepted, the soak has unexplained 4xx/5xx responses, Redis or Keycloak is degraded, backend data differs from canonical, or rollback has not been rehearsed on the soak host.
+Do not switch traffic when any release gate is red, the live checks fail on the release, the soak has unexplained 4xx/5xx responses, Redis or Keycloak is degraded, backend data differs from canonical, or rollback has not been rehearsed on the soak host.
 
 ## Soak
 

@@ -47,7 +47,7 @@
     "total_unique": "Paged.total"
   },
   "sandbox.vnc.tsx": {
-    "status.bridge_ws": "waived: the VNC bridge's WebSocket URL is transport for the live viewer, which the mock stands in for; wired with the sandbox slice (#78)"
+    "status.bridge_ws": "waived: the VNC bridge's WebSocket URL is transport for the live viewer, carried by getSandboxVncBridge and never shown; wired with the sandbox slice (#78)"
   },
   "tty-replay.$shasum.tsx": {
     "replay.ttylog_base64": "waived: the raw ttylog transport; the rewrite's Replay carries the decoded frames"
