@@ -18,6 +18,9 @@
 # token's one other home is the backend's DEV_SERVICE_TOKEN: copy it there
 # through a pipe or a file, never on a command line.
 #
+# Needs OpenSSL 3 (or any OpenSSL with Ed25519): macOS's bundled LibreSSL
+# cannot make the key; use Homebrew's (`brew install openssl`) first on PATH.
+#
 # Env: DEV_CREDENTIALS_DIR (default ~/.config/apiary).
 set -euo pipefail
 
@@ -44,7 +47,8 @@ fi
 
 if [[ $force -eq 0 ]]; then
   for file in "$TOKEN" "$KEY"; do
-    if [[ -e "$file" ]]; then
+    # -L too: a dangling symlink is not -e, yet mv would write through it.
+    if [[ -e "$file" || -L "$file" ]]; then
       echo "refusing to overwrite $file (use --force to replace both files)" >&2
       exit 1
     fi
@@ -64,12 +68,28 @@ trap 'rm -f "$token_tmp" "$key_tmp"' EXIT
 # 256 bits, URL-safe, no padding or newline (what docs/BACKEND-TRUST-BOUNDARY.md
 # in the APIARY repository prescribes for bearer credentials).
 openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n' >"$token_tmp"
-openssl genpkey -algorithm ed25519 -out "$key_tmp"
+if ! openssl genpkey -algorithm ed25519 -out "$key_tmp" 2>/dev/null; then
+  echo "this openssl cannot generate Ed25519 keys (macOS's LibreSSL cannot); use OpenSSL 3, e.g. Homebrew's" >&2
+  exit 1
+fi
 chmod 600 "$token_tmp" "$key_tmp"
 public_key="$(openssl pkey -in "$key_tmp" -pubout)"
 
-mv -f "$token_tmp" "$TOKEN"
-mv -f "$key_tmp" "$KEY"
+# Without --force never overwrite: `mv -n` skips a target that appeared since
+# the check above, which shows as the temporary file still being there. The
+# key goes second; if it fails, the token just written goes too, so there is
+# never a new token beside an old key.
+flag=-n
+[[ $force -eq 1 ]] && flag=-f
+if ! mv "$flag" "$token_tmp" "$TOKEN" || [[ -e "$token_tmp" ]]; then
+  echo "could not write $TOKEN (it appeared meanwhile? use --force to replace)" >&2
+  exit 1
+fi
+if ! mv "$flag" "$key_tmp" "$KEY" || [[ -e "$key_tmp" ]]; then
+  rm -f "$TOKEN"
+  echo "could not write $KEY; removed $TOKEN again, nothing was left half-written" >&2
+  exit 1
+fi
 trap - EXIT
 
 {
