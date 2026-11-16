@@ -34,7 +34,7 @@ The dashboard needs a backend: without `BACKEND_URL` it refuses to start (`E-BAC
 scripts/dev-backend-tunnel.sh   # prints BACKEND_URL / BACKEND_MOUNTED_URL, keeps the tunnel open
 ```
 
-It resolves `hp-apiary-backend` (port 8081) and `hp-apiary-backend-mounted` (port 8082) with `docker inspect` over `ssh homeserver` and forwards `127.0.0.1:8081` and `127.0.0.1:8082` to them (override with `DEV_SSH_HOST`, `DEV_BACKEND_CONTAINER`, `DEV_LOCAL_PORT`, …). Then, in `.env` (Bun loads it for `bun run dev`):
+It resolves `hp-apiary-backend` (port 8081) and `hp-apiary-backend-mounted` (port 8082) with `docker inspect` over `ssh homeserver` and forwards `127.0.0.1:8081` and `127.0.0.1:8082` to them (override with `DEV_SSH_HOST`, `DEV_BACKEND_CONTAINER`, `DEV_LOCAL_PORT`, …). Then, in `.env` (the dev server loads it: `bun run dev` reads `./.env`, and a variable already set in the environment wins):
 
 ```bash
 BACKEND_URL=http://127.0.0.1:8081
