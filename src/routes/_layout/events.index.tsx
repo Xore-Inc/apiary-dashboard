@@ -87,7 +87,7 @@ export const Route = createFileRoute('/_layout/events/')({
   },
   // Only what the read takes: the filters and the page. An explicit ?since=
   // wins; otherwise the app-wide range applies. (Not the whole search: the
-  // settings modal or the mock switch would refetch the events.)
+  // settings modal would refetch the events.)
   loaderDeps: ({ search }) => ({ ...filtersOf(search), since: search.since ?? search.range, page: search.page }),
   // One page at a time: the query filters and pages, as the real API does.
   // The counted facets are unavailable until the backend serves them

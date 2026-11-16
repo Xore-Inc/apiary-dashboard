@@ -1,6 +1,5 @@
 // Pure helpers both sides of the data seam use: the page (in the browser
-// and during SSR) and the mock backend. Nothing here holds or reads data, so
-// importing it never pulls the mock into the browser bundle.
+// and during SSR) and the server. Nothing here holds or reads data.
 import type { AlertGroup, ReportDefinition } from './types'
 
 const HOUR = 3_600_000
@@ -8,7 +7,7 @@ const DAY = 24 * HOUR
 const RANGE_MS: Record<string, number> = { '1h': HOUR, '6h': 6 * HOUR, '24h': DAY, '7d': 7 * DAY, '30d': 30 * DAY }
 
 /** Whether a timestamp falls inside an app-wide range (`all` for any), counted
- * back from `now`: the caller's clock (the mock tier passes its fixed one). */
+ * back from `now`: the caller's clock, the wall clock unless a test fixes it. */
 export function inRange(at: string, range?: string, now: number = Date.now()): boolean {
   if (range === 'all') return true
   return now - Date.parse(at) <= (RANGE_MS[range ?? '24h'] ?? DAY)

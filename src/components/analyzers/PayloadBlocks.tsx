@@ -44,7 +44,7 @@ export function PayloadOperatorMenu({ hash }: { hash: string }) {
   if (!isAdmin) return null
   const run = async (action: PayloadAction) => {
     try {
-      toast({ body: `${await queue.mutateAsync([hash, action])} (mock: nothing was actually queued)` })
+      toast({ body: await queue.mutateAsync([hash, action]) })
     } catch (e) {
       toast({ type: 'error', body: `Not queued: ${describeError(e)}` })
     }

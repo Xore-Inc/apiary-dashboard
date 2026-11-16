@@ -13,6 +13,7 @@ export const OIDC_DISABLED_GATE_CODE = 'E-OIDC-DISABLED'
 export const EXPORT_TOKEN_GATE_CODE = 'E-EXPORT-TOKEN'
 export const DEV_HTTP_COOKIE_GATE_CODE = 'E-DEV-HTTP-COOKIE'
 export const OIDC_ISSUER_GATE_CODE = 'E-OIDC-ISSUER'
+export const BACKEND_URL_GATE_CODE = 'E-BACKEND-URL'
 /** "1": the session cookie works over plain HTTP (a dev server reached by
  * its LAN address). Never on a deployed instance. */
 export const DEV_HTTP_COOKIE_ENV = 'APIARY_DEV_HTTP_COOKIE'
@@ -20,8 +21,24 @@ export const DEV_HTTP_COOKIE_ENV = 'APIARY_DEV_HTTP_COOKIE'
 type Env = Record<string, string | undefined>
 type Policy<T extends string> = { kind: T } | { kind: 'refuse'; message: string }
 
-/** Mock scenarios are local-only once this process has a live backend. */
-export const mockScenariosAllowed = (env: Env = process.env): boolean => !env.BACKEND_URL?.trim() || env[DEV_UNAUTH_OVERRIDE_ENV] === '1'
+/** The backend this dashboard reads and writes through: there is no other
+ * source of data, so a process without one refuses to start. */
+export function backendUrlPolicy(env: Env = process.env): Policy<'backend'> {
+  const value = env.BACKEND_URL?.trim()
+  let url: URL | undefined
+  try {
+    url = value ? new URL(value) : undefined
+  } catch {
+    url = undefined
+  }
+  if (url && (url.protocol === 'http:' || url.protocol === 'https:')) return { kind: 'backend' }
+  return {
+    kind: 'refuse',
+    message: value
+      ? `[${BACKEND_URL_GATE_CODE}] refusing to start: BACKEND_URL is not an http(s) URL. Set it to the base URL of the APIARY backend-service (see .env.example).`
+      : `[${BACKEND_URL_GATE_CODE}] refusing to start: BACKEND_URL is unset, so this dashboard has no backend to read from; there is no built-in data. Set BACKEND_URL to the base URL of the APIARY backend-service (see .env.example).`,
+  }
+}
 
 export function serviceTokenPolicy(env: Env = process.env): Policy<'token' | 'dev-override'> {
   const token = readSecret('SERVICE_TOKEN', env, SERVICE_TOKEN_GATE_CODE)
@@ -73,15 +90,15 @@ export function devHttpCookiePolicy(env: Env = process.env): Policy<'secure' | '
   }
 }
 
-/** Who signs people in: Keycloak when OIDC_ISSUER_URL is set; otherwise
- * the mock identity provider, which signs anyone in as anyone, so only on
- * a local instance (or with OIDC_DISABLED=1, itself development only). */
-export function identityProviderPolicy(env: Env = process.env): Policy<'oidc' | 'mock'> {
+/** Who signs people in: Keycloak when OIDC_ISSUER_URL is set. Without it
+ * only OIDC_DISABLED=1 (development only, see oidcDisabledPolicy) may run,
+ * where nobody signs in and every request is the development operator. */
+export function identityProviderPolicy(env: Env = process.env): Policy<'oidc' | 'disabled'> {
   if (env.OIDC_ISSUER_URL) return { kind: 'oidc' }
-  if (env.OIDC_DISABLED === '1' || env.NODE_ENV === 'development' || env[DEV_UNAUTH_OVERRIDE_ENV] === '1') return { kind: 'mock' }
+  if (env.OIDC_DISABLED === '1') return { kind: 'disabled' }
   return {
     kind: 'refuse',
-    message: `[${OIDC_ISSUER_GATE_CODE}] refusing to start: OIDC_ISSUER_URL is unset (NODE_ENV=${env.NODE_ENV ?? 'unset'}), which would leave only the mock identity provider, where anyone signs in as an admin. Set OIDC_ISSUER_URL to the Keycloak realm, or set NODE_ENV=development or ${DEV_UNAUTH_OVERRIDE_ENV}=1 to confirm this is a local instance.`,
+    message: `[${OIDC_ISSUER_GATE_CODE}] refusing to start: OIDC_ISSUER_URL is unset (NODE_ENV=${env.NODE_ENV ?? 'unset'}), so nobody could sign in. Set OIDC_ISSUER_URL to the Keycloak realm, or, on a local development instance only, OIDC_DISABLED=1 (with NODE_ENV=development or ${DEV_UNAUTH_OVERRIDE_ENV}=1), where every request is the development operator.`,
   }
 }
 
@@ -96,13 +113,13 @@ export function actorAssertionPolicy(env: Env = process.env): Policy<'sign' | 'u
 
 /** Throws the first refusal; silent when the environment is sound. */
 export function assertBootPolicies(env: Env = process.env): void {
-  for (const policy of [serviceTokenPolicy(env), exportTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env), actorAssertionPolicy(env)]) {
+  for (const policy of [backendUrlPolicy(env), serviceTokenPolicy(env), exportTokenPolicy(env), oidcDisabledPolicy(env), devHttpCookiePolicy(env), identityProviderPolicy(env), actorAssertionPolicy(env)]) {
     if (policy.kind === 'refuse') throw new Error(policy.message)
   }
 }
 
 export const oidcDisabled = (env: Env = process.env) => env.OIDC_DISABLED === '1'
 
-/** The mock sign-in may run: decided per call too, so a process that
- * skipped the boot check still fails closed. */
-export const mockIdentityProvider = (env: Env = process.env) => identityProviderPolicy(env).kind === 'mock'
+/** Keycloak signs people in: decided per call too, so a process that
+ * skipped the boot check still fails closed (no OIDC, no sign-in). */
+export const oidcConfigured = (env: Env = process.env) => identityProviderPolicy(env).kind === 'oidc'

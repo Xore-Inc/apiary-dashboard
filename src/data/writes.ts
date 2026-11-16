@@ -20,7 +20,6 @@ import {
   provisionCredential,
   purgeDeadLetters,
   queuePayloadAction,
-  resolveIncidents,
   rollbackConfig,
   rotateCredential,
   runServiceAction,
@@ -31,7 +30,6 @@ import {
   setIpBlocked,
   setProblemStatus,
   setRunChild,
-  simulateIncident,
   startAnalysisRun,
   submitProblemReport,
 } from './queries'
@@ -157,7 +155,4 @@ export const saveConfigSectionWrite = () => plain(saveConfigSection, CONFIG_READ
 export const rollbackConfigWrite = () => plain(rollbackConfig, CONFIG_READS)
 export const runServiceActionWrite = () => plain(runServiceAction, [settingsQuery.key])
 
-/** Development: the mock's incidents change source health. */
-export const simulateIncidentWrite = () => ({ ...plain(simulateIncident, [sourceHealthQuery.key]), reloadRoutes: false })
-export const resolveIncidentsWrite = () => ({ ...plain(resolveIncidents, [sourceHealthQuery.key]), reloadRoutes: false })
 

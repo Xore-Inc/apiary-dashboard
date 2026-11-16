@@ -1,5 +1,5 @@
-// Operations slice (#77): backend wire shapes → the page types the mock seam
-// already serves, and back again for the admin writes. One pure function per
+// Operations slice (#77): backend wire shapes → the page types the data seam
+// serves, and back again for the admin writes. One pure function per
 // endpoint; nothing here fetches. Wire shapes: ../contracts/operations.ts.
 //
 // A page field the wire does not carry is left out of the return type

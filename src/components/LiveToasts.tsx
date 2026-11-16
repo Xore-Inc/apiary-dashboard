@@ -14,7 +14,6 @@ import { StatusDot } from '@astryxdesign/core/StatusDot'
 import { useToast } from '@astryxdesign/core/Toast'
 import { settingsQuery, sourceHealthQuery } from '#/data/resources'
 import { useQueryClient } from '@tanstack/react-query'
-import { HEALTH_CHANGED } from '#/data/incidents'
 import type { SourceHealth } from '#/data/types'
 import { conditionsFrom, transitions } from '#/lib/healthConditions'
 import type { Condition, Severity } from '#/lib/healthConditions'
@@ -85,13 +84,6 @@ export function LiveToasts() {
   }, [show, queryClient])
 
   useLiveInterval(poll, Math.max(MIN_POLL_MS, prefs.current.seconds * 1000), { leading: true })
-
-  // A simulated incident is a change worth seeing now, not in a minute.
-  useEffect(() => {
-    const now = () => void poll()
-    window.addEventListener(HEALTH_CHANGED, now)
-    return () => window.removeEventListener(HEALTH_CHANGED, now)
-  }, [poll])
 
   return null
 }

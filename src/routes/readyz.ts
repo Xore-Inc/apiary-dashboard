@@ -1,7 +1,7 @@
 // GET /readyz — can this dashboard serve, given the backend it is deployed
-// against? 200 when no backend is configured (mock) or every configured
-// listener publishes a supported contract version; 503 with the reason
-// otherwise (src/server/backendContract.ts).
+// against? 200 when every configured listener publishes a supported
+// contract version; 503 with the reason otherwise
+// (src/server/backendContract.ts).
 //
 // Distinct from /healthz on purpose: that is liveness, constant, and never
 // touches the upstream, so a backend outage or an incompatible backend

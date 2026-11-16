@@ -1,11 +1,11 @@
 // Sessions: an opaque id in an HttpOnly cookie, the identity behind it in a
 // store. Keycloak sign-in keeps the store in Redis, shared by every
-// instance; the mock identity provider (a local instance) keeps it in this
-// process's memory unless OIDC_SESSION_REDIS_URL names a Redis. Server-only.
+// instance. A development instance with OIDC_DISABLED=1 signs nobody in; it
+// keeps an empty store in this process's memory. Server-only.
 import { randomBytes } from 'node:crypto'
 import { Redis } from 'ioredis'
-import { Unavailable, faulty, warnThrottled } from './faults'
-import { DEV_HTTP_COOKIE_ENV, mockIdentityProvider } from './policy'
+import { warnThrottled } from './faults'
+import { DEV_HTTP_COOKIE_ENV, oidcConfigured } from './policy'
 
 export type Role = 'admin' | 'viewer'
 
@@ -36,14 +36,12 @@ export class MemorySessionStore implements SessionStore {
   constructor(private readonly now: () => number = Date.now) {}
 
   create(data: Omit<Session, 'createdAt'>): Promise<string> {
-    if (faulty('session-store')) return Promise.reject(new Unavailable('session-store'))
     const sid = randomBytes(32).toString('base64url')
     this.sessions.set(sid, { session: { ...data, createdAt: this.now() }, expires: this.now() + SESSION_TTL_SECONDS * 1000 })
     return Promise.resolve(sid)
   }
 
   get(sid: string | undefined): Promise<Session | null> {
-    if (faulty('session-store')) return Promise.reject(new Unavailable('session-store'))
     if (!sid || sid.length > 128) return Promise.resolve(null)
     const entry = this.sessions.get(sid)
     if (!entry) return Promise.resolve(null)
@@ -55,7 +53,6 @@ export class MemorySessionStore implements SessionStore {
   }
 
   destroy(sid: string | undefined): Promise<void> {
-    if (faulty('session-store')) return Promise.reject(new Unavailable('session-store'))
     if (sid) this.sessions.delete(sid)
     return Promise.resolve()
   }
@@ -115,25 +112,7 @@ export function redis(): Redis {
  * development a code reload re-evaluates this module, and a fresh store
  * would sign everyone out. */
 const holder = globalThis as typeof globalThis & { __apiarySessions?: SessionStore }
-export const sessions: SessionStore = (holder.__apiarySessions ??= !mockIdentityProvider()
-  ? new RedisSessionStore(redis())
-  : process.env.OIDC_SESSION_REDIS_URL
-    ? withMemoryFallback(new RedisSessionStore(redis()), new MemorySessionStore())
-    : new MemorySessionStore())
-
-/** A local instance keeps working while its Redis is down: sessions fall
- * back to this process's memory. Never with Keycloak, where every instance
- * must see the same sessions. */
-export function withMemoryFallback(primary: SessionStore, fallback: SessionStore): SessionStore {
-  const either =
-    <TArgs extends unknown[], TResult>(op: (store: SessionStore) => (...args: TArgs) => Promise<TResult>) =>
-    (...args: TArgs) =>
-      op(primary)(...args).catch((error: unknown) => {
-        warnThrottled('[session] redis unavailable, using memory:', error)
-        return op(fallback)(...args)
-      })
-  return { create: either((s) => s.create.bind(s)), get: either((s) => s.get.bind(s)), destroy: either((s) => s.destroy.bind(s)) }
-}
+export const sessions: SessionStore = (holder.__apiarySessions ??= oidcConfigured() ? new RedisSessionStore(redis()) : new MemorySessionStore())
 
 /** Development over plain HTTP from another machine: browsers refuse a
  * Secure (and so a `__Host-`) cookie there, and sign-in would loop. With

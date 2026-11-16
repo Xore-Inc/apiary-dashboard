@@ -1,28 +1,35 @@
 // @vitest-environment jsdom
 // Every pre-epic-#25 URL lands on its entity page (and tab), through the real
 // route tree, so a route rename cannot silently strand an old link.
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createMemoryHistory, createRouter } from '@tanstack/react-router'
 import { routeTree } from '#/routeTree.gen'
 import { createQueryClient } from '#/lib/query'
-import { backend } from '#/data/backend'
+import { DEFAULT_PREFERENCES_WIRE, preferences } from '#/data/adapters/settings'
+import { preferencesQuery, sessionUserQuery } from '#/data/resources'
+import type { SessionUser } from '#/data/types'
 
-// The mock backend itself: tests and scripts call it directly; the routes'
-// own queries go to it in-process too.
-const q = backend()
-vi.mock('#/data/queries', () => import('#/test/queriesOnBackend').then((m) => m.queriesOnBackend()))
+// The navigation guard's two reads, answered from the cache: a signed-in
+// operator with the default preferences. The redirects decide before any
+// page reads data; whatever a landed page then asks for is not looked at.
+const ip = '198.51.100.13'
+const hash = '0'.repeat(64)
+const cidr = '198.51.100.0/24'
+const shasum = 'f'.repeat(64)
+
+const operator: SessionUser = { name: 'Operator', email: 'operator@example.test', roles: ['admin'] }
 
 async function land(path: string): Promise<string> {
-  const router = createRouter({ routeTree, context: { queryClient: createQueryClient() }, history: createMemoryHistory({ initialEntries: [path] }) })
+  const queryClient = createQueryClient()
+  queryClient.setQueryData(sessionUserQuery().queryKey, operator)
+  queryClient.setQueryData(preferencesQuery().queryKey, preferences(DEFAULT_PREFERENCES_WIRE))
+  const router = createRouter({ routeTree, context: { queryClient }, history: createMemoryHistory({ initialEntries: [path] }) })
   await router.load()
   return decodeURIComponent(router.state.location.pathname)
 }
 
 describe('old URLs redirect to entity pages', () => {
   it('source, event, session and payload detail routes', async () => {
-    const { sources } = await q.getSourceProfiles()
-    const ip = sources[0].ip
-    const hash = (await q.getPayloads()).payloads[0].hash
     expect(await land(`/investigate/ip/${ip}`)).toBe(`/sources/${ip}`)
     expect(await land(`/investigate/ip/${ip}?tab=indicators`)).toBe(`/sources/${ip}/payloads`)
     expect(await land(`/investigate/ip/${ip}?tab=correlation`)).toBe(`/sources/${ip}/network`)
@@ -36,9 +43,6 @@ describe('old URLs redirect to entity pages', () => {
   })
 
   it('correlation, recording and lookup routes', async () => {
-    const { campaigns } = await q.getNetworkCampaigns()
-    const cidr = campaigns[0].cidr
-    const shasum = (await q.getRecordings())[0].shasum
     expect(await land(`/investigate/cidr/${encodeURIComponent(cidr)}`)).toBe(`/networks/${cidr}`)
     expect(await land('/investigate/cluster?kind=credential&value=root%3Atoor')).toBe('/clusters/credential/root:toor')
     expect(await land('/investigate/cluster?kind=asn&value=AS9009')).toBe('/asn/AS9009')

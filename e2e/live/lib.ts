@@ -135,7 +135,7 @@ export async function installServerFns(page: Page): Promise<string[]> {
     const ids: Record<string, string> = {}
     const queue = [...new Set(performance.getEntriesByType('resource').map((e) => e.name).filter((u) => u.endsWith('.js') && u.includes('/assets/')))]
     const seen = new Set<string>(queue)
-    const found: Record<string, () => Promise<(...args: unknown[]) => Promise<unknown>>> = {}
+    const found: Partial<Record<string, () => Promise<(...args: unknown[]) => Promise<unknown>>>> = {}
     while (queue.length) {
       const url = queue.shift()!
       const text = await fetch(url).then((r) => r.text())
@@ -149,7 +149,7 @@ export async function installServerFns(page: Page): Promise<string[]> {
       for (const m of text.matchAll(/\(`(\w+)`,[\w$]+\(\{method:`(?:GET|POST)`\}\)\.middleware\(\[[\w$,]*\]\)\.handler\([\w$]+\(`([0-9a-f]{16,})`\)\)/g)) ids[m[2]] = m[1]
       const exported = text.match(/export\{([^}]*)\}\s*;?\s*(\/\/.*)?$/)?.[1]
       if (!exported) continue
-      const alias = new Map(exported.split(',').map((p) => p.trim().split(/\s+as\s+/)).map(([local, as]) => [local, as ?? local]))
+      const alias = new Map(exported.split(',').map((p) => p.trim().split(/\s+as\s+/) as [string, string?]).map(([local, as]) => [local, as ?? local]))
       for (const m of text.matchAll(/([\w$]+)=[\w$]+\(`(\w+)`,[\w$]+\(\{method:`(?:POST|GET)`\}\)/g)) {
         const as = alias.get(m[1])
         if (as && !found[m[2]]) found[m[2]] = async () => ((await import(url)) as Record<string, (...args: unknown[]) => Promise<unknown>>)[as]

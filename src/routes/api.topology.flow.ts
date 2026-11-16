@@ -7,7 +7,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { serveDownload } from '#/data/downloads'
 import { ApiError } from '#/data/errors'
-import { isLiveBackend, liveTopologyFlow } from '#/data/api'
+import { liveTopologyFlow } from '#/data/api'
 
 const plain = (status: number, message: string) => new Response(message, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
 
@@ -15,24 +15,17 @@ export const Route = createFileRoute('/api/topology/flow')({
   server: {
     handlers: {
       GET: ({ request }) =>
-        serveDownload(request, async (_search, q, reach) => {
-          // As on the chart route, only an explicitly allowed development
-          // scenario keeps the mock beside a configured live backend.
-          if (isLiveBackend() && !reach.mock) {
-            try {
-              const flow = await liveTopologyFlow()
-              if (flow === null) return plain(502, 'topology unavailable')
-              return Response.json(flow, { headers: { 'cache-control': 'no-store' } })
-            } catch (error) {
-              // One answer for every refusal, as canonical's topology proxy
-              // makes it and as the chart route does above.
-              if (error instanceof ApiError) return plain(502, 'topology unavailable')
-              throw error
-            }
+        serveDownload(request, async () => {
+          try {
+            const flow = await liveTopologyFlow()
+            if (flow === null) return plain(502, 'topology unavailable')
+            return Response.json(flow, { headers: { 'cache-control': 'no-store' } })
+          } catch (error) {
+            // One answer for every refusal, as canonical's topology proxy
+            // makes it and as the chart route does.
+            if (error instanceof ApiError) return plain(502, 'topology unavailable')
+            throw error
           }
-          // The mock tier is loaded only for the arm that serves it.
-          const { topologyFlow } = await import('#/data/mock/charts')
-          return Response.json(await topologyFlow(q), { headers: { 'cache-control': 'no-store' } })
         }),
     },
   },

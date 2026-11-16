@@ -3,18 +3,7 @@ import { backendGapOf, isBackendGap } from '#/lib/backendGap'
 import { resetReauth } from '#/lib/reauth'
 import { CSRF_HEADER, crossOriginResponse, isSameOriginRequest } from '#/server/origin'
 import { ApiError } from './errors'
-import { announced, clockFor, guardedFetch } from './serverFn'
-
-describe('clockFor', () => {
-  // A live backend runs on the wall clock, whatever the dev scenario says.
-  it('is the wall clock (null) when a live backend is configured', () => {
-    expect(clockFor(true, 1_000)).toBeNull()
-  })
-
-  it('is the mock tier clock when no live backend is configured', () => {
-    expect(clockFor(false, 1_000)).toBe(1_000)
-  })
-})
+import { announced, guardedFetch } from './serverFn'
 
 describe('guardedFetch (#284)', () => {
   const cloudflare = () =>

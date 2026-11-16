@@ -10,8 +10,8 @@ export default defineConfig({
     // Component tests opt into a DOM per file with a
     // `// @vitest-environment jsdom` pragma.
     setupFiles: ['src/test/setup.ts'],
-    // A local instance, as `bun dev` is: the mock identity provider and
-    // in-memory sessions, never a Redis the machine happens to run.
+    // A local instance: no Keycloak (OIDC_ISSUER_URL unset), so in-memory
+    // sessions, never a Redis the machine happens to run.
     // The shared read cache (api.ts) is off by default here so each test's
     // stubbed answer is the one read; api.readCache.test.ts turns it on.
     env: { APIARY_ALLOW_UNAUTH_DEV: '1', OIDC_SESSION_REDIS_URL: '', BACKEND_READ_CACHE_TTL_MS: '0' },

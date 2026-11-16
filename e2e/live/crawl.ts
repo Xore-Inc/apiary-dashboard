@@ -19,13 +19,13 @@ import type { APIRequestContext } from 'playwright-core'
 import { routeEntries, routePolicy } from '../../scripts/authorization-matrix'
 import { base, check, done, fail, info, launch, origin, shots, signedIn } from './lib'
 
-const maxPerShape = Number(process.argv[2] ?? 3)
+const maxPerShape = Number(process.argv[2] ?? 2)
 const browser = await launch()
 const context = await signedIn(browser)
 const http: APIRequestContext = context.request
 
 const get = async (path: string) => {
-  const r = await http.get(base + path, { maxRedirects: 0, timeout: 90_000 }).catch((e: Error) => ({ status: () => -1, headers: () => ({}) as Record<string, string>, text: async () => e.message }))
+  const r = await http.get(base + path, { maxRedirects: 0, timeout: 90_000 }).catch((e: Error) => ({ status: () => -1, headers: (): Record<string, string> => ({}), text: async () => e.message }))
   return { status: r.status(), location: r.headers()['location'] ?? '', text: () => r.text() }
 }
 
@@ -84,9 +84,11 @@ for (const file of readdirSync(join(import.meta.dirname, '../../src/routes/_layo
   tabs.set(key, [...(tabs.get(key) ?? []), last])
 }
 
-/** Every page route without a parameter: the crawl's seeds. */
+/** Every page route without a parameter: the crawl's seeds. A legacy
+ * address that only redirects with its search (checked in FIXED) is not. */
+const LEGACY = new Set(['/investigate/cluster', '/investigate/lookup'])
 const seeds = routeEntries()
-  .filter(({ path, type }) => !path.includes('$') && routePolicy(path, type) === 'page')
+  .filter(({ path, type }) => !path.includes('$') && routePolicy(path, type) === 'page' && !LEGACY.has(path))
   .map(({ path }) => (path.length > 1 ? path.replace(/\/$/, '') : path))
 
 /** Collapses ids so a few instances of each route pattern are visited. */
@@ -100,7 +102,8 @@ const shape = (path: string) =>
     .replace(/\/(ioc\/[^/]+|alerts|clusters\/[^/]+|sensors|asn|identities|sessions|events)\/[^/]+/, '/$1/:v')
 
 // A viewer's refusals and the live stream are proven by authorization.ts.
-const NOT_CRAWLED = [/^\/api\/payload\/[^/]+\/download/, /^\/api\/live/, /^\/auth\//, /^\/export\//, /^\/admin(\/|$|\?)/]
+// `/cdn-cgi/` is the CDN's own (its e-mail obfuscation), not the dashboard's.
+const NOT_CRAWLED = [/^\/api\/payload\/[^/]+\/download/, /^\/api\/live/, /^\/auth\//, /^\/export\//, /^\/admin(\/|$|\?)/, /^\/cdn-cgi\//]
 // The error boundary's titles (DefaultCatchBoundary), by failure kind.
 const BOUNDARY = { unavailable: 'The backend did not answer', overloaded: 'The backend is busy', expired: 'Your session expired', crash: 'This page failed to load' } as const
 const FORBIDDEN = 'Not available to your role'
@@ -109,6 +112,7 @@ const seen = new Set<string>()
 const perShape = new Map<string, number>()
 const broken: string[] = []
 const refusedForViewer: string[] = []
+const transient: string[] = []
 const samples = new Map<string, string>()
 const queue = [...seeds]
 let fetched = 0
@@ -117,7 +121,16 @@ const started = Date.now()
 /** One address: fetched, its links and tabs queued. */
 async function visit(path: string) {
   const t = Date.now()
-  const res = await get(path)
+  let res = await get(path)
+  // A 5xx once can be the backend shedding under the crawl itself (heavy
+  // entity pages time out upstream, APIARY#3856): asked again after a pause,
+  // only an answer that fails twice is a finding.
+  if (res.status >= 500 || res.status < 0) {
+    await new Promise((resolve) => setTimeout(resolve, 5000))
+    const again = await get(path)
+    if (again.status < 500 && again.status >= 0) transient.push(`${res.status} ${path}`)
+    res = again
+  }
   const ms = Date.now() - t
   fetched++
   if (ms > slowest.ms) slowest = { ms, path }
@@ -154,7 +167,7 @@ async function visit(path: string) {
 /** The next address worth fetching: not seen, not excluded, its shape not full. */
 function next(): string | undefined {
   for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
-    if (seen.has(path) || NOT_CRAWLED.some((re) => re.test(path!))) continue
+    if (seen.has(path) || NOT_CRAWLED.some((re) => re.test(path))) continue
     seen.add(path)
     const key = shape(path)
     if ((perShape.get(key) ?? 0) >= maxPerShape) continue
@@ -167,7 +180,7 @@ function next(): string | undefined {
 // the others, whose pages may still add to it.
 let busy = 0
 await Promise.all(
-  Array.from({ length: Number(process.env.PARALLEL ?? 4) }, async () => {
+  Array.from({ length: Number(process.env.PARALLEL ?? 2) }, async () => {
     for (;;) {
       const path = next()
       if (path === undefined) {
@@ -185,6 +198,7 @@ await Promise.all(
   }),
 )
 info(`slowest page: ${slowest.ms} ms (${shape(slowest.path)})`)
+if (transient.length) info(`failed once, answered on a second try (${transient.length}): ${transient.slice(0, 10).join('; ')}`)
 info(`crawled ${fetched} pages across ${perShape.size} route shapes from ${seeds.length} seeds`)
 if (refusedForViewer.length) info(`pages that show the viewer "${FORBIDDEN}" (an admin-only part): ${refusedForViewer.slice(0, 10).join(', ')}`)
 check(fetched > seeds.length, 'the crawl followed links beyond its seeds', `${fetched} fetched`)

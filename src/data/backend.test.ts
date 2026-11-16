@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runForRequest } from './backend'
 import { ApiError } from './errors'
-import { SOURCES } from './mock/fixtures'
 
 const responseStatus = vi.hoisted(() => vi.fn())
 
@@ -19,7 +18,6 @@ const blocked = { total: 1, rows: [{ IP: 'live-source.example', Blocked: true }]
 beforeEach(() => {
   process.env.BACKEND_URL = 'http://backend.test'
   process.env.SERVICE_TOKEN = 'test-token'
-  delete process.env.APIARY_ALLOW_UNAUTH_DEV
   responseStatus.mockReset()
 })
 
@@ -27,11 +25,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
   delete process.env.BACKEND_URL
   delete process.env.SERVICE_TOKEN
-  process.env.APIARY_ALLOW_UNAUTH_DEV = '1'
 })
 
-describe('production request routing', () => {
-  it('ignores a mock scenario and returns the live getBlockedIps response', async () => {
+describe('request routing', () => {
+  it('answers every query through the live adapter', async () => {
     const calls: string[] = []
     vi.stubGlobal(
       'fetch',
@@ -41,29 +38,12 @@ describe('production request routing', () => {
       }),
     )
 
-    const result = await runForRequest('getBlockedIps', [], 'empty')
-
-    expect(result).toEqual(['live-source.example'])
-    expect(new URL(calls[0]).pathname).toBe('/api/v1/investigate/blocked-ips')
-    expect(JSON.stringify(result)).not.toContain(SOURCES[0].ip)
-  })
-
-  it('uses the live backend for the default scenario even with the development override', async () => {
-    process.env.APIARY_ALLOW_UNAUTH_DEV = '1'
-    const calls: string[] = []
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        calls.push(url)
-        return Response.json(blocked)
-      }),
-    )
-
-    expect(await runForRequest('getBlockedIps', [], 'normal')).toEqual(['live-source.example'])
+    expect(await runForRequest('getBlockedIps', [])).toEqual(['live-source.example'])
     expect(calls).toHaveLength(1)
+    expect(new URL(calls[0]).pathname).toBe('/api/v1/investigate/blocked-ips')
   })
 
-  it('returns the backend ApiError instead of fixtures when a live read cannot connect', async () => {
+  it('returns the backend ApiError, with its status on the response, when a read cannot connect', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -71,18 +51,14 @@ describe('production request routing', () => {
       }),
     )
 
-    const error = await runForRequest('getBlockedIps', [], undefined).catch((caught: unknown) => caught)
+    const error = await runForRequest('getBlockedIps', []).catch((caught: unknown) => caught)
 
     expect(error).toBeInstanceOf(ApiError)
     expect(error).toMatchObject({ kind: 'unavailable', status: 502, backendUnreachable: true })
     expect(responseStatus).toHaveBeenCalledWith(502)
   })
 
-  it('returns an explicit not-available error for an unwired query', async () => {
-    const error = await runForRequest('getReplay', [], undefined).catch((caught: unknown) => caught)
-
-    expect(error).toBeInstanceOf(ApiError)
-    expect((error as ApiError).message).toContain('not available on live backend')
-    expect(responseStatus).toHaveBeenCalledWith(502)
+  it('refuses a name that is not a query', async () => {
+    await expect(runForRequest('getReplay', [])).rejects.toThrow('unknown query getReplay')
   })
 })

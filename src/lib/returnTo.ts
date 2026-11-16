@@ -9,11 +9,9 @@ export function safeReturnTo(value: unknown): string {
   return value
 }
 
-/** Where a fresh sign-in lands: the return path, without the mock
- * scenarios a session replaces (the role now comes from the session, and
- * signing in again leaves "session expired"). */
+/** Where a fresh sign-in lands: the safe return path, normalized as a URL
+ * path on this dashboard. */
 export function returnAfterSignIn(returnTo: string): string {
   const url = new URL(safeReturnTo(returnTo), 'http://dashboard.invalid')
-  if (['expired', 'viewer'].includes(url.searchParams.get('mock') ?? '')) url.searchParams.delete('mock')
   return `${url.pathname}${url.search}${url.hash}`
 }

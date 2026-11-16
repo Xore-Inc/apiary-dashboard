@@ -52,8 +52,6 @@ function isTyping(target: EventTarget | null): boolean {
 type ShellProps = {
   user: SessionUser
   config: ShellConfig
-  /** Whether the Mock data menu shows: never with a live backend. */
-  mockScenarios?: boolean
   /** Whether the first render is the narrow (drawer) layout: what the
    * server knew of this browser's width, so it renders the same. */
   narrow?: boolean
@@ -62,7 +60,7 @@ type ShellProps = {
   onSettingsPane: (pane: PaneId | undefined) => void
 }
 
-export function ShellAppShell({ user, config, mockScenarios = false, narrow = false, settingsPane, onSettingsPane }: ShellProps) {
+export function ShellAppShell({ user, config, narrow = false, settingsPane, onSettingsPane }: ShellProps) {
   const navigate = useNavigate()
   const [isPaletteOpen, setIsPaletteOpen] = useState(false)
   const isAdmin = user.roles.includes('admin')
@@ -101,7 +99,7 @@ export function ShellAppShell({ user, config, mockScenarios = false, narrow = fa
         // Tablets and small laptops get the drawer too: a 260 px sidebar
         // leaves them too little (lib/viewport predicts it for the server).
         mobileNav={{ breakpoint: 'xl', defaultIsMobile: narrow }}
-        topNav={<ShellTopNav config={config} mockScenarios={mockScenarios} onOpenPalette={() => setIsPaletteOpen(true)} />}
+        topNav={<ShellTopNav config={config} onOpenPalette={() => setIsPaletteOpen(true)} />}
         sideNav={
           <ShellSideNav
             user={user}

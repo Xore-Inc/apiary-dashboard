@@ -109,7 +109,7 @@ afterEach(() => {
 })
 
 describe('which queries the real backend answers', () => {
-  it('names only the wired slices, leaving the rest to the mock', () => {
+  it('names every query of the contract', () => {
     expect(liveQueryNames().sort()).toEqual(
       [
         // events & sessions (#75)
@@ -233,24 +233,31 @@ describe('which queries the real backend answers', () => {
     )
   })
 
-  it('answers nothing without BACKEND_URL — the mock stays the default', () => {
+  it('refuses as unavailable without BACKEND_URL, before any fetch', async () => {
+    const calls = stub({})
     delete process.env.BACKEND_URL
     expect(isLiveBackend()).toBe(false)
-    expect(liveQuery('getEvents', undefined)).toBeUndefined()
+    await expect(liveQuery('getEvents', undefined)!({})).rejects.toMatchObject({ kind: 'unavailable' })
     process.env.BACKEND_URL = '   '
     expect(isLiveBackend()).toBe(false)
+    expect(calls).toEqual([])
+  })
+
+  it('knows no query outside the contract', () => {
+    expect(liveQuery('getReplay', undefined)).toBeUndefined()
+    expect(liveQuery('toString', undefined)).toBeUndefined()
   })
 
   it('answers savePreferences live: the write diffs the stored document', () => {
     expect(liveQuery('savePreferences', undefined)).toBeTypeOf('function')
   })
 
-  it('applies the same authorization decision the mock does', async () => {
+  it('applies the authorization decision before any fetch', async () => {
     stub({ '/api/v1/events': page, '/api/v1/filter-values': values })
     const viewer = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
     expect(await liveQuery('getEvents', viewer)!({})).toMatchObject({ total: 1 })
-    // Nobody signed in is refused the same way the mock refuses them, before
-    // any fetch — the live path is not a way around the guard.
+    // Nobody signed in is refused before any fetch: the live path is not a
+    // way around the guard.
     await expect(liveQuery('getEvents', null)!({})).rejects.toThrow(ApiError)
   })
 })
@@ -643,7 +650,7 @@ describe('the actor the Rust tier trusts', () => {
     expect((init.headers as Record<string, string>)['x-actor-username']).toBeUndefined()
   })
 
-  it('refuses a viewer the same way the mock refuses them, before any fetch', async () => {
+  it('refuses a viewer before any fetch', async () => {
     stub({ '/api/v1/gpu-queue/gj-1/abort': { ok: true, job_id: 'gj-1', abort_requested: true } })
     await expect(liveQuery('abortGpuJob', { name: 'V', email: 'v@example.test', roles: ['viewer'] })!('gj-1')).rejects.toThrow(ApiError)
     expect(fetch).not.toHaveBeenCalled()
@@ -1070,10 +1077,9 @@ describe('the config writes', () => {
 })
 
 describe('read-only mode, which the Rust tier does not enforce', () => {
-  it('refuses a write with the same 423 the mock gives', async () => {
+  it('refuses a write with a 423 while read-only mode is on', async () => {
     // Nothing in the backend implements read_only — it is a dashboard
-    // preference. Without this the guard would exist for the mock tier only:
-    // passing its tests and absent in production.
+    // setting, so the guard is this tier's or nobody's.
     stub({ '/api/v1/config': { ...configWire, payload: { behavior: { read_only: true } } } })
     const error = (await live('setProblemStatus')('pr-1', 'triaged').then(() => null, (e: unknown) => e)) as ApiError
     expect(error).toBeInstanceOf(ApiError)
@@ -1081,8 +1087,7 @@ describe('read-only mode, which the Rust tier does not enforce', () => {
     // One config read, and the guarded write never leaves.
     expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledTimes(1)
 
-    // A container restart is guarded too — nothing exempts it, exactly as
-    // the mock treats it. The two exemptions are the writes that turn
+    // A container restart is guarded too — nothing exempts it. The two exemptions are the writes that turn
     // read-only off, which is why they need the flag readable at all.
     stub({ '/api/v1/config': { ...configWire, payload: { behavior: { read_only: true } } }, '/api/v1/services/hp-tanner/restart': { ok: true } })
     await expect(live('runServiceAction')('hp-tanner', 'restart')).rejects.toThrow(ApiError)
@@ -1813,7 +1818,7 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
   it('offers only the one target credentials.rs implements', async () => {
     // Gap #5: `create` refuses any target but cowrie_honeyfs with a 400
     // (credentials.rs:157) and there is no listing endpoint, so the picker
-    // offers that one rather than the sensor list the mock derives.
+    // offers that one rather than a sensor list derived on this side.
     stub(toolsFixtures())
     expect((await live('getCredentials')()).targets).toEqual(['cowrie_honeyfs'])
   })
@@ -1849,7 +1854,7 @@ describe('the tools slice reads the endpoints the Rust tier actually serves', ()
   it('rotates and links through the record-returning POSTs, dropping the record', async () => {
     // Gap #6: both handlers answer the full record and the page's seam
     // returns void, so the new password and the link id are dropped here and
-    // the page re-reads the credential — as it does on the mock.
+    // the page re-reads the credential.
     stub(toolsFixtures({ '/api/v1/credentials/cred_0011223344556677/rotate': { ...credentialRecord, password: 'newSecret' }, '/api/v1/credentials/cred_0011223344556677/link-token': { ...credentialRecord, linked_token_id: 'a1b2' } }))
     expect(await live('rotateCredential')('cred_0011223344556677')).toBeUndefined()
     expect(await live('linkCredentialToken')('cred_0011223344556677', 'a1b2')).toBeUndefined()
@@ -2093,7 +2098,7 @@ describe('the reports writes', () => {
   it('the wizard generates through a saved definition, and drops it again for a one-off', async () => {
     // generate takes an id and reads the definition out of the store, so a
     // draft must exist first. keep: true keeps it and returns it; keep: false
-    // creates, generates, then deletes — the same store state the mock leaves.
+    // creates, generates, then deletes: the store is left as it was.
     const created = { definition: { ...definitionWire, id: 'rd_new' } }
     stub(reportsFixtures({
       '/api/v1/reports/definitions': created,
@@ -2143,7 +2148,7 @@ describe('the reports writes', () => {
     expect(calls).toHaveLength(6)
   })
 
-  it('refuses a non-admin the same writes the mock refuses them', async () => {
+  it('refuses a non-admin every write', async () => {
     stub(reportsFixtures())
     const viewer = { id: 'u', name: 'A', email: 'a@example.test', roles: ['viewer' as const] }
     await expect(liveQuery('saveReportDefinition', viewer)!(savedDefinition)).rejects.toThrow(ApiError)
@@ -2256,7 +2261,7 @@ const recordedSources = {
   "truncated": true,
   "rows": [
     {
-      "ip": "85.217.149.4",
+      "ip": "198.51.100.204",
       "country": "DE",
       "events": 896629,
       "logins": 0,
@@ -2269,7 +2274,7 @@ const recordedSources = {
       "last": "2026-10-09T14:56:22.158Z"
     },
     {
-      "ip": "85.217.149.16",
+      "ip": "198.51.100.216",
       "country": "",
       "events": 896623,
       "logins": 0,
@@ -2281,7 +2286,7 @@ const recordedSources = {
       "last": "2026-10-09T14:56:22.158Z"
     },
     {
-      "ip": "45.156.129.136",
+      "ip": "203.0.113.136",
       "country": "",
       "events": 896621,
       "logins": 0,
@@ -2389,9 +2394,9 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     // The recorded rows, highest event count first, as the page type carries them.
     // The second row has no country on the wire: it is absent, not ''.
     expect(out.topSources).toEqual([
-      { ip: '85.217.149.4', country: 'DE', events: 896629, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
-      { ip: '85.217.149.16', events: 896623, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
-      { ip: '45.156.129.136', events: 896621, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
+      { ip: '198.51.100.204', country: 'DE', events: 896629, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
+      { ip: '198.51.100.216', events: 896623, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
+      { ip: '203.0.113.136', events: 896621, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
     ])
     expect(out.topSources?.[1]).not.toHaveProperty('country')
     expect(out.topCountries).toEqual([{ id: 'NL', label: 'NL', count: 611 }])
@@ -3163,13 +3168,6 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
     expect(await live('resolveHash')('deadbeef')).toEqual({ kind: 'not-found', value: 'deadbeef' })
   })
 
-  it('leaves the mock answering when BACKEND_URL is unset or a scenario is in force', async () => {
-    delete process.env.BACKEND_URL
-    for (const name of ['getSourceProfiles', 'getAttackers', 'getNetworkCampaigns', 'getInfraClusters', 'getKillChain', 'getIpProfile', 'getNetwork', 'getCluster', 'resolveHash', 'getIdentityFusion'] as const) {
-      expect(liveQuery(name, undefined), name).toBeUndefined()
-    }
-  })
-
   it('maps a failed sources fetch to an error, never to an empty list', async () => {
     const cases: Array<[string, () => Promise<unknown>, Record<string, unknown>]> = [
       ['getSourceProfiles', () => live('getSourceProfiles')(), { '/api/v1/sources': fail(502) }],
@@ -3190,20 +3188,3 @@ describe('the sources slice reads the endpoints the Rust tier actually serves', 
   })
 })
 
-describe('the Monitor slice keeps the mock path untouched', () => {
-  it('leaves every Monitor query answering from the mock without BACKEND_URL', async () => {
-    // The default: an unconfigured deployment talks to nobody, and the ten
-    // scenarios the smoke gate depends on keep working.
-    delete process.env.BACKEND_URL
-    for (const name of ['getOverview', 'getOverviewViews', 'getMlAnomalies', 'acknowledgeAllAnomalies', 'acknowledgeAnomalies', 'setAnomalyDisposition', 'getLlmAnalyses', 'semanticSearch', 'getAgentCampaigns', 'getAuthEvents', 'getAgentCampaign', 'getLlmAnalysis', 'getAnomaly'] as const) {
-      expect(liveQuery(name, undefined), name).toBeUndefined()
-    }
-    const { backend } = await import('./backend')
-    // The mock's own figures are still the mock's: four KPIs, folded rows and
-    // all — nothing above reached for a fixture.
-    const mock = backend('normal', { name: 'A', email: 'a@x.test', roles: ['admin'] })
-    expect((await mock.getOverview()).kpis).toHaveLength(5)
-    expect((await mock.getMlAnomalies()).anomalies.some((a) => a.folded > 1)).toBe(true)
-    expect((await mock.getAgentCampaigns())[0].events[0].sourceIndex).not.toBe('')
-  })
-})

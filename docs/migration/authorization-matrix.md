@@ -197,9 +197,9 @@ Effective access for every generated HTTP route and every server query. “Viewe
 
 The two canonical catch-all BFF routes are intentionally absent: browser-selected upstream paths were removed. `src/data/api.ts` owns fixed server-side backend calls and sends the service token. Static assets are served by `server.ts` and contain no protected data.
 
-## Server queries (112)
+## Server queries (109)
 
-Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced in `src/data/backend.ts` for both mock and live adapters.
+Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced by `liveQuery` in `src/data/api.ts` before the backend is called. `e2e/live/authorization.ts` proves this table on the running dashboard.
 
 | Query | Anonymous | Viewer | Admin |
 |---|---|---|---|
@@ -265,7 +265,6 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `getProblemReports` | 401 | allow | allow |
 | `getRecordings` | 401 | allow | allow |
 | `getRelated` | 401 | allow | allow |
-| `getReplay` | 401 | allow | allow |
 | `getReplayDetail` | 401 | allow | allow |
 | `getReports` | 401 | allow | allow |
 | `getRevDeckRun` | 401 | allow | allow |
@@ -296,7 +295,6 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `purgeDeadLetters` | 401 | 403 | allow |
 | `queuePayloadAction` | 401 | 403 | allow |
 | `resolveHash` | 401 | allow | allow |
-| `resolveIncidents` | 401 | allow | allow |
 | `rollbackConfig` | 401 | 403 | allow |
 | `rotateCredential` | 401 | 403 | allow |
 | `runServiceAction` | 401 | 403 | allow |
@@ -311,7 +309,6 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `setIpBlocked` | 401 | 403 | allow |
 | `setProblemStatus` | 401 | 403 | allow |
 | `setRunChild` | 401 | 403 | allow |
-| `simulateIncident` | 401 | allow | allow |
 | `startAnalysisRun` | 401 | 403 | allow |
 | `submitProblemReport` | 401 | 403 | allow |
 | `validateConfig` | 401 | 403 | allow |

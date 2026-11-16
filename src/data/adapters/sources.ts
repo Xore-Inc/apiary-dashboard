@@ -391,9 +391,8 @@ export const correlationGroup = (wire: CorrelationWire, events: HoneypotEvent[])
 /** GET /api/v1/events?ip= as the source's timeline: one item per event, newest
  * first as the handler serves it. A row carrying a payload hash is a capture,
  * and links to the payload; every other row links to its event. Only the
- * events of this source are here — the mock's timeline also folds in ML
- * anomalies, LLM analyses, canary triggers, auth failures and alerts, which
- * the backend does not serve for a source yet. */
+ * events of this source are here: ML anomalies, LLM analyses, canary
+ * triggers, auth failures and alerts are not served for a source yet. */
 export const sourceTimeline = (rows: EventRow[]): TimelineItem[] =>
   rows.map((row) => {
     const place = [row.src_ip, row.sensor].filter(Boolean).join(' · ')

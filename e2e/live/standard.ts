@@ -26,7 +26,7 @@ const server5xx: string[] = []
 let bff = { ok: 0, bad: [] as string[] }
 page.on('pageerror', (e) => pageErrors.push(e.message.slice(0, 160)))
 page.on('console', (m) => {
-  if (m.type() === 'error') consoleErrors.push(`${m.text().slice(0, 200)} @ ${m.location().url?.replace(base, '') ?? ''}`)
+  if (m.type() === 'error') consoleErrors.push(`${m.text().slice(0, 200)} @ ${m.location().url.replace(base, '')}`)
 })
 page.on('response', (r) => {
   if (!r.url().startsWith(base)) return

@@ -27,7 +27,7 @@ function body(slice: Slice, fns: ServerFn[], routes: RouteInventory[]): string {
   return [
     `Part of #6 (Phase 2). Workflow: ${slice.workflow}`,
     '',
-    'Wire this workflow to the real backend behind the data seam the mock pages already use (`src/data/queries.ts`), keeping the pages as they are. The rows below come from the inventory in `docs/migration/` (`route-matrix.md`, `routes.md`, `server-functions.md`); tick them there as they become real.',
+    'Wire this workflow to the real backend behind the data seam (`src/data/queries.ts`), keeping the pages as they are. The rows below come from the inventory in `docs/migration/` (`route-matrix.md`, `routes.md`, `server-functions.md`); tick them there as they become real.',
     '',
     '## Routes',
     '',
@@ -42,8 +42,8 @@ function body(slice: Slice, fns: ServerFn[], routes: RouteInventory[]): string {
     '',
     '- Every route above reads and writes through real server functions or handlers, with typed search and path params.',
     '- Permissions match the canonical ones (admin checks in the handler, session and same-origin in the middleware), with tests for a viewer, an admin and no session.',
-    '- Loading, empty, error, retry, redirect and session-expiry states behave as on mock data; the mock scenarios still work for design.',
-    '- Unit, integration and browser checks pass, including `scripts/smoke.sh`.',
+    '- Loading, empty, error, retry, redirect and session-expiry states behave as canonical\'s do.',
+    '- Unit and integration checks pass, and the live checks (`e2e/live/`) pass against production.',
     '- The inventory rows above are marked real.',
   ].join('\n')
 }

@@ -18,8 +18,7 @@ import { SkeletonTable } from '#/components/SkeletonTable'
 import type { SensorFeed, SourceHealth } from '#/data/types'
 import { formatDateTime, formatNumber } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
-import { useCallback, useEffect } from 'react'
-import { HEALTH_CHANGED } from '#/data/incidents'
+import { useCallback } from 'react'
 import { useLiveInterval } from '#/lib/live'
 import { usePreferences } from '#/lib/prefs'
 import { healthTabs } from '#/lib/navFamilies'
@@ -66,14 +65,9 @@ const feedColumns: TableColumn<SensorFeed>[] = [
 function SourceHealthPage() {
   const health = usePageQuery(sourceHealthQuery())
   const queryClient = useQueryClient()
-  // Health moves in minutes: re-read it on the live interval, and at once
-  // when a simulated incident changes it.
+  // Health moves in minutes: re-read it on the live interval.
   const refresh = useCallback(() => void queryClient.invalidateQueries({ queryKey: sourceHealthQuery().queryKey }, { cancelRefetch: false }), [queryClient])
   useLiveInterval(refresh, (usePreferences()?.refreshSeconds ?? 30) * 1000)
-  useEffect(() => {
-    window.addEventListener(HEALTH_CHANGED, refresh)
-    return () => window.removeEventListener(HEALTH_CHANGED, refresh)
-  }, [refresh])
   const { ingest, yara, runtime, pipeline } = health ?? {}
   const unhealthy = health?.feeds.filter((f) => f.state !== 'fresh').length
 

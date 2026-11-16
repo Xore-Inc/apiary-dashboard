@@ -7,7 +7,7 @@ import { LinkProvider } from '@astryxdesign/core/Link'
 import { Theme } from '@astryxdesign/core/theme'
 import { RouterLink } from '../components/RouterLink'
 import { appTheme } from '#/themes/appTheme'
-import { mockClockQuery, preferencesQuery } from '#/data/resources'
+import { preferencesQuery } from '#/data/resources'
 import { ensure } from '#/lib/query'
 import type { Preferences } from '#/data/types'
 import { browserTimeZone, rememberBrowserZone } from '#/lib/browserZone'
@@ -53,12 +53,12 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   // The operator's preferences shape the whole document: theme mode,
-  // palette, contrast, motion, evidence text, and how times read. They and
-  // the mock clock go to the data cache (and so to the browser with the
-  // HTML, once); the loader's own data is the browser's time zone, resolved
-  // here so the server renders it too (lib/prefs.ts).
+  // palette, contrast, motion, evidence text, and how times read. They go to
+  // the data cache (and so to the browser with the HTML, once); the loader's
+  // own data is the browser's time zone, resolved here so the server renders
+  // it too (lib/prefs.ts).
   loader: async ({ context: { queryClient } }) => {
-    await Promise.all([ensure(queryClient, preferencesQuery()), ensure(queryClient, mockClockQuery())])
+    await ensure(queryClient, preferencesQuery())
     return { browserZone: browserTimeZone() }
   },
   shellComponent: RootDocument,
@@ -91,8 +91,7 @@ function useTimePreferences(prefs: RootPreferences | undefined) {
     return () => cancelIdleCallback(idle)
   }, [rendered, router])
   if (!prefs) return
-  const { mockClock } = prefs
-  configureTime({ timeZone: prefs.timezone, hour12: prefs.clock === 'h12', relative: prefs.timestamps === 'relative', now: mockClock === null ? () => Date.now() : () => mockClock })
+  configureTime({ timeZone: prefs.timezone, hour12: prefs.clock === 'h12', relative: prefs.timestamps === 'relative' })
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {

@@ -6,7 +6,7 @@
 // superset the extras are dropped, and where it is a subset the lost page
 // fields are named in the doc comment on that adapter (and in the slice's
 // gaps) rather than widening a page type to hold them.
-import type { ArtifactRow } from '../queries.impl'
+import type { ArtifactRow } from '../queries.contract'
 import type {
   AnalyzerCatalog,
   AnalyzerId,
@@ -61,8 +61,7 @@ import type {
   YaraRunPageWire,
 } from '../contracts/evidence'
 
-/** A sandbox risk score as the run page words it. Same scale the mock's
- * sandboxVerdict uses, so a wire-backed run reads identically. */
+/** A sandbox risk score as the run page words it. */
 export const sandboxVerdict = (risk: number): SandboxRun['verdict'] => (risk > 70 ? 'malicious' : risk > 40 ? 'suspicious' : 'benign')
 
 const lines = (value: string | string[] | undefined | null): string[] => (Array.isArray(value) ? value : value ? [value] : [])
@@ -207,8 +206,7 @@ export function sandboxRunPage(wire: SandboxRunPageWire): { total: number; runs:
 }
 
 /** GET /api/v1/sandbox/golden-image-status. The host timer writes its own
- * key names; the page's camelCase shape only exists on the mock, so what
- * the wire carries is passed through as the page's own record and `error`
+ * key names, so what the wire carries is passed through as the page's own record and `error`
  * is filled from the backend's refusal to answer. */
 export function goldenImageStatus(wire: Record<string, unknown> & { configured: boolean }): SandboxRun['goldenImage'] {
   if (!wire.configured) return undefined

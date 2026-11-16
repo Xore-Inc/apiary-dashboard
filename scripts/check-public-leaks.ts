@@ -1,8 +1,8 @@
 // Public-repository safety: fails when a tracked file carries a deployment
-// secret, a real deployment address, or mock data outside the documentation
+// secret, a real deployment address, or test data outside the documentation
 // ranges. The same gate as APIARY's scripts/check-public-leaks.py, plus the
-// rewrite's own rule that mock data uses RFC 5737 addresses and reserved
-// domains only.
+// rewrite's own rule that the literal inputs of tests, the live checks and
+// the design studio use RFC 5737 addresses and reserved domains only.
 //
 //   bun scripts/check-public-leaks.ts
 import { readFileSync } from 'node:fs'
@@ -28,9 +28,10 @@ const PATTERNS: Array<[RegExp, string]> = [
 ]
 const RESERVED_HOST = /\.(example|test|invalid|localhost)\.?$/i
 
-/** Mock data may name only documentation, private-use and loopback
- * addresses: RFC 5737, RFC 1918, 127/8 and 0/8. */
-const MOCK_DIR = 'src/data/mock/'
+/** Test data may name only documentation, private-use and loopback
+ * addresses: RFC 5737, RFC 1918, 127/8 and 0/8. The live checks find real
+ * addresses at run time and never write one down. */
+const TEST_DATA = (file: string) => /\.test\.tsx?$/.test(file) || file.startsWith('e2e/') || file.startsWith('design-studio/') || file.startsWith('src/data/__fixtures__/')
 // Not after a slash: `Chrome/126.0.0.0` is a version, not an address.
 const IPV4 = /(?<![\d./])(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?![\d.])/g
 function allowedAddress(a: number, b: number, c: number): boolean {
@@ -71,11 +72,11 @@ for (const file of files) {
       findings.push(`${file}:${lineOf(text, match.index)}: possible ${reason}`)
     }
   }
-  if (file.startsWith(MOCK_DIR)) {
+  if (TEST_DATA(file)) {
     for (const match of text.matchAll(IPV4)) {
       const [a, b, c, d] = match.slice(1).map(Number)
       if ([a, b, c, d].some((n) => n > 255) || allowedAddress(a, b, c)) continue
-      findings.push(`${file}:${lineOf(text, match.index)}: mock data names ${match[0]}, outside the documentation ranges`)
+      findings.push(`${file}:${lineOf(text, match.index)}: test data names ${match[0]}, outside the documentation ranges`)
     }
   }
 }

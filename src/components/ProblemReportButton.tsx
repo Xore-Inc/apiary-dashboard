@@ -20,8 +20,8 @@ import { ChatBubbleLeftEllipsisIcon } from '@heroicons/react/24/outline'
 import { useRouterState } from '@tanstack/react-router'
 import { submitProblemReportWrite } from '#/data/writes'
 import { useDataMutation } from '#/lib/mutation'
-import { API_CALL } from '#/data/scenarios'
-import type { ApiCallRecord } from '#/data/scenarios'
+import { API_CALL } from '#/data/serverFn'
+import type { ApiCallRecord } from '#/data/serverFn'
 import { describeError } from '#/lib/actionError'
 
 const MAX_TRAIL = 100

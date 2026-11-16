@@ -98,9 +98,9 @@ describe('the signing key', () => {
         expect(policy.message).toContain('E-ACTOR-ASSERTION-KEY')
         expect(policy.message).not.toContain('PRIVATE KEY-----')
       }
-      expect(() => assertBootPolicies({ SERVICE_TOKEN: 's', OIDC_ISSUER_URL: 'https://idp.test', ...e })).toThrow('E-ACTOR-ASSERTION-KEY')
+      expect(() => assertBootPolicies({ BACKEND_URL: 'http://backend.example.test:8080', SERVICE_TOKEN: 's', OIDC_ISSUER_URL: 'https://idp.test', ...e })).toThrow('E-ACTOR-ASSERTION-KEY')
     }
-    expect(() => assertBootPolicies({ SERVICE_TOKEN: 's', OIDC_ISSUER_URL: 'https://idp.test', ...env })).not.toThrow()
+    expect(() => assertBootPolicies({ BACKEND_URL: 'http://backend.example.test:8080', SERVICE_TOKEN: 's', OIDC_ISSUER_URL: 'https://idp.test', ...env })).not.toThrow()
   })
 })
 

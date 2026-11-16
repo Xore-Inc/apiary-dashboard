@@ -408,7 +408,7 @@ export function GhidraResult({ g, fn, section }: { g: GhidraAnalysis; fn?: strin
           </Text>
           <ActionLink href={`/revdeck/${sha}`}>RevDeck walkthrough</ActionLink>
         </HStack>
-        {queued && <Banner status="success" title={queued} description="Mock: nothing was actually queued." isDismissable onDismiss={() => setQueued(null)} />}
+        {queued && <Banner status="success" title={queued} isDismissable onDismiss={() => setQueued(null)} />}
         {section === 'overview' && <Overview g={g} />}
         {section === 'code' && <Code g={g} fn={fn} onSelect={select} />}
         {section === 'data' && <Data g={g} />}

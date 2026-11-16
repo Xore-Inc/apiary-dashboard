@@ -7,17 +7,11 @@
 // A browser's first load gets that skeleton from the server (lib/pageSsr), so
 // the first client render must be the skeleton too, even when the loader has
 // already answered: the data shows from the render after hydration.
-//
-// The "Loading forever" mock scenario keeps every page on that skeleton, so
-// it can be checked at leisure. Its data still loads; the page never shows
-// it, and navigation works as usual (a loader that never answered would hold
-// up every navigation after it).
-import { useHydrated, useSearch } from '@tanstack/react-router'
+import { useHydrated } from '@tanstack/react-router'
 
 export function orPending<T>(data: T): T | undefined {
   const hydrated = useHydrated()
-  const loading = useSearch({ strict: false, select: (search: Record<string, unknown>) => search.mock === 'loading' })
-  return (typeof window === 'undefined' || hydrated) && !loading ? data : undefined
+  return typeof window === 'undefined' || hydrated ? data : undefined
 }
 
 /** When the router shows a page's skeleton (src/router.tsx): only a load

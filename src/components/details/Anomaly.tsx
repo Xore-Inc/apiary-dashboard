@@ -108,7 +108,7 @@ export function AnomalyTriage({ anomaly }: { anomaly: MlAnomaly }) {
       setBusy(false)
     }
   }
-  // A folded row stands for several anomalies; the mock keeps them as one.
+  // A folded row stands for several anomalies; triage acts on the one shown.
   const ids = [anomaly.id]
   // Triage is an admin's call: viewers are not offered it.
   const isAdmin = useIsAdmin()

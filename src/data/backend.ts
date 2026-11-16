@@ -1,74 +1,34 @@
-// The mock backend, server-side: every query of the implementation run as
-// the backend in a given scenario answers it, for a given user. The server
-// functions (src/data/queries.ts) call it for the signed-in user of the
-// request; downloads do the same. Tests and scripts call it without a user,
-// as a trusted internal caller. The browser never loads it.
+// The one funnel every server function (src/data/queries.ts) calls: the
+// request's signed-in user, then the live adapter that answers the query
+// (src/data/api.ts), behind the same authorization decision for every one.
+// Server-only; the browser never loads it.
 import { ApiError } from './errors'
-import { MOCK_USER } from './mock/fixtures'
-import * as impl from './queries.impl'
-import { runScenario } from './scenario'
-import { isScenario } from './scenarios'
-import type { MockScenario } from './scenarios'
+import { liveQuery, liveQueryNames } from './api'
+import type { Queries } from './queries.contract'
 import type { SessionUser } from './types'
-import { authorize } from '#/server/authorize'
-import { mockScenariosAllowed } from '#/server/policy'
 
-type Impl = typeof impl
-/** The queries: every async export of the implementation. */
-export type QueryName = { [K in keyof Impl]: Impl[K] extends (...args: never[]) => Promise<unknown> ? K : never }[keyof Impl]
-export type Backend = { [K in QueryName]: Impl[K] }
+/** The queries, by name. */
+export type QueryName = keyof Queries
+/** What answers every query: the live adapters. */
+export type Backend = Queries
 
-const QUERIES = Object.entries(impl).filter(([, value]) => typeof value === 'function' && value.constructor.name === 'AsyncFunction') as Array<[QueryName, (...args: unknown[]) => Promise<unknown>]>
-
-export const queryNames = (): QueryName[] => QUERIES.map(([name]) => name)
+/** Every query the pages can make. */
+export const queryNames = (): QueryName[] => liveQueryNames() as QueryName[]
 
 /** The caller: a signed-in user, nobody (null), or the trusted internal
- * caller (undefined: tests, scripts), which is not checked. */
+ * caller (undefined: a route that checks its own token), which is not
+ * checked. */
 export type Caller = SessionUser | null | undefined
 
-/** The backend as it answers in `scenario`, for `caller`. The viewer
- * scenario signs any caller in as a viewer, for designing that role. */
-export function backend(scenario: MockScenario = 'normal', caller?: Caller): Backend {
-  const user = caller && scenario === 'viewer' ? { ...caller, name: 'Analyst', roles: ['viewer'] } : caller
-  return Object.fromEntries(
-    QUERIES.map(([name, query]) => {
-      const answer = runScenario(name, query, scenario)
-      const guarded = async (...args: unknown[]) => {
-        if (name === 'getSessionUser') return user === undefined ? MOCK_USER : user
-        if (user !== undefined) {
-          const decision = authorize(name, user)
-          if (decision === 'sign-in') throw new ApiError('expired', name)
-          if (decision === 'admin-only') throw new ApiError('forbidden', name)
-        }
-        return answer(...args)
-      }
-      return [name, guarded]
-    }),
-  ) as unknown as Backend
-}
-
-/** One call from a server function: by name, with its arguments, in the
- * page's scenario, for the request's signed-in user.
- *
- * There is exactly one funnel, so this is where the real backend sits
- * alongside the mock (src/data/api.ts). Without BACKEND_URL the mock answers;
- * with it, every request must use a live adapter or return an error. The
- * explicit development override is the only exception. */
-
-export async function runForRequest(name: string, args: unknown[], scenario: unknown): Promise<unknown> {
+/** One call from a server function: by name, with its arguments, for the
+ * request's signed-in user. */
+export async function runForRequest(name: string, args: unknown[]): Promise<unknown> {
   const [{ getRequest, setResponseStatus }, { resolveUser }] = await Promise.all([import('@tanstack/react-start/server'), import('#/server/identity')])
   const request = getRequest()
   const user = await resolveUser(request)
-  const mockScenario = mockScenariosAllowed() && isScenario(scenario) && scenario !== 'normal' ? scenario : undefined
-  const api = mockScenario ? undefined : await import('./api')
-  const live = api?.liveQuery(name, user, request.headers.get('x-request-id') || undefined)
-  const mock = backend(mockScenario ?? 'normal', user)[name as QueryName] as ((...a: unknown[]) => Promise<unknown>) | undefined
-  if (!live && !mock) throw new Error(`unknown query ${name}`)
+  const live = liveQuery(name, user, request.headers.get('x-request-id') || undefined)
+  if (!live) throw new Error(`unknown query ${name}`)
   try {
-    if (!live) {
-      if (api?.isLiveBackend()) throw new ApiError('unavailable', name, { detail: 'not available on live backend' })
-      return await mock!(...args)
-    }
     return await live(...args)
   } catch (error) {
     // The refusal is the response's status too (401, 403, 502, …), as the

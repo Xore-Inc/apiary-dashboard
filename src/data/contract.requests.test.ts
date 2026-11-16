@@ -23,9 +23,12 @@ import { reportDefinitionBody } from './adapters/reports'
 import { createWorkbenchRunBody, saveWorkbenchRecipeBody } from './adapters/evidence'
 import { configRollbackBody, configSectionBody, configValidateBody, dashboardConfig, preferences, preferencesPatch, preferencesResetBody, preferencesWriteBody, problemReportBody, problemStatusPatch } from './adapters/settings'
 import { setIpBlockBody } from './adapters/sources'
-import { CONFIG } from './mock/details'
 import type { AnalyzerOptions, ProblemStatus, ReportDefinition, WorkbenchRecipe } from './types'
 import wireSettings from './__fixtures__/wire-settings.json'
+
+/** Every section at the compiled defaults, as a backend with nothing
+ * configured answers them. */
+const CONFIG = dashboardConfig({ revision: 14, payload: {} })
 
 interface Fields {
   /** backend-service source of the struct. */

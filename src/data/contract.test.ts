@@ -470,7 +470,7 @@ const EMITTED = [
   // backend-service/src/search.rs
   '/sessions/abc', '/investigate/ip/203.0.113.4', '/events?cmd=ls', '/events?kind=login', '/events?fingerprint=f', '/events?persona=p', '/events', '/sensors', '/history?q=x',
   // backend-service/src/dashboard.rs
-  '/events?asn=1', '/events?shasum=ab', '/events?proto=tcp', '/events?port=22', '/events?country=NL', '/events?city=Rome', '/events?provider=p', '/events?ip=1.2.3.4', '/events?path=%2Fx', '/commands',
+  '/events?asn=1', '/events?shasum=ab', '/events?proto=tcp', '/events?port=22', '/events?country=NL', '/events?city=Rome', '/events?provider=p', '/events?ip=192.0.2.4', '/events?path=%2Fx', '/commands',
   // backend-service/src/detail.rs, events.rs, worker.rs
   '/events?sensor=cowrie&k=v', '/tty-replay/abc', '/events?cidr=203.0.113.0/24',
   // backend-service/src/entity_details.rs (timeline hrefs)

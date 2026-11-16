@@ -6,31 +6,23 @@ import type { RangeId } from '#/lib/range'
 import { PANE_IDS } from '#/components/SettingsDialog'
 import type { PaneId } from '#/components/SettingsDialog'
 import { ShellAppShell } from '#/components/ShellAppShell'
-import { mockScenariosAllowedQuery, preferencesQuery, sessionUserQuery, shellConfigQuery } from '#/data/resources'
+import { preferencesQuery, sessionUserQuery, shellConfigQuery } from '#/data/resources'
 import { ensure } from '#/lib/query'
-import { isScenario } from '#/data/scenarios'
-import { setNavigationScenario } from '#/data/serverFn'
-import type { MockScenario } from '#/data/scenarios'
 import { isNarrowViewport } from '#/lib/viewport'
 import { pageFor, sectionFor } from '#/lib/nav'
 import { DEFAULT_TITLE_FORMAT, formatTitle } from '#/lib/title'
 
 export const Route = createFileRoute('/_layout')({
   // `?settings=<pane>` opens the settings modal over any page; `?range=` is
-  // the app-wide time range and `?mock=` the mock backend scenario, both
-  // kept on every navigation.
-  validateSearch: (search: Record<string, unknown>): { settings?: PaneId; range?: RangeId; mock?: MockScenario } => ({
+  // the app-wide time range, kept on every navigation.
+  validateSearch: (search: Record<string, unknown>): { settings?: PaneId; range?: RangeId } => ({
     settings: PANE_IDS.includes(search.settings as PaneId) ? (search.settings as PaneId) : undefined,
     range: isRange(search.range) && search.range !== '24h' ? search.range : undefined,
-    mock: isScenario(search.mock) && search.mock !== 'normal' ? search.mock : undefined,
   }),
-  search: { middlewares: [retainSearchParams(['range', 'mock'])] },
-  // Before any loader below runs: the navigation's mock scenario (every
-  // query of it carries that), then the landing and default-range redirects.
+  search: { middlewares: [retainSearchParams(['range'])] },
+  // Before any loader below runs: the session, then the landing and
+  // default-range redirects.
   beforeLoad: async ({ search, location, preload, context: { queryClient } }) => {
-    // A switch of mock scenario changes every answer: drop the cached ones
-    // (development only; production has no scenarios).
-    if (setNavigationScenario(search.mock)) queryClient.removeQueries()
     // The navigation guard: no session, no page. Sign-in brings the operator
     // back here. Answered from the cache when it has the session (asked again
     // in the background after 30 s, lib/query.ts), so a navigation never
@@ -56,8 +48,8 @@ export const Route = createFileRoute('/_layout')({
     return { user, preload }
   },
   loader: async ({ context }) => {
-    const [config, mockScenarios] = await Promise.all([ensure(context.queryClient, shellConfigQuery()), ensure(context.queryClient, mockScenariosAllowedQuery())])
-    return { user: context.user, config, mockScenarios, narrow: isNarrowViewport() }
+    const config = await ensure(context.queryClient, shellConfigQuery())
+    return { user: context.user, config, narrow: isNarrowViewport() }
   },
   // The document title follows navigation (WCAG 2.4.2): it is what a
   // screen reader announces on arrival and what tells tabs apart.
@@ -83,14 +75,14 @@ function rememberedSearch(path: string): string | null {
 }
 
 function LayoutComponent() {
-  const { user, config, mockScenarios, narrow } = Route.useLoaderData()
+  const { user, config, narrow } = Route.useLoaderData()
   const prefs = usePreferences()
   const location = useLocation({ select: (l) => ({ pathname: l.pathname, searchStr: l.searchStr }) })
   // Keep each page's last filters for "remember filters" (this tab only).
   useEffect(() => {
     if (!prefs?.rememberFilters) return
     const kept = new URLSearchParams(location.searchStr)
-    for (const key of ['settings', 'mock', 'range']) kept.delete(key)
+    for (const key of ['settings', 'range']) kept.delete(key)
     try {
       if ([...kept].length) sessionStorage.setItem(REMEMBER_KEY(location.pathname), `?${kept.toString()}`)
       else sessionStorage.removeItem(REMEMBER_KEY(location.pathname))
@@ -104,5 +96,5 @@ function LayoutComponent() {
   const navigate = useNavigate()
   const setSettings = (pane: PaneId | undefined) =>
     void navigate({ to: '.', search: (prev: Record<string, unknown>) => ({ ...prev, settings: pane }) })
-  return <ShellAppShell user={user} config={config} mockScenarios={mockScenarios} narrow={narrow} settingsPane={settings} onSettingsPane={setSettings} />
+  return <ShellAppShell user={user} config={config} narrow={narrow} settingsPane={settings} onSettingsPane={setSettings} />
 }

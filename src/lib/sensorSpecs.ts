@@ -1,8 +1,6 @@
 // The static catalog of honeypot sensors: what each one is, the columns and
 // artefacts its event page shows, and the leaderboards and measures it
-// feeds. Pure description, no data, so the live tier can read it. The
-// mock fleet (src/data/mock/fleet.ts) adds traffic and generators on top
-// of these entries, so a sensor is described once.
+// feeds. Pure description, no data, so a sensor is described once.
 import type { EventType, SensorFields, SensorReading } from '#/data/types'
 
 /** A field, or the first of several names different versions use for it. */

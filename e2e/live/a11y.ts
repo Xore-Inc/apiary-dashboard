@@ -24,7 +24,7 @@ const probe = await finder.newPage()
 await probe.goto(`${base}/alerts`, { waitUntil: 'load', timeout: 90_000 })
 await requireSession(probe, browser)
 const [SOURCE = '/sources/192.0.2.1'] = await discover(probe, '/ips', /^\/sources\/[^/?]+$/, 1)
-const [PAYLOAD_PAGE] = await discover(probe, '/payloads', /^\/payloads\/[0-9a-f]{32,64}$/, 1)
+const [PAYLOAD_PAGE] = (await discover(probe, '/payloads', /^\/payloads\/[0-9a-f]{32,64}$/, 1)) as Array<string | undefined>
 const PAYLOAD = PAYLOAD_PAGE?.split('/')[2] ?? '0'.repeat(64)
 info(`a source and a payload: ${SOURCE.startsWith('/sources/') ? 'found' : '-'}, ${PAYLOAD_PAGE ? 'found' : '-'}`)
 await finder.close()

@@ -192,8 +192,8 @@ const refused = async (name: string, args: unknown[]) => {
   const sent = captured.get(name)
   if (sent) byArgs.set(key, sent)
   const ok = !result.ok && (result.status === 403 || /: 403 forbidden/.test(result.error ?? '')) && sent?.status === 403
-  check(ok, `viewer ${name} refused 403`, ok ? `csrf header ${sent && 'x-csrf-token' in sent.headers ? 'sent' : 'MISSING'}` : `${JSON.stringify(result).slice(0, 200)} network ${sent?.status ?? 'none'}`)
-  if (ok && sent && !('x-csrf-token' in sent.headers) && sent.method === 'POST') fail(`viewer ${name}`, 'the refused POST did not carry x-csrf-token: the refusal may be the same-origin rule, not the role')
+  check(ok, `viewer ${name} refused 403`, ok ? `csrf header ${'x-csrf-token' in sent.headers ? 'sent' : 'MISSING'}` : `${JSON.stringify(result).slice(0, 200)} network ${sent?.status ?? 'none'}`)
+  if (ok && !('x-csrf-token' in sent.headers) && sent.method === 'POST') fail(`viewer ${name}`, 'the refused POST did not carry x-csrf-token: the refusal may be the same-origin rule, not the role')
   return ok
 }
 
@@ -213,7 +213,7 @@ check(Array.isArray(alerts), 'viewer getAlerts answers', Array.isArray(alerts) ?
 // The admin page sends a viewer home; a payload download is refused.
 const req = viewer.request
 const status = async (ctx: APIRequestContext, path: string, headers: Record<string, string> = {}) => {
-  const r = await ctx.get(base + path, { maxRedirects: 0, timeout: 60_000, headers }).catch((e: Error) => ({ status: () => -1, headers: () => ({}) as Record<string, string>, text: async () => e.message }))
+  const r = await ctx.get(base + path, { maxRedirects: 0, timeout: 60_000, headers }).catch((e: Error) => ({ status: () => -1, headers: (): Record<string, string> => ({}), text: async () => e.message }))
   return { code: r.status(), location: r.headers()['location'] ?? '', text: r.text }
 }
 {

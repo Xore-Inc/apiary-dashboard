@@ -62,8 +62,8 @@ describe('backend readiness', () => {
     expect((await checkBackendContract({ BACKEND_URL: 'http://b.test' }, backends({ 'http://b.test': 500 }))).ok).toBe(false)
   })
 
-  it('is ready when no backend is configured', async () => {
-    expect(await checkBackendContract({}, backends({}))).toEqual({ ok: true, configured: false, listeners: [] })
+  it('is not ready when no backend is configured', async () => {
+    expect(await checkBackendContract({}, backends({}))).toEqual({ ok: false, configured: false, listeners: [] })
   })
 })
 

@@ -1,6 +1,5 @@
-// Domain types the UI renders. Shaped after the canonical BFF responses so the
-// mock implementations in ./mock can be swapped for real server functions
-// without touching page code.
+// Domain types the UI renders, shaped after the canonical BFF responses. The
+// adapters (./adapters) map the backend's wire shapes into them.
 
 export type Severity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
@@ -489,7 +488,7 @@ export interface SensorMeasure {
    * as they are. Absent: a plain count. */
   unit?: 'count' | 'bytes' | 'duration'
   /** The headline beside the value, in words: "busiest source: 12 from
-   * 198.51.100.7" from the mock, "largest single value 3 m 6 s" from the wire. */
+   * 198.51.100.7", "largest single value 3 m 6 s". */
   peak: string
 }
 
@@ -507,7 +506,7 @@ export interface SensorDetail {
   firstSeen: string
   timeline: TimeBucket[]
   /** The span `timeline` and the sensor's event count cover, as the wire
-   * names it ("7 d", "24 h"). Absent: the mock's 24 hours. */
+   * names it ("7 d", "24 h"). Absent: 24 hours. */
   window?: string
   /** The quantities this sensor type exists to produce. */
   measures: SensorMeasure[]
@@ -1303,7 +1302,7 @@ export interface SettingsData {
   reportTemplates: ReportTemplate[]
   /** Per config section, the page fields the stored document sets. A field
    * it leaves out is at the backend's default; a save sends it only when the
-   * operator changes it. Absent (the mock) means every field is set. */
+   * operator changes it. Absent means every field is set. */
   configSet?: Partial<Record<ConfigSection, string[]>>
 }
 

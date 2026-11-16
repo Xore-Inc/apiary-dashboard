@@ -80,7 +80,6 @@ import {
   searchAll,
   searchHistory,
 } from './queries'
-import { getMockClock, getMockScenariosAllowed } from './serverFn'
 
 // ---- the shell: every page reads these -----------------------------------
 
@@ -91,8 +90,6 @@ export const sessionUserQuery = resource('getSessionUser', getSessionUser, 'norm
 export const preferencesQuery = resource('getPreferences', getPreferences, 'normal')
 /** Presentation, map tiles, feature switches: deployment configuration. */
 export const shellConfigQuery = resource('getShellConfig', getShellConfig, 'slow')
-export const mockClockQuery = resource('getMockClock', getMockClock, 'static')
-export const mockScenariosAllowedQuery = resource('getMockScenariosAllowed', getMockScenariosAllowed, 'static')
 
 // ---- live: asked again on every visit, and on focus/reconnect ----------
 
