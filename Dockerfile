@@ -7,7 +7,9 @@ ARG BUN_VERSION=1.4.2
 
 FROM oven/bun:${BUN_VERSION} AS build
 WORKDIR /app
+# patches/ holds the bun patchedDependencies; install refuses without them.
 COPY package.json bun.lock ./
+COPY patches ./patches
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
@@ -18,6 +20,7 @@ RUN apt-get update && apt-get -y upgrade --no-install-recommends && rm -rf /var/
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000
 COPY package.json bun.lock ./
+COPY patches ./patches
 RUN bun install --frozen-lockfile --production && rm -rf /root/.bun/install/cache
 COPY --from=build /app/dist ./dist
 COPY server.ts ./

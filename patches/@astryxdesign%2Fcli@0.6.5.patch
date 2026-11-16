@@ -1,0 +1,77 @@
+diff --git a/api/theme/build/build.mjs b/api/theme/build/build.mjs
+index a060bf3d2bbe6270099104bbae7eb2d6f778d453..eecdf50ceda51f89bb3e9625fc0f7870b3ece91c 100644
+--- a/api/theme/build/build.mjs
++++ b/api/theme/build/build.mjs
+@@ -306,6 +306,17 @@ function toPascalCase(name) {
+     .join('');
+ }
+ 
++/**
++ * Directory entries in code-point order of their names, independent of the
++ * filesystem's own readdir order and of the locale.
++ * @param {string} dir
++ */
++function sortedEntries(dir) {
++  return fs
++    .readdirSync(dir, {withFileTypes: true})
++    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
++}
++
+ /** @type {Promise<Record<string, Record<string, string[]>>> | null} */
+ let _knownValuesIndexPromise = null;
+ 
+@@ -324,7 +335,9 @@ async function loadKnownValuesIndex() {
+   const docs = [];
+   /** @param {string} dir */
+   async function scan(dir) {
+-    for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
++    // readdir order is filesystem-specific (ext4 hashes names with a
++    // per-filesystem seed); sort so the scan order never varies.
++    for (const entry of sortedEntries(dir)) {
+       const full = path.join(dir, entry.name);
+       if (entry.isDirectory()) {
+         if (entry.name !== 'node_modules' && entry.name !== '__tests__') {
+@@ -374,17 +387,29 @@ async function loadKnownValuesIndex() {
+     return result;
+   };
+ 
++  // A component can appear in more than one doc: its own doc declares its
++  // props, and a parent doc can list it by name only (Avatar.doc.mjs lists
++  // AvatarStatusDot). Merge every entry, so the result does not depend on
++  // the order the docs load in. Backport of upstream #10288 (CLI 0.7.11).
+   /** @type {Record<string, Record<string, Set<string>>>} */
+   const valuesByOwner = {};
++  /**
++   * @param {string} name
++   * @param {any[]} props
++   */
++  const addOwnerValues = (name, props) => {
++    const owner = (valuesByOwner[targetName(name)] ??= {});
++    for (const [prop, values] of Object.entries(valuesFromProps(props))) {
++      owner[prop] = new Set([...(owner[prop] ?? []), ...values]);
++    }
++  };
+   for (const doc of docs) {
+     if (typeof doc?.name === 'string') {
+-      valuesByOwner[targetName(doc.name)] = valuesFromProps(doc.props);
++      addOwnerValues(doc.name, doc.props);
+     }
+     for (const component of /** @type {any[]} */ (doc?.components ?? [])) {
+       if (typeof component?.name === 'string') {
+-        valuesByOwner[targetName(component.name)] = valuesFromProps(
+-          component.props,
+-        );
++        addOwnerValues(component.name, component.props);
+       }
+     }
+   }
+@@ -544,8 +569,7 @@ async function resolveAugmentationTargetCandidates(componentName) {
+ 
+   /** @param {string} dir */
+   async function scan(dir) {
+-    const entries = fs.readdirSync(dir, {withFileTypes: true});
+-    for (const entry of entries) {
++    for (const entry of sortedEntries(dir)) {
+       const full = path.join(dir, entry.name);
+       if (entry.isDirectory()) {
+         if (entry.name === 'node_modules' || entry.name === '__tests__')
