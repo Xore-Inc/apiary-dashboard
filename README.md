@@ -39,12 +39,20 @@ It resolves `hp-apiary-backend` (port 8081) and `hp-apiary-backend-mounted` (por
 ```bash
 BACKEND_URL=http://127.0.0.1:8081
 BACKEND_MOUNTED_URL=http://127.0.0.1:8082
-SERVICE_TOKEN_FILE=/path/to/your/service-token              # 0600, never in the repository
-ACTOR_ASSERTION_PRIVATE_KEY_FILE=/path/to/your/actor-key.pem # 0600; the backend enforces signed actors
+SERVICE_TOKEN_FILE=/home/you/.config/apiary/dev-service-token                   # 0600, never in the repository
+ACTOR_ASSERTION_PRIVATE_KEY_FILE=/home/you/.config/apiary/dev-actor-signing-key.pem # 0600; the backend enforces signed actors
 OIDC_DISABLED=1      # no Keycloak locally: every request is the development operator (an admin)
 ```
 
-The backend runs with `ACTOR_ASSERTION_MODE=enforce`, so it answers a dashboard only with the service token **and** an actor assertion signed by a key it trusts. Keep both in your own 0600 files and name them with the `_FILE` variables; never put them on a command line or in the repository. Without them the dev server still starts and pages render, but every read shows "The backend did not answer" (`service token required`): `/readyz` reports the backend reachable either way. With `OIDC_DISABLED=1` every request is an admin, so writes reach the homeserver's real data: treat it like production. To sign in through Keycloak instead, set `OIDC_ISSUER_URL` and its client settings.
+The backend runs with `ACTOR_ASSERTION_MODE=enforce`, so it answers a dashboard only with the service token **and** an actor assertion signed by a key it trusts. Keep both in your own 0600 files and name them with the `_FILE` variables (the dashboard already reads both this way, and the key as an Ed25519 PEM); never put them on a command line or in the repository.
+
+**Use a dev pair, never production's.** The homeserver's production token and signing key stay on the homeserver. A local dashboard gets a pair of its own, which the backend trusts separately (`DEV_SERVICE_TOKEN` and `DEV_ACTOR_ASSERTION_PUBLIC_KEY`, [`docs/BACKEND-TRUST-BOUNDARY.md`](https://github.com/Xore-Inc/APIARY/blob/main/docs/BACKEND-TRUST-BOUNDARY.md) in the APIARY repository):
+
+```bash
+scripts/dev-credentials.sh   # once; stdout is the public key only, so you can redirect it to a file outside the repository
+```
+
+It writes `dev-service-token` (a random 256-bit token) and `dev-actor-signing-key.pem` (an Ed25519 private key) into `~/.config/apiary/` with mode 0600, never prints either, and prints the **public** key on stdout for the backend's `DEV_ACTOR_ASSERTION_PUBLIC_KEY`; the paths for your `.env` go to stderr. It needs OpenSSL 3: macOS's bundled LibreSSL cannot generate Ed25519 keys, so put Homebrew's `openssl` first on `PATH` (`brew install openssl`). It refuses to overwrite existing files unless you pass `--force` (a new pair: register the new public key again); `--public` prints the public key of the existing pair again. The token's other home is the backend's `DEV_SERVICE_TOKEN`: hand it over from the file through a pipe, never as a command-line argument. The backend verifies an assertion sent with the dev token against the dev key only (a production-signed one is refused, and so is the reverse), treats the dev token without an assertion exactly like production's, marks everything it does as `dev` (request log, and `dev:<username>` in the audit trail), and keeps viewers read-only, so dev writes are always distinguishable from the real dashboard's. That holds because the backend only accepts the dev pair under `ACTOR_ASSERTION_MODE=enforce` (under `off` or `log` it refuses to boot with the pair set), and it wants a dev token of at least 32 characters, which the script's 43 satisfy. Both backends the tunnel reaches (8081 and 8082) need the pair registered. Revoke it by unsetting the pair on the backend. Without a pair the backend trusts, the dev server still starts and pages render, but every read shows "The backend did not answer" (`service token required`): `/readyz` reports the backend reachable either way. With `OIDC_DISABLED=1` every request is an admin, so writes reach the homeserver's real data: treat it like production. To sign in through Keycloak instead, set `OIDC_ISSUER_URL` and its client settings.
 
 ### Design studio
 
