@@ -5,6 +5,7 @@
 //   BETA_URL=… BETA_STORAGE_STATE=… SHOTS_DIR=… bun e2e/live/run.ts
 //   ONLY=authorization,crawl bun e2e/live/run.ts      a subset
 import { mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 /** In order: the crawl writes the samples the skeleton check reads. */
@@ -21,12 +22,18 @@ for (const name of ['BETA_URL', 'BETA_STORAGE_STATE']) {
     process.exit(2)
   }
 }
-const root = process.env.SHOTS_DIR?.trim() || join(process.cwd(), '.live-shots')
+const root = process.env.SHOTS_DIR?.trim() || join(tmpdir(), `apiary-live-${new Date().toISOString().replace(/[:.]/g, '-')}`)
 const OUTCOME: Record<number, string> = { 0: 'PASS', 1: 'FAIL', 2: 'SKIPPED', 3: 'SESSION' }
 const results: Array<{ name: string; code: number; seconds: number }> = []
+let authorizationFailed = false
 
 for (const name of CHECKS) {
   if (only && !only.includes(name)) continue
+  if (name === 'viewer-readonly' && (authorizationFailed || (only && !only.includes('authorization')))) {
+    console.log(`\n==> ${name}\nSKIP authorization.ts did not pass in this run, so no write is sent`)
+    results.push({ name, code: 2, seconds: 0 })
+    continue
+  }
   const shots = join(root, name)
   mkdirSync(shots, { recursive: true })
   console.log(`\n==> ${name}`)
@@ -35,6 +42,9 @@ for (const name of CHECKS) {
   const child = Bun.spawn(['bun', join(import.meta.dirname, `${name}.ts`)], { env, stdout: 'inherit', stderr: 'inherit' })
   const code = await child.exited
   results.push({ name, code, seconds: Math.round((Date.now() - started) / 1000) })
+  // viewer-readonly sends writes that change data if the guard is broken:
+  // never without authorization.ts having proven every refusal first.
+  if (name === 'authorization' && code !== 0) authorizationFailed = true
   if (code === 3) {
     console.log('\nthe session was not accepted: refresh BETA_STORAGE_STATE and run again')
     break

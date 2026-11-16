@@ -27,7 +27,7 @@ LOCAL_MOUNTED="${DEV_LOCAL_MOUNTED_PORT:-8082}"
 
 # The container's first Docker network address.
 address() {
-  ssh -o BatchMode=yes "$HOST" "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' $1" 2>/dev/null | awk '{print $1}'
+  ssh -o BatchMode=yes "$HOST" "docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}' $(printf '%q' "$1")" 2>/dev/null | awk '{print $1}'
 }
 
 standard="$(address "$CONTAINER")"

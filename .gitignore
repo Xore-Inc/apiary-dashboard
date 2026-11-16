@@ -22,3 +22,6 @@ design-studio/index.html
 .claude/
 .grit/
 .impeccable/
+
+# Live-check output (e2e/live): real addresses and hashes, never committed.
+.live-shots/

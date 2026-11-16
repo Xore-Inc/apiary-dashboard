@@ -12,7 +12,7 @@ Do not switch traffic when any release gate is red, the live checks fail on the 
 
 1. Route `next.dashboard.example.test` to the rewrite with `EXTERNAL_URL` set to that origin. Keep `dashboard.example.test` on canonical.
 2. Confirm the clean-clone and container gates passed for the deployed commit and digest, then perform viewer/admin workflows on the soak host for lists, details, mutations, downloads, reports, SSE, mobile navigation, and session expiry.
-3. Compare canonical and rewrite results for the same time window. Resolve every unexplained difference in the traceability and backend-coverage matrices.
+3. Compare canonical and rewrite results for the same time window. Resolve every unexplained difference in the traceability matrix.
 4. Observe at least one normal operating window. Watch request errors, backend failures/timeouts, `bff_sheds_total`, `bff_named_events_total{name="auth_callback_failed"}`, Redis, Keycloak, and container restarts.
 5. Rehearse [rollback](rollback.md) on the soak host: route it to canonical, verify sign-in and a live page, then route it back to the rewrite and verify again. Record both changes and timestamps.
 

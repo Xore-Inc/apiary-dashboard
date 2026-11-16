@@ -10,6 +10,12 @@
 #    sign-in off as on a development instance: nothing crashes, the outages
 #    are reported with their statuses, a page renders its error state with a
 #    fresh CSP nonce on every script, and sign-out is same-origin only.
+# 3. Started with Keycloak configured, but the identity provider, the session
+#    store and the backend all unreachable: without a session every page goes
+#    to sign-in and every direct handler answers 401; sign-in says it is
+#    unavailable and sets no session; a cookie signs nobody in.
+# 4. Against a backend that answers only after 12 s: the answer still
+#    arrives (Bun's own idle timeout, 10 s, once emptied such answers).
 #
 # Usage: scripts/server-checks.sh
 set -euo pipefail
@@ -17,8 +23,10 @@ set -euo pipefail
 PORT="${SERVER_CHECKS_PORT:-3199}"
 WORK="$(mktemp -d)"
 SERVER_PID=""
+OTHER_PIDS=()
 cleanup() {
   [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true
+  for pid in "${OTHER_PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -86,8 +94,46 @@ check "cross-site sign-out" "$(code /auth/logout -H 'Referer: https://evil.examp
 check "sign-out without Origin or Referer" "$(code /auth/logout)" 403
 check "same-origin sign-out" "$(code /auth/logout -H "Referer: $(url /events)")" 303
 
+step "without a session, with the identity provider and the session store down"
+ANON_PORT=$((PORT + 1))
+OIDC_ISSUER_URL=https://sso.invalid/realms/ci OIDC_SESSION_REDIS_URL=redis://127.0.0.1:1/0 SERVICE_TOKEN=checks BACKEND_URL=http://127.0.0.1:1 PORT="$ANON_PORT" bun run start >"$WORK/anon.log" 2>&1 &
+OTHER_PIDS+=($!)
+for _ in $(seq 1 100); do curl -s -o /dev/null "http://localhost:$ANON_PORT/healthz" && break; sleep 0.2; done
+acode() { curl -s -o /dev/null -w '%{http_code}' --max-time 15 "${@:2}" "http://localhost:$ANON_PORT$1"; }
+check "liveness" "$(acode /healthz)" 200
+for path in / /events '/events?kind=login' /admin; do check "a page goes to sign-in: $path" "$(acode "$path")" 307; done
+for path in /api/live /api/export/events.csv /api/chart/os-distribution /api/topology/flow "/api/payload/$(printf '0%.0s' $(seq 1 64))/download" /export/portbridge-manual-blackhole.txt; do
+  check "a direct handler refuses: $path" "$(acode "$path")" 401
+done
+metrics="$(acode /metrics)"
+if [[ "$metrics" == 401 || "$metrics" == 403 ]]; then printf '  ok   %s /metrics needs the service token\n' "$metrics"; else printf '  FAIL %s /metrics without the service token\n' "$metrics"; failed=1; fi
+# With the store down every read of it waits out the client's retries (up to
+# ~30 s each), so these get a minute.
+check "a session cookie the store cannot read signs nobody in" "$(acode /events --max-time 60 -b '__Host-apiary_bff=checks-not-a-session')" 307
+location="$(curl -s -o /dev/null -D - --max-time 30 "http://localhost:$ANON_PORT/auth/login?return_to=%2Fevents" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')"
+check "sign-in that cannot start goes to its own failure page" "$location" "/auth/login?fail=unavailable"
+if curl -s --max-time 15 "http://localhost:$ANON_PORT/auth/login?fail=unavailable" | tr -d '\0' | grep -q "temporarily unavailable"; then printf '  ok   the sign-in page says it is unavailable\n'; else printf '  FAIL the sign-in page does not say it is unavailable\n'; failed=1; fi
+for path in '/auth/callback?code=mock&role=admin' '/auth/callback?code=failed' '/auth/callback?state=forged&code=forged'; do
+  headers="$(curl -s -o /dev/null -D - --max-time 60 "http://localhost:$ANON_PORT$path" | tr -d '\r' || true)"
+  if [[ -z "$headers" ]]; then printf '  FAIL %s did not answer\n' "$path"; failed=1
+  elif grep -qi '^set-cookie: __Host-apiary_bff=[^;]' <<<"$headers"; then printf '  FAIL %s set a session\n' "$path"; failed=1
+  else printf '  ok   %s sets no session (%s)\n' "$path" "$(head -1 <<<"$headers" | cut -d' ' -f2)"; fi
+done
+check "the old mock sign-in is just a failure page" "$(acode '/auth/callback?code=mock&role=admin')" 200
+
+step "an answer slower than Bun's default 10 s idle window still arrives"
+SLOW_PORT=$((PORT + 2))
+STUB_PORT=$((PORT + 3))
+# A backend that answers every request after 12 s, with an empty chart.
+bun -e "Bun.serve({ port: $STUB_PORT, hostname: '127.0.0.1', idleTimeout: 60, fetch: async () => { await Bun.sleep(12000); return Response.json([]) } })" >"$WORK/stub.log" 2>&1 &
+OTHER_PIDS+=($!)
+APIARY_ALLOW_UNAUTH_DEV=1 OIDC_DISABLED=1 SERVICE_TOKEN=checks BACKEND_URL="http://127.0.0.1:$STUB_PORT" BACKEND_TIMEOUT_MS=30000 BACKEND_READ_CACHE_TTL_MS=0 PORT="$SLOW_PORT" bun run start >"$WORK/slow.log" 2>&1 &
+OTHER_PIDS+=($!)
+for _ in $(seq 1 100); do curl -s -o /dev/null "http://localhost:$SLOW_PORT/healthz" && break; sleep 0.2; done
+check "a 12 s chart answers 200, not an empty reply" "$(curl -s -o /dev/null -w '%{http_code}' --max-time 40 "http://localhost:$SLOW_PORT/api/chart/os-distribution")" 200
+
 if [[ "$failed" -ne 0 ]]; then
-  echo; echo "server log:"; tail -30 "$WORK/server.log"
+  for log in server anon slow; do echo; echo "$log server log:"; tail -${SERVER_CHECKS_LOG_LINES:-15} "$WORK/$log.log" 2>/dev/null; done
   exit 1
 fi
 step "server checks passed"

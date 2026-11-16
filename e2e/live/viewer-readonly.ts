@@ -101,17 +101,39 @@ info(`before: new rows ${before.newRows}, acknowledged rows ${before.ackedRows}`
 await page.goto(`${base}/alerts`, { waitUntil: 'load', timeout: 90_000 })
 await settle(page)
 // The writes a viewer's screens would make, refused: the state must hold.
-const tries: Array<[string, unknown[]]> = []
-if (openKey) tries.push(['setAlertsAcknowledged', [[openKey], true]])
-if (ackedKey) tries.push(['setAlertsAcknowledged', [[ackedKey], false]])
-const prefs = (before.prefs ?? {}) as Record<string, unknown>
-tries.push(['savePreferences', [{ ...prefs, motion: prefs.motion === 'reduced' ? 'system' : 'reduced' }]])
-let allRefused = true
-for (const [name, args] of tries) {
+// Inert first (an empty list, the stored preferences unchanged): if one of
+// those is accepted the guard is broken and nothing that changes data is
+// sent. Only then the changing ones, each undone at once should it ever be
+// accepted.
+const refusedCall = async (name: string, args: unknown[]) => {
   const r = await callServerFn(page, name, ...args)
   const ok = !r.ok && (r.status === 403 || /: 403 forbidden/.test(r.error ?? ''))
-  allRefused &&= ok
   check(ok, `${name} refused 403`, ok ? '' : JSON.stringify(r).slice(0, 200))
+  return { ok, accepted: r.ok }
+}
+const prefs = (before.prefs ?? {}) as Record<string, unknown>
+const inert: Array<[string, unknown[]]> = [
+  ['setAlertsAcknowledged', [[], true]],
+  ['savePreferences', [prefs]],
+]
+let allRefused = true
+for (const [name, args] of inert) allRefused = (await refusedCall(name, args)).ok && allRefused
+if (!allRefused) {
+  fail('changing writes', 'not sent: a harmless write was not refused, so the guard is broken')
+} else {
+  const changing: Array<{ name: string; args: unknown[]; undo: unknown[] }> = []
+  if (openKey) changing.push({ name: 'setAlertsAcknowledged', args: [[openKey], true], undo: [[openKey], false] })
+  if (ackedKey) changing.push({ name: 'setAlertsAcknowledged', args: [[ackedKey], false], undo: [[ackedKey], true] })
+  changing.push({ name: 'savePreferences', args: [{ ...prefs, motion: prefs.motion === 'reduced' ? 'system' : 'reduced' }], undo: [prefs] })
+  for (const write of changing) {
+    const r = await refusedCall(write.name, write.args)
+    allRefused &&= r.ok
+    if (r.accepted) {
+      const undone = await callServerFn(page, write.name, ...write.undo)
+      fail(`${write.name} was ACCEPTED`, `undone: ${undone.ok ? 'yes' : `NO (${undone.error ?? undone.status}), restore by hand`}`)
+      break
+    }
+  }
 }
 const after = await snapshot()
 info(`after reload: new rows ${after.newRows}, acknowledged rows ${after.ackedRows}`)

@@ -90,7 +90,7 @@ const fail = (status: number, body = 'boom', headers: Record<string, string> = {
   new Response(body, { status, headers })
 
 /** The live query, with BACKEND_URL set as the opt-in, typed as the seam
- * function it stands in for — so a signature drift in queries.impl.ts fails
+ * function it stands in for — so a signature drift in the contract fails
  * the compiler here rather than at the page. */
 const live = <TQuery extends keyof Backend>(name: TQuery): Backend[TQuery] => {
   process.env.BACKEND_URL = 'http://backend.test'

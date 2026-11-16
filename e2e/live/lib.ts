@@ -11,6 +11,7 @@
 // failed, 2 the check could not run (no BETA_URL, no session file, no
 // browser), 3 the session was not accepted (expired: refresh it).
 import { existsSync, mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
 import type { Browser, BrowserContext, BrowserContextOptions, Page } from 'playwright-core'
@@ -34,7 +35,9 @@ if (!existsSync(statePath)) {
   console.log(`SKIP BETA_STORAGE_STATE names no file (${statePath})`)
   process.exit(EXIT.skipped)
 }
-export const shots = process.env.SHOTS_DIR?.trim() || join(process.cwd(), '.live-shots')
+// Screenshots and results hold real addresses and hashes: outside the
+// repository unless SHOTS_DIR says otherwise.
+export const shots = process.env.SHOTS_DIR?.trim() || join(tmpdir(), 'apiary-live-shots')
 mkdirSync(shots, { recursive: true })
 export const shot = (label: string) => join(shots, `${label.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}.png`)
 
@@ -146,7 +149,7 @@ export async function installServerFns(page: Page): Promise<string[]> {
           queue.push(next)
         }
       }
-      for (const m of text.matchAll(/\(`(\w+)`,[\w$]+\(\{method:`(?:GET|POST)`\}\)\.middleware\(\[[\w$,]*\]\)\.handler\([\w$]+\(`([0-9a-f]{16,})`\)\)/g)) ids[m[2]] = m[1]
+      for (const m of text.matchAll(/\(`(\w+)`,[\w$]+\(\{method:`(?:GET|POST)`\}\)(?:\.middleware\(\[[\w$,]*\]\))?\.handler\([\w$]+\(`([0-9a-f]{16,})`\)\)/g)) ids[m[2]] = m[1]
       const exported = text.match(/export\{([^}]*)\}\s*;?\s*(\/\/.*)?$/)?.[1]
       if (!exported) continue
       const alias = new Map(exported.split(',').map((p) => p.trim().split(/\s+as\s+/) as [string, string?]).map(([local, as]) => [local, as ?? local]))

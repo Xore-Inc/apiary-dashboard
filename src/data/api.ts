@@ -292,7 +292,13 @@ export const isLiveBackend = (env: NodeJS.ProcessEnv = process.env): boolean => 
  * silently shows an operator an empty list. Unset falls back to BACKEND_URL: a
  * deployment that has collapsed the two into one instance still works, it just
  * loses the distinction. */
-const baseURL = (env: NodeJS.ProcessEnv = process.env, mounted = false): string => (mounted ? env.BACKEND_MOUNTED_URL?.trim() || env.BACKEND_URL! : env.BACKEND_URL!).replace(/\/$/, '')
+const baseURL = (env: NodeJS.ProcessEnv = process.env, mounted = false, endpoint = 'backend'): string => {
+  const standard = env.BACKEND_URL?.trim()
+  // A running server always has one (backendUrlPolicy); a script or a route
+  // reached without it is refused the same way liveQuery refuses, not a 500.
+  if (!standard) throw new ApiError('unavailable', endpoint, { detail: 'BACKEND_URL is not configured' })
+  return ((mounted && env.BACKEND_MOUNTED_URL?.trim()) || standard).replace(/\/$/, '')
+}
 
 /** One wire page's worth of nothing — the degraded answer a 200 with no body
  * maps to. Every real endpoint answers 200 with its envelope, so this is
@@ -388,7 +394,7 @@ async function raw(path: string, opts: { mounted?: boolean; user?: Caller; searc
   const query = queryOf(opts.search)
   let response: Response
   try {
-    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
+    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted, endpoint)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('unavailable', endpoint)
@@ -475,7 +481,7 @@ const hopHeaders = (user: Caller, method: string, path: string): Record<string, 
  * operator cannot tell that from a quiet fleet. */
 async function request<T>(endpoint: string, path: string, opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; search?: SearchParams; body?: unknown; mounted?: boolean; user?: Caller }): Promise<T | null> {
   const query = queryOf(opts.search)
-  const url = `${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`
+  const url = `${baseURL(process.env, opts.mounted, endpoint)}${path}${query.size ? `?${query}` : ''}`
   let response: Response
   try {
     response = await limited(endpoint, () => fetch(url, {
@@ -538,7 +544,7 @@ const post = async <T>(endpoint: string, path: string, body: unknown, opts: { mo
  * next one. `signal` is the caller's — the request's own abort, which is how
  * a disconnect upstream stops the poller rather than leaking it. */
 async function stream(endpoint: string, path: string, signal: AbortSignal): Promise<Response> {
-  const url = `${baseURL()}${path}`
+  const url = `${baseURL(process.env, false, endpoint)}${path}`
   let response: Response
   try {
     response = await fetch(url, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...assertionHeaders(undefined, 'GET', path) }, signal })
@@ -2089,10 +2095,10 @@ const getAnalyzerCatalog: Backend['getAnalyzerCatalog'] = async (hash) => {
  * for publication (mounted, `confirm: 'publish'` is the backend's own
  * required literal). `pdf` has no submit endpoint in the canonical list —
  * the report route is the generated-reports store, a different thing —
- * so that one action queues nothing, and says so rather than claiming it
- * started. */
+ * so that one action is refused as unavailable rather than claiming it
+ * started (the menu shows it disabled). */
 const queuePayloadAction: Backend['queuePayloadAction'] = async (hash, action) => {
-  if (action === 'pdf') return 'PDF report generation has no backend endpoint yet: nothing was queued'
+  if (action === 'pdf') throw new ApiError('unavailable', 'queuePayloadAction', { detail: 'PDF report generation has no backend endpoint yet: nothing was queued' })
   const mounted = { mounted: true, user: callerOf() }
   if (action === 'sandbox') await post<SandboxSubmitWire>('queuePayloadAction', '/api/v1/sandbox/submit', { hash }, mounted)
   else if (action === 'ghidra') await post<GhidraSubmitWire>('queuePayloadAction', '/api/v1/ghidra/submit', { hash }, mounted)

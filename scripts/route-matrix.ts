@@ -85,7 +85,7 @@ export const ROWS: Row[] = [
   { source: 'api/artifact.$kind.$key.$filename.ts', destination: ['/api/artifact/$kind/$key/$filename'], status: 'implemented', note: 'Proxied from the Rust tier\'s artifacts.rs::download.' , security: 'handler\'s own session check; artifact admission gate' },
   { source: 'api/canarytoken.$id.download.ts', destination: ['/api/canarytoken/$id/download'], status: 'implemented', note: 'The token file proxied off the Rust tier\'s own /api/v1/canarytokens/{id}/download; a 404 there is a 404 here.', security: 'handler\'s own session check; admission gate' },
   { source: 'api/export.$name.ts', destination: ['/api/export/$name'], status: 'implemented', note: 'Same allowlist; full scope, capped at the export limit.' , security: 'handler\'s own session check; name allowlist; export admission gate' },
-  { source: 'api/payload.$hash.download.ts', destination: ['/api/payload/$hash/download'], status: 'implemented', note: 'Admins only; a harmless stand-in for the live bytes.' , security: 'handler\'s own session check, then admin role; hash validated; payload admission gate' },
+  { source: 'api/payload.$hash.download.ts', destination: ['/api/payload/$hash/download'], status: 'implemented', note: 'Admins only; the captured bytes from the Rust tier\'s payload_detail.rs::raw, unchanged.' , security: 'handler\'s own session check, then admin role; hash validated; payload admission gate' },
   { source: 'api/raw-report.$kind.$sha.ts', destination: ['/api/raw-report/$kind/$sha'], status: 'implemented', note: '' , security: 'handler\'s own session check; kind allowlist; admission gate' },
   { source: 'api/recording.$shasum.$format.ts', destination: ['/api/recording/$shasum/$format'], status: 'implemented', note: 'asciicast v2 and the raw log.' , security: 'handler\'s own session check; shasum and format validated; admission gate' },
   { source: 'api/report.$id.pdf.ts', destination: ['/api/report/$id/pdf'], status: 'implemented', note: 'A real PDF from the report\'s sections, proxied off the Rust tier\'s own reports::pdf.' , security: 'handler\'s own session check; PDF admission gate' },
@@ -102,7 +102,7 @@ export const ROWS: Row[] = [
 ]
 
 const LEGEND: Record<Status, string> = {
-  implemented: 'the behavior lives at the destination; backend deviations are explicit in `backend-coverage.md`',
+  implemented: 'the behavior lives at the destination, answered by the live adapters (`src/data/api.ts`)',
   replaced: 'the old path redirects to its new home, or its transport is owned by the named server module',
   pending: 'not in the rewrite yet; the note says what stands in and where it is tracked',
 }

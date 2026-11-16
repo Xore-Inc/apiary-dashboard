@@ -4,7 +4,7 @@ Every route module of the canonical dashboard (`Xore/APIARY@62ee45d`, listed in 
 
 **63 routes**: 46 implemented, 17 replaced, 0 pending.
 
-- **implemented**: the behavior lives at the destination; backend deviations are explicit in `backend-coverage.md`
+- **implemented**: the behavior lives at the destination, answered by the live adapters (`src/data/api.ts`)
 - **replaced**: the old path redirects to its new home, or its transport is owned by the named server module
 - **pending**: not in the rewrite yet; the note says what stands in and where it is tracked
 
@@ -63,7 +63,7 @@ Every route module of the canonical dashboard (`Xore/APIARY@62ee45d`, listed in 
 | `api/artifact.$kind.$key.$filename.ts` | `/api/artifact/$kind/$key/$filename` | implemented | Proxied from the Rust tier's artifacts.rs::download. | handler's own session check; artifact admission gate | #83 |
 | `api/canarytoken.$id.download.ts` | `/api/canarytoken/$id/download` | implemented | The token file proxied off the Rust tier's own /api/v1/canarytokens/{id}/download; a 404 there is a 404 here. | handler's own session check; admission gate | #80 |
 | `api/export.$name.ts` | `/api/export/$name` | implemented | Same allowlist; full scope, capped at the export limit. | handler's own session check; name allowlist; export admission gate | #83 |
-| `api/payload.$hash.download.ts` | `/api/payload/$hash/download` | implemented | Admins only; a harmless stand-in for the live bytes. | handler's own session check, then admin role; hash validated; payload admission gate | #83 |
+| `api/payload.$hash.download.ts` | `/api/payload/$hash/download` | implemented | Admins only; the captured bytes from the Rust tier's payload_detail.rs::raw, unchanged. | handler's own session check, then admin role; hash validated; payload admission gate | #83 |
 | `api/raw-report.$kind.$sha.ts` | `/api/raw-report/$kind/$sha` | implemented |  | handler's own session check; kind allowlist; admission gate | #83 |
 | `api/recording.$shasum.$format.ts` | `/api/recording/$shasum/$format` | implemented | asciicast v2 and the raw log. | handler's own session check; shasum and format validated; admission gate | #83 |
 | `api/report.$id.pdf.ts` | `/api/report/$id/pdf` | implemented | A real PDF from the report's sections, proxied off the Rust tier's own reports::pdf. | handler's own session check; PDF admission gate | #79 |

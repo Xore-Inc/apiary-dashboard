@@ -67,6 +67,6 @@ The destination baseline must prove:
 - [x] Record route data fields, mutations, and user-visible states: [routes.md](routes.md) (45 page routes).
 - [x] Link each inventory row to a bounded migration issue: [slices.md](slices.md) (#74–#83, and #5 for security).
 - [x] Map every production component and every server function to an existing rewrite owner: [traceability.md](traceability.md).
-- [x] Classify every rewrite query that does not use the live backend: [backend-coverage.md](backend-coverage.md).
+- [x] Every rewrite query uses the live backend (`LIVE` in `src/data/api.ts` implements the whole contract; dash#324).
 
 The inventory is generated from the pinned tree by `bun scripts/inventory/all.ts <frontend-next dir>`; `src/test/route-matrix.test.ts` keeps it complete.
