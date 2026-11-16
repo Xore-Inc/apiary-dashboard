@@ -4,7 +4,7 @@
 //
 //   BETA_URL=… BETA_STORAGE_STATE=… SHOTS_DIR=… bun e2e/live/run.ts
 //   ONLY=authorization,crawl bun e2e/live/run.ts      a subset
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -22,7 +22,7 @@ for (const name of ['BETA_URL', 'BETA_STORAGE_STATE']) {
     process.exit(2)
   }
 }
-const root = process.env.SHOTS_DIR?.trim() || join(tmpdir(), `apiary-live-${new Date().toISOString().replace(/[:.]/g, '-')}`)
+const root = process.env.SHOTS_DIR?.trim() || mkdtempSync(join(tmpdir(), 'apiary-live-'))
 const OUTCOME: Record<number, string> = { 0: 'PASS', 1: 'FAIL', 2: 'SKIPPED', 3: 'SESSION' }
 const results: Array<{ name: string; code: number; seconds: number }> = []
 let authorizationFailed = false

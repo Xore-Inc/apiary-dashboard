@@ -10,7 +10,7 @@
 // Exit codes, the same for every check: 0 every step passed, 1 a step
 // failed, 2 the check could not run (no BETA_URL, no session file, no
 // browser), 3 the session was not accepted (expired: refresh it).
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright-core'
@@ -36,8 +36,9 @@ if (!existsSync(statePath)) {
   process.exit(EXIT.skipped)
 }
 // Screenshots and results hold real addresses and hashes: outside the
-// repository unless SHOTS_DIR says otherwise.
-export const shots = process.env.SHOTS_DIR?.trim() || join(tmpdir(), 'apiary-live-shots')
+// repository unless SHOTS_DIR says otherwise, in a fresh private directory
+// (mkdtemp: unpredictable name, mode 0700).
+export const shots = process.env.SHOTS_DIR?.trim() || mkdtempSync(join(tmpdir(), 'apiary-live-'))
 mkdirSync(shots, { recursive: true })
 export const shot = (label: string) => join(shots, `${label.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}.png`)
 

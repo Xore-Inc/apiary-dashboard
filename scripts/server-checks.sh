@@ -112,7 +112,8 @@ if [[ "$metrics" == 401 || "$metrics" == 403 ]]; then printf '  ok   %s /metrics
 check "a session cookie the store cannot read signs nobody in" "$(acode /events --max-time 60 -b '__Host-apiary_bff=checks-not-a-session')" 307
 location="$(curl -s -o /dev/null -D - --max-time 30 "http://localhost:$ANON_PORT/auth/login?return_to=%2Fevents" | tr -d '\r' | sed -n 's/^[Ll]ocation: //p')"
 check "sign-in that cannot start goes to its own failure page" "$location" "/auth/login?fail=unavailable"
-if curl -s --max-time 15 "http://localhost:$ANON_PORT/auth/login?fail=unavailable" | tr -d '\0' | grep -q "temporarily unavailable"; then printf '  ok   the sign-in page says it is unavailable\n'; else printf '  FAIL the sign-in page does not say it is unavailable\n'; failed=1; fi
+login_page="$(curl -s --max-time 15 "http://localhost:$ANON_PORT/auth/login?fail=unavailable" | tr -d '\0' || true)"
+if grep -q "temporarily unavailable" <<<"$login_page"; then printf '  ok   the sign-in page says it is unavailable\n'; else printf '  FAIL the sign-in page does not say it is unavailable\n'; failed=1; fi
 for path in '/auth/callback?code=mock&role=admin' '/auth/callback?code=failed' '/auth/callback?state=forged&code=forged'; do
   headers="$(curl -s -o /dev/null -D - --max-time 60 "http://localhost:$ANON_PORT$path" | tr -d '\r' || true)"
   if [[ -z "$headers" ]]; then printf '  FAIL %s did not answer\n' "$path"; failed=1
