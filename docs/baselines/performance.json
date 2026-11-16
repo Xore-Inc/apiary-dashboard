@@ -1,86 +1,90 @@
 {
-  "measuredOn": "production build, cold load, 1440x900",
+  "measuredOn": "the live dashboard, cold load, 1440x900, as the viewer",
+  "gated": [
+    "jsKb",
+    "cssKb"
+  ],
   "growthAllowed": 1.25,
   "pages": {
     "/": {
-      "htmlKb": 526.3,
-      "jsKb": 624,
-      "cssKb": 52.2,
+      "htmlKb": 16.3,
+      "jsKb": 513.3,
+      "cssKb": 54.9,
       "requests": 94,
-      "domContentLoadedMs": 144,
-      "loadMs": 499
+      "domContentLoadedMs": 462,
+      "loadMs": 667
     },
     "/events": {
-      "htmlKb": 393.3,
-      "jsKb": 576.7,
-      "cssKb": 52.2,
-      "requests": 95,
-      "domContentLoadedMs": 422,
-      "loadMs": 654
+      "htmlKb": 16.5,
+      "jsKb": 508.4,
+      "cssKb": 54.9,
+      "requests": 92,
+      "domContentLoadedMs": 369,
+      "loadMs": 519
     },
-    "/sources/198.51.100.13": {
-      "htmlKb": 443.2,
-      "jsKb": 578.2,
-      "cssKb": 52.2,
-      "requests": 105,
-      "domContentLoadedMs": 319,
-      "loadMs": 468
+    "/sources/<ip>": {
+      "htmlKb": 17.5,
+      "jsKb": 500.4,
+      "cssKb": 54.9,
+      "requests": 93,
+      "domContentLoadedMs": 30336,
+      "loadMs": 30545
     },
-    "/payloads/320cbb5e902f6bc9d8ea8edd7974b7829b1e4f08f477b7e3aadb240c18e9cc37": {
-      "htmlKb": 148.1,
-      "jsKb": 594,
-      "cssKb": 52.2,
-      "requests": 116,
-      "domContentLoadedMs": 286,
-      "loadMs": 430
+    "/payloads/<hash>": {
+      "htmlKb": 18.6,
+      "jsKb": 515,
+      "cssKb": 54.9,
+      "requests": 102,
+      "domContentLoadedMs": 2890,
+      "loadMs": 3262
     },
-    "/payloads/320cbb5e902f6bc9d8ea8edd7974b7829b1e4f08f477b7e3aadb240c18e9cc37/ghidra?section=code": {
-      "htmlKb": 180.9,
-      "jsKb": 591.7,
-      "cssKb": 52.2,
-      "requests": 115,
-      "domContentLoadedMs": 276,
-      "loadMs": 469
+    "/payloads/<hash>/ghidra?section=code": {
+      "htmlKb": 15.9,
+      "jsKb": 512.9,
+      "cssKb": 54.9,
+      "requests": 100,
+      "domContentLoadedMs": 412,
+      "loadMs": 637
     },
     "/kill-chain": {
-      "htmlKb": 94.5,
-      "jsKb": 579.5,
-      "cssKb": 52.2,
-      "requests": 109,
-      "domContentLoadedMs": 207,
-      "loadMs": 358
+      "htmlKb": 15,
+      "jsKb": 502.2,
+      "cssKb": 54.9,
+      "requests": 92,
+      "domContentLoadedMs": 453,
+      "loadMs": 654
     },
     "/alerts": {
-      "htmlKb": 129.5,
-      "jsKb": 581.5,
-      "cssKb": 52.2,
-      "requests": 107,
-      "domContentLoadedMs": 83,
-      "loadMs": 383
+      "htmlKb": 16.3,
+      "jsKb": 501.3,
+      "cssKb": 54.9,
+      "requests": 89,
+      "domContentLoadedMs": 359,
+      "loadMs": 644
     },
     "/reports/generate": {
-      "htmlKb": 116.3,
-      "jsKb": 587.6,
-      "cssKb": 52.2,
-      "requests": 100,
-      "domContentLoadedMs": 222,
-      "loadMs": 355
+      "htmlKb": 15.3,
+      "jsKb": 511.9,
+      "cssKb": 54.9,
+      "requests": 90,
+      "domContentLoadedMs": 320,
+      "loadMs": 495
     },
     "/source-health": {
-      "htmlKb": 153.7,
-      "jsKb": 579.6,
-      "cssKb": 52.2,
-      "requests": 108,
-      "domContentLoadedMs": 295,
-      "loadMs": 507
+      "htmlKb": 16.6,
+      "jsKb": 496.2,
+      "cssKb": 54.9,
+      "requests": 86,
+      "domContentLoadedMs": 376,
+      "loadMs": 517
     },
-    "/auth/login": {
-      "htmlKb": 17.3,
-      "jsKb": 538.3,
-      "cssKb": 52.2,
-      "requests": 83,
-      "domContentLoadedMs": 47,
-      "loadMs": 230
+    "/auth/callback?code=expired": {
+      "htmlKb": 5.6,
+      "jsKb": 471.7,
+      "cssKb": 54.9,
+      "requests": 78,
+      "domContentLoadedMs": 402,
+      "loadMs": 551
     }
   }
 }

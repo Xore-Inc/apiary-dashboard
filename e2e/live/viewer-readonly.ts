@@ -1,0 +1,133 @@
+// A viewer is strictly read-only (APIARY#3857), as the viewer sees it:
+// no write control is on screen (alerts, alert detail, canarytokens, the
+// report-a-problem button), Settings shows the read-only note with every
+// setting disabled and a click sends nothing, the report wizard says it is
+// read-only; and a refused write leaves the state as it was (the alert
+// lists and the preferences read back the same after a reload).
+// authorization.ts proves every write is refused; this proves the screens.
+//
+//   BETA_URL=… BETA_STORAGE_STATE=… SHOTS_DIR=… bun e2e/live/viewer-readonly.ts
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { base, callServerFn, check, discover, done, fail, info, launch, pass, queryData, requireSession, settle, shot, shots, signedIn } from './lib'
+
+const browser = await launch()
+const context = await signedIn(browser)
+const page = await context.newPage()
+const errors: string[] = []
+page.on('pageerror', (e) => errors.push(e.message.slice(0, 160)))
+const posts: Array<{ url: string; status: number }> = []
+page.on('response', (r) => {
+  if (r.url().includes('/_serverFn/') && r.request().method() === 'POST') posts.push({ url: r.url(), status: r.status() })
+})
+
+await page.goto(`${base}/alerts`, { waitUntil: 'load', timeout: 90_000 })
+await requireSession(page, browser)
+await settle(page)
+const me = (await queryData(page, 'getSessionUser')) as { roles?: string[] } | null
+if (!me?.roles || me.roles.includes('admin')) {
+  console.log(`SKIP the session is not a viewer (${JSON.stringify(me?.roles ?? null)}): nothing to prove read-only`)
+  await browser.close()
+  process.exit(2)
+}
+
+const visible = async (role: 'button', name: RegExp) => (await page.getByRole(role, { name }).count()) > 0
+const WRITE = /^(Acknowledge( \d+)?|Acknowledge all|Reopen)$/
+for (const [href, where, name] of [
+  ['/alerts', 'alerts New', WRITE],
+  ['/alerts?view=acknowledged', 'alerts Acknowledged', WRITE],
+  ['/canarytokens', 'canarytokens', /^Create token$/],
+] as const) {
+  await page.goto(`${base}${href}`, { waitUntil: 'load', timeout: 90_000 })
+  await settle(page)
+  await page.waitForTimeout(1000)
+  check(!(await visible('button', name)), `${where}: no ${name} control`)
+  await page.screenshot({ path: shot(where) })
+}
+
+const keyOf = async (view: string) => {
+  const [href] = await discover(page, `/alerts${view}`, /^\/alerts\/[^/?]+$/, 1)
+  return href ? decodeURIComponent(href.replace('/alerts/', '')) : undefined
+}
+const openKey = await keyOf('')
+const ackedKey = await keyOf('?view=acknowledged')
+info(`an open alert: ${openKey ? 'found' : '-'}; an acknowledged alert: ${ackedKey ? 'found' : '-'}`)
+if (openKey) {
+  await page.goto(`${base}/alerts/${encodeURIComponent(openKey)}`, { waitUntil: 'load', timeout: 90_000 })
+  await settle(page)
+  await page.waitForTimeout(1000)
+  check(!(await visible('button', /^(Acknowledge( \d+)?|Reopen)$/)), 'alert detail: no Acknowledge or Reopen')
+  await page.screenshot({ path: shot('alert detail') })
+}
+check(!(await page.getByRole('button', { name: 'Report a problem' }).count()), 'no Report a problem button')
+
+await page.goto(`${base}/?settings=appearance`, { waitUntil: 'load', timeout: 90_000 })
+const reduced = page.getByRole('radio', { name: 'Reduced' })
+await reduced.waitFor({ timeout: 30_000 }).catch(() => fail('settings', 'the Appearance pane did not open'))
+await page.waitForTimeout(1000)
+const note = await page.getByText('Read-only for viewers').count()
+const enabledRadios = await page.locator('[role="radiogroup"] [role="radio"]:not([disabled]):not([aria-disabled="true"])').count()
+const enabledSwitches = await page.locator('[role="switch"]:not([disabled]):not([aria-disabled="true"])').count()
+await page.screenshot({ path: shot('settings appearance') })
+check(note > 0 && enabledRadios === 0 && enabledSwitches === 0, 'settings: read-only note, every radio and switch disabled', `note=${note} enabled radios=${enabledRadios} switches=${enabledSwitches}`)
+const p0 = posts.length
+await reduced.click({ force: true, timeout: 3000 }).catch(() => {})
+await page.waitForTimeout(1500)
+check(posts.length === p0, 'settings: clicking a disabled setting sends nothing', `${posts.length - p0} POST(s)`)
+
+await page.goto(`${base}/reports/generate`, { waitUntil: 'load', timeout: 90_000 })
+await settle(page)
+await page.screenshot({ path: shot('reports generate') })
+check((await page.getByText('Read-only for viewers').count()) > 0, 'report wizard: read-only note')
+
+/** The alert lists and the stored preferences, as a fresh load shows them. */
+const snapshot = async () => {
+  const rows = async (href: string) => {
+    await page.goto(`${base}${href}`, { waitUntil: 'load', timeout: 90_000 })
+    await settle(page)
+    return page.getByRole('row').count()
+  }
+  const newRows = await rows('/alerts')
+  const ackedRows = await rows('/alerts?view=acknowledged')
+  await page.goto(`${base}/?settings=appearance`, { waitUntil: 'load', timeout: 90_000 })
+  await settle(page)
+  const prefs = await queryData(page, 'getPreferences')
+  const html = await page.evaluate(() => ({ motion: document.documentElement.getAttribute('data-motion'), theme: document.documentElement.getAttribute('data-theme') }))
+  return { newRows, ackedRows, prefs, html }
+}
+const before = await snapshot()
+info(`before: new rows ${before.newRows}, acknowledged rows ${before.ackedRows}`)
+await page.goto(`${base}/alerts`, { waitUntil: 'load', timeout: 90_000 })
+await settle(page)
+// The writes a viewer's screens would make, refused: the state must hold.
+const tries: Array<[string, unknown[]]> = []
+if (openKey) tries.push(['setAlertsAcknowledged', [[openKey], true]])
+if (ackedKey) tries.push(['setAlertsAcknowledged', [[ackedKey], false]])
+const prefs = (before.prefs ?? {}) as Record<string, unknown>
+tries.push(['savePreferences', [{ ...prefs, motion: prefs.motion === 'reduced' ? 'system' : 'reduced' }]])
+let allRefused = true
+for (const [name, args] of tries) {
+  const r = await callServerFn(page, name, ...args)
+  const ok = !r.ok && (r.status === 403 || /: 403 forbidden/.test(r.error ?? ''))
+  allRefused &&= ok
+  check(ok, `${name} refused 403`, ok ? '' : JSON.stringify(r).slice(0, 200))
+}
+const after = await snapshot()
+info(`after reload: new rows ${after.newRows}, acknowledged rows ${after.ackedRows}`)
+// Alerts come and go on a live dashboard: only the refused rows must hold.
+for (const [label, key, view] of [
+  ['open', openKey, ''],
+  ['acknowledged', ackedKey, '?view=acknowledged'],
+] as const) {
+  if (!key) continue
+  await page.goto(`${base}/alerts${view}`, { waitUntil: 'load', timeout: 90_000 })
+  await settle(page)
+  check((await page.locator(`a[href="/alerts/${encodeURIComponent(key)}"]`).count()) > 0, `the ${label} alert is still ${label}`)
+}
+check(JSON.stringify(after.prefs) === JSON.stringify(before.prefs) && JSON.stringify(after.html) === JSON.stringify(before.html), 'preferences unchanged after reload')
+if (!allRefused) fail('a write was not refused', 'see above')
+check(posts.every((p) => p.status === 403), 'every server-function POST was refused', posts.map((p) => p.status).join(',') || 'none')
+if (errors.length) fail('page errors', errors.join(' | '))
+else pass('no page errors')
+writeFileSync(join(shots, 'viewer-state.json'), JSON.stringify({ before, after, posts: posts.map((p) => p.status) }, null, 2))
+await done(browser)
