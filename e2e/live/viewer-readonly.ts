@@ -45,15 +45,16 @@ for (const [href, where, name] of [
   await page.screenshot({ path: shot(where) })
 }
 
-const keyOf = async (view: string) => {
-  const [href] = await discover(page, `/alerts${view}`, /^\/alerts\/[^/?]+$/, 1)
-  return href ? decodeURIComponent(href.replace('/alerts/', '')) : undefined
+/** The first alert's link on a list, as the page writes it, and its key. */
+const firstAlert = async (view: string) => {
+  const [href] = (await discover(page, `/alerts${view}`, /^\/alerts\/[^/?]+$/, 1)) as Array<string | undefined>
+  return { href, key: href ? decodeURIComponent(href.replace('/alerts/', '')) : undefined }
 }
-const openKey = await keyOf('')
-const ackedKey = await keyOf('?view=acknowledged')
+const { href: openHref, key: openKey } = await firstAlert('')
+const { href: ackedHref, key: ackedKey } = await firstAlert('?view=acknowledged')
 info(`an open alert: ${openKey ? 'found' : '-'}; an acknowledged alert: ${ackedKey ? 'found' : '-'}`)
-if (openKey) {
-  await page.goto(`${base}/alerts/${encodeURIComponent(openKey)}`, { waitUntil: 'load', timeout: 90_000 })
+if (openHref) {
+  await page.goto(`${base}${openHref}`, { waitUntil: 'load', timeout: 90_000 })
   await settle(page)
   await page.waitForTimeout(1000)
   check(!(await visible('button', /^(Acknowledge( \d+)?|Reopen)$/)), 'alert detail: no Acknowledge or Reopen')
@@ -115,14 +116,20 @@ for (const [name, args] of tries) {
 const after = await snapshot()
 info(`after reload: new rows ${after.newRows}, acknowledged rows ${after.ackedRows}`)
 // Alerts come and go on a live dashboard: only the refused rows must hold.
-for (const [label, key, view] of [
-  ['open', openKey, ''],
-  ['acknowledged', ackedKey, '?view=acknowledged'],
+for (const [label, href, view, other] of [
+  ['open', openHref, '', '?view=acknowledged'],
+  ['acknowledged', ackedHref, '?view=acknowledged', ''],
 ] as const) {
-  if (!key) continue
+  if (!href) continue
+  // It must not have moved to the other list. (A live alert can also age out
+  // of its own list's first page, so absence there alone is no finding.)
+  await page.goto(`${base}/alerts${other}`, { waitUntil: 'load', timeout: 90_000 })
+  await settle(page)
+  const moved = (await page.locator(`a[href="${href}"]`).count()) > 0
   await page.goto(`${base}/alerts${view}`, { waitUntil: 'load', timeout: 90_000 })
   await settle(page)
-  check((await page.locator(`a[href="/alerts/${encodeURIComponent(key)}"]`).count()) > 0, `the ${label} alert is still ${label}`)
+  const still = (await page.locator(`a[href="${href}"]`).count()) > 0
+  check(!moved, `the ${label} alert is still ${label}`, still ? 'on its list' : 'not on the first page of its list, and not on the other one')
 }
 check(JSON.stringify(after.prefs) === JSON.stringify(before.prefs) && JSON.stringify(after.html) === JSON.stringify(before.html), 'preferences unchanged after reload')
 if (!allRefused) fail('a write was not refused', 'see above')
