@@ -1,31 +1,22 @@
-// Every kind of page at phone, tablet, laptop and 4K widths: nothing may
-// scroll sideways, no top-bar control may leave the screen or overlap
-// another, the shell must fit the window, and no page may throw or log a
-// console error.
+// Every kind of page at phone, tablet, laptop and 4K widths, on the live
+// dashboard: nothing may scroll sideways, no top-bar control may leave the
+// screen or overlap another, the shell must fit the window, and no page may
+// throw or log a console error.
 //
-//   bun scripts/responsive.ts http://localhost:3000
-//
-// Uses Chrome (CHROME_PATH, else /usr/bin/google-chrome) or Playwright's
-// own Chromium; exits 2 when no browser is available so callers can skip.
-import { existsSync } from 'node:fs'
-import { chromium, devices } from 'playwright-core'
-import type { Browser } from 'playwright-core'
-import { signInContext } from './lib/signIn'
+//   BETA_URL=… BETA_STORAGE_STATE=… bun e2e/live/responsive.ts
+import { devices } from 'playwright-core'
+import { base, check, discover, done, info, launch, requireSession, signedIn } from './lib'
 
-const base = process.argv[2] ?? 'http://localhost:3000'
+const browser = await launch()
+const finder = await signedIn(browser)
+const probe = await finder.newPage()
+await probe.goto(`${base}/alerts`, { waitUntil: 'load', timeout: 90_000 })
+await requireSession(probe, browser)
+const [SOURCE = '/sources/192.0.2.1'] = await discover(probe, '/ips', /^\/sources\/[^/?]+$/, 1)
+const [PAYLOAD = `/payloads/${'0'.repeat(64)}`] = await discover(probe, '/payloads', /^\/payloads\/[0-9a-f]{32,64}$/, 1)
+await finder.close()
 
-const PAGES = [
-  '/',
-  '/?view=behavior',
-  '/events',
-  '/sources/198.51.100.13',
-  '/payloads/320cbb5e902f6bc9d8ea8edd7974b7829b1e4f08f477b7e3aadb240c18e9cc37/ghidra?section=code',
-  '/payload-workbench/results',
-  '/kill-chain',
-  '/alerts',
-  '/reports/history',
-  '/auth/login',
-]
+const PAGES = ['/', '/?view=behavior', '/events', SOURCE, `${PAYLOAD}/ghidra?section=code`, '/payload-workbench/results', '/kill-chain', '/alerts', '/reports/history', '/auth/callback?code=expired']
 
 const SIZES = [
   { name: 'phone', options: { ...devices['iPhone 13'], viewport: { width: 375, height: 812 } } },
@@ -34,26 +25,10 @@ const SIZES = [
   { name: '4k', options: { viewport: { width: 3840, height: 2160 } } },
 ]
 
-async function launch(): Promise<Browser | undefined> {
-  const executablePath = process.env.CHROME_PATH ?? (existsSync('/usr/bin/google-chrome') ? '/usr/bin/google-chrome' : undefined)
-  try {
-    return await chromium.launch({ executablePath, args: ['--no-sandbox'] })
-  } catch {
-    return undefined
-  }
-}
-
-const browser = await launch()
-if (!browser) {
-  console.log('no browser available (set CHROME_PATH); responsive check skipped')
-  process.exit(2)
-}
-
 const findings: string[] = []
 let checked = 0
 for (const size of SIZES) {
-  const context = await browser.newContext(size.options)
-  await signInContext(context, base)
+  const context = await signedIn(browser, size.options)
   const page = await context.newPage()
   const errors: string[] = []
   page.on('pageerror', (e) => errors.push(e.message.slice(0, 160)))
@@ -63,7 +38,8 @@ for (const size of SIZES) {
   })
   for (const path of PAGES) {
     errors.length = 0
-    await page.goto(base + path, { waitUntil: 'load' })
+    await page.goto(base + path, { waitUntil: 'load', timeout: 90_000 })
+    await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {})
     await page.waitForTimeout(1500)
     checked++
     const layout = await page.evaluate(() => {
@@ -99,11 +75,6 @@ for (const size of SIZES) {
   }
   await context.close()
 }
-await browser.close()
-
-console.log(`checked ${checked} pages at ${SIZES.map((s) => s.name).join(', ')}`)
-if (findings.length) {
-  console.log(findings.join('\n'))
-  process.exit(1)
-}
-console.log('every size fits')
+info(`checked ${checked} pages at ${SIZES.map((s) => s.name).join(', ')}`)
+check(findings.length === 0, 'every size fits', findings.length ? `\n${findings.join('\n')}` : '')
+await done(browser)

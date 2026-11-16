@@ -149,7 +149,7 @@ export function renderAuthorizationMatrix(
     '',
     `## Server queries (${queries.length})`,
     '',
-    'Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced in `src/data/backend.ts` for both mock and live adapters.',
+    'Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced by `liveQuery` in `src/data/api.ts` before the backend is called. `e2e/live/authorization.ts` proves this table on the running dashboard.',
     '',
     '| Query | Anonymous | Viewer | Admin |',
     '|---|---|---|---|',

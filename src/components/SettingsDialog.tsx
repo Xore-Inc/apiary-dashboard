@@ -96,7 +96,8 @@ function useStagedForm<TSection extends ConfigSection>(panel: PaneId, section: T
   // What a save sends: every field the stored document already sets, plus
   // the ones changed here. A field left at the backend's default is not
   // sent (and so not validated): "keep the default", never a typed-in 0 or
-  // empty string. `undefined` (the mock) sends the whole section.
+  // empty string. `undefined` (a document that names no fields) sends the
+  // whole section.
   const stored = data.configSet?.[section]
   const fields = stagedFields(saved, form, stored)
   /** A field the stored document leaves to the default, and not changed here. */
@@ -169,7 +170,7 @@ function AccountPanel() {
         <SettingsRow setting="name" control={<Text>{data.user.name}</Text>} />
         <SettingsRow setting="email" control={<Text>{data.user.email}</Text>} />
         <SettingsRow setting="roles" control={<HStack gap={1}>{data.user.roles.map((role) => <Token key={role} size="sm" label={role} />)}</HStack>} />
-        <SettingsRow setting="session" control={<Text type="supporting">OIDC provider (mock)</Text>} />
+        <SettingsRow setting="session" control={<Text type="supporting">Keycloak (OIDC)</Text>} />
         <SettingsRow setting="signOut" control={<Button label="Sign out" variant="secondary" size="sm" onClick={() => window.location.assign('/auth/logout')} />} />
       </SettingsCard>
       {account && (

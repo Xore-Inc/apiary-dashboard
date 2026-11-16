@@ -56,10 +56,11 @@ jobs:
             hold the project's conventions. Report only what matters:
             - correctness bugs, with the input that breaks;
             - security: session and authorization checks, same-origin rule,
-              anything that could reach the live backend (the rewrite must
-              run on the mock backend only);
+              viewers strictly read-only, the backend's service token never
+              leaving the server;
             - public-repository safety: no real hosts, domains, addresses or
-              credentials (mock data uses RFC 5737 and example.test);
+              credentials (test data uses RFC 5737 and example.test; the
+              live checks take the dashboard's URL from the environment);
             - missing tests or docs for changed behavior.
             Use inline comments for specific lines and one short summary
             comment. No praise, no style nits the linters already catch. If

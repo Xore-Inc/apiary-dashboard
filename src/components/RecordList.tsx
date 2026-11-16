@@ -143,7 +143,7 @@ export function RecordList<T extends Record<string, unknown>>({
   const activation = useRowActivation<T>({ onActivate: openRow, focusable: linkKey === undefined })
 
   // Every hook runs before this: the same list goes from skeleton to rows
-  // (after hydration, or leaving the "Loading forever" mock scenario).
+  // (after hydration).
   if (!rows) return <ListFrame title={title} description={description} actions={actions} summary={summary} toolbar={toolbar} body={<SkeletonTable columns={columns} rows={Math.min(pageSize, SKELETON_ROWS)} density={tableDensity(prefs)} withCount />} />
   const currentPage = paging ? Math.floor(paging.offset / pageSize) + 1 : Math.min(page, pageCount)
   const visible = paging ? rows : rows.slice((currentPage - 1) * pageSize, currentPage * pageSize)

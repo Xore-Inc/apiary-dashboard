@@ -1,6 +1,6 @@
 # Server functions
 
-Every `createServerFn` of the canonical dashboard (`Xore/APIARY@62ee45d`), read from the source by `scripts/inventory/server-functions.ts`. Data: `server-functions.json`. The rewrite deliberately consolidates route-local functions behind `src/data/queries.ts`; **Rewrite owner** names the destination seam and type mapper. Production exceptions are explicit in `backend-coverage.md`.
+Every `createServerFn` of the canonical dashboard (`Xore/APIARY@62ee45d`), read from the source by `scripts/inventory/server-functions.ts`. Data: `server-functions.json`. The rewrite deliberately consolidates route-local functions behind `src/data/queries.ts`; **Rewrite owner** names the destination seam and type mapper. Every query has a live adapter: `LIVE` in `src/data/api.ts` implements the whole contract.
 
 **153 functions** in 58 files: 114 GET, 39 POST; 55 called from a route loader.
 

@@ -1,17 +1,11 @@
 // GET /api/live — the live event stream, as Server-Sent Events: one `data:`
-// line per new event (JSON), an `event: health` when source health changes,
-// and a comment every 15 s so proxies keep the connection. Fed by the mock
-// backend's generator when the page is in a `?mock=` scenario, and proxied
-// off the Rust tier's own /api/v1/live when this process has a BACKEND_URL
-// and the request carries no scenario.
+// line per new event (JSON) and the comments the upstream sends, proxied off
+// the Rust tier's own /api/v1/live.
 //
-// THE GATE (#82). `streams.admit()` sits directly above the branch, so it
-// covers BOTH arms: the mock generator and the upstream fetch. That is the
-// point of moving it here — an SSE connection holds its slot for as long as
-// the browser stays on the page, so a proxy in front of the real stream
-// with no gate is an unbounded fan-in on the backend, and shedding would
-// only ever have applied to the mock it replaces. One gate, one counter: a
-// shed on either arm is counted the same way on /metrics
+// THE GATE (#82). `streams.admit()` sits directly above the upstream fetch:
+// an SSE connection holds its slot for as long as the browser stays on the
+// page, so a proxy in front of the real stream with no gate is an unbounded
+// fan-in on the backend. A shed is counted on /metrics
 // (`bff_sheds_total{reason}`). The slot is held for the life of the stream
 // and released exactly once — on close, on client disconnect, and on an
 // upstream that ends first.
@@ -20,19 +14,11 @@
 // design, so the only signal is the request's own abort, which is what stops
 // the upstream connection when the operator navigates away.
 import { createFileRoute } from '@tanstack/react-router'
-import { isScenario } from '#/data/scenarios'
 import { admissionGate, envInt } from '#/server/admission'
 import { resolveUser } from '#/server/identity'
-import { mockScenariosAllowed } from '#/server/policy'
 import { asApiError } from '#/data/errors'
-import { isLiveBackend, liveRow, openLiveStream } from '#/data/api'
+import { liveRow, openLiveStream } from '#/data/api'
 import type { EventRow } from '#/data/contracts/events'
-
-const OUTAGE: Record<string, { status: number; headers?: Record<string, string> }> = {
-  unavailable: { status: 502 },
-  overloaded: { status: 503, headers: { 'retry-after': '30' } },
-  expired: { status: 401 },
-}
 
 // Concurrent streams this server holds open; past it a new one is shed
 // (503, Retry-After: 1) and EventSource reconnects. Canonical's default.
@@ -62,83 +48,21 @@ export const Route = createFileRoute('/api/live')({
 async function openLive(request: Request): Promise<Response> {
   // A direct handler: it checks the session itself.
   if (!(await resolveUser(request))) return new Response('unauthorized', { status: 401 })
-  const mock = new URL(request.url).searchParams.get('mock')
-  const mockScenario = mockScenariosAllowed() && isScenario(mock) ? mock : undefined
-  const scenario = mockScenario ?? 'normal'
-  const outage = mockScenario ? (OUTAGE[mockScenario] as (typeof OUTAGE)[string] | undefined) : undefined
-  if (outage) return new Response(`live stream: ${mockScenario}`, { status: outage.status, headers: outage.headers })
-  // The gate, in front of both arms. See the note above.
   const release = streams.admit()
   if (release instanceof Response) return release
-
-  // No allowed development scenario, and a backend configured: the
-  // Rust tier's own stream.
-  if (isLiveBackend() && !mockScenario) {
-    try {
-      const upstream = await openLiveStream(request.signal)
-      return new Response(relay(upstream.body!, release), { headers: SSE })
-    } catch (error) {
-      release()
-      // The tier refused or never answered. Canonical answers 502 for
-      // the same failure (its api/live.ts `limitedStreamProxy` option),
-      // and EventSource gives up on a non-200 — the honest outcome: the
-      // browser says the feed is not connected rather than sitting on a
-      // stream that will never produce.
-      const api = asApiError(error)
-      return new Response(api ? `${api.endpoint}: ${api.kind}` : 'stream unavailable', { status: api?.status ?? 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
-    }
-  }
-
-  // The mock tier is loaded only for the arm that serves it.
-  const { listen } = await import('#/data/mock/liveFeed')
-  // The client may have left while the module loaded: the abort
-  // listener below is not attached yet, so release the slot here.
-  if (request.signal.aborted) {
+  try {
+    const upstream = await openLiveStream(request.signal)
+    return new Response(relay(upstream.body!, release), { headers: SSE })
+  } catch (error) {
     release()
-    return new Response(null, { status: 499 })
+    // The tier refused or never answered. Canonical answers 502 for the
+    // same failure (its api/live.ts `limitedStreamProxy` option), and
+    // EventSource gives up on a non-200 — the honest outcome: the browser
+    // says the feed is not connected rather than sitting on a stream that
+    // will never produce.
+    const api = asApiError(error)
+    return new Response(api ? `${api.endpoint}: ${api.kind}` : 'stream unavailable', { status: api?.status ?? 502, headers: { 'content-type': 'text/plain; charset=utf-8' } })
   }
-  const encoder = new TextEncoder()
-  let stop = () => {}
-  const body = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = (text: string) => {
-        try {
-          controller.enqueue(encoder.encode(text))
-        } catch {
-          stop()
-        }
-      }
-      send('retry: 3000\n: open\n\n')
-      let sent = 0
-      const unlisten = listen({
-        event: (event) => {
-          if (scenario === 'empty' || scenario === 'loading') return
-          // A slow backend: one event in five.
-          if (scenario === 'slow' && sent++ % 5 !== 0) return
-          send(`data: ${JSON.stringify(event)}\n\n`)
-        },
-        health: () => send('event: health\ndata: {}\n\n'),
-      })
-      const ping = setInterval(() => send(': ping\n\n'), 15_000)
-      stop = () => {
-        clearInterval(ping)
-        unlisten()
-        release()
-      }
-      request.signal.addEventListener('abort', () => {
-        stop()
-        try {
-          controller.close()
-        } catch {
-          /* already closed */
-        }
-      })
-    },
-    cancel() {
-      stop()
-    },
-  })
-  return new Response(body, { headers: SSE })
 }
 
 /** The upstream body relayed to the browser, holding the gate's slot until
@@ -174,8 +98,8 @@ function relay(upstream: ReadableStream<Uint8Array>, release: () => void): Reada
         }
         // Frames are complete on a blank line, so a frame split across two
         // reads is held until its terminator arrives. Everything else —
-        // retry, keep-alive comments, the health event — rides through in
-        // whatever chunk it came in.
+        // retry and keep-alive comments — rides through in whatever chunk it
+        // came in.
         buffered += decoder.decode(value, { stream: true })
         const frames = buffered.split('\n\n')
         buffered = frames.pop() ?? ''
@@ -212,7 +136,6 @@ function relay(upstream: ReadableStream<Uint8Array>, release: () => void): Reada
  *   is the only listener src/data/liveStream.ts registers. Forwarding the
  *   name would leave the browser receiving a live stream it silently never
  *   reads — the same failure as serving the wrong chart, one layer down.
- *   The unnamed default event is what the mock arm already sends.
  * - `data:` is mapped through the same `pageEvent` the JSON path applies,
  *   because upstream sends an `events.rs` `row_from_hit` document and every
  *   consumer of a live event here holds a `HoneypotEvent`
@@ -220,9 +143,8 @@ function relay(upstream: ReadableStream<Uint8Array>, release: () => void): Reada
  *   row does not carry under those names). Relaying raw rows would hand
  *   those pages `undefined` fields instead of a connection.
  *
- * Comments, `retry:`, and any other named event (`health` from the mock arm)
- * are passed through untouched — there is nothing to map on a comment, and
- * `health` is this tier's own event name, not the Rust tier's. */
+ * Comments, `retry:`, and any other named event are passed through
+ * untouched: there is nothing to map on a comment. */
 function translated(frame: string): string {
   if (!frame.startsWith('event: event')) return frame
   const data = frame.match(/^data: (.*)$/m)

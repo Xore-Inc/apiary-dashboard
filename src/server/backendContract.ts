@@ -28,9 +28,11 @@ export interface ListenerStatus {
 }
 
 export interface BackendContractStatus {
-  /** False only when a configured listener is unreachable or unsupported. */
+  /** False when no backend is configured, or a listener is unreachable or
+   * unsupported. */
   ok: boolean
-  /** No BACKEND_URL: this process serves the mock and talks to nobody. */
+  /** False without BACKEND_URL: a server refuses to start that way
+   * (src/server/policy.ts), so only a test or a script sees it. */
   configured: boolean
   listeners: ListenerStatus[]
 }
@@ -57,7 +59,7 @@ async function probe(listener: ListenerStatus['listener'], base: string, fetchIm
  * as `baseURL` in src/data/api.ts does). */
 export async function checkBackendContract(env: Record<string, string | undefined> = process.env, fetchImpl: typeof fetch = fetch): Promise<BackendContractStatus> {
   const standard = env.BACKEND_URL?.trim()
-  if (!standard) return { ok: true, configured: false, listeners: [] }
+  if (!standard) return { ok: false, configured: false, listeners: [] }
   const mounted = env.BACKEND_MOUNTED_URL?.trim()
   const probes = [probe('standard', standard, fetchImpl)]
   if (mounted && mounted.replace(/\/$/, '') !== standard.replace(/\/$/, '')) probes.push(probe('mounted', mounted, fetchImpl))

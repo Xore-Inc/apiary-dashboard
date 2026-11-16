@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Shell composition (#4): one shell, one content region, navigation metadata
 // driving active item and breadcrumbs, and the palette's keyboard contract.
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { LinkProvider } from '@astryxdesign/core/Link'
@@ -21,11 +21,20 @@ import { ShellAppShell } from './ShellAppShell'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { createQueryClient } from '#/lib/query'
 import { searchTabs } from './ViewTabs'
-import { CONFIG, DEPLOYMENT_LINKS } from '#/data/mock/details'
+import { dashboardConfig } from '#/data/adapters/settings'
+import { openAlertCountQuery } from '#/data/resources'
+import type { ShellConfig } from '#/data/types'
 
-// The shell reads the open-alert count and palette search through the data
-// seam; here that runs on the mock backend directly.
-vi.mock('#/data/queries', () => import('#/test/queriesOnBackend').then((m) => m.queriesOnBackend()))
+// The configuration a backend with nothing configured answers (the compiled
+// defaults) with the ML panels on, so every nav item shows, plus the
+// deployment's links. The shell's one read, the open alert count, is put in
+// the cache where a test needs it: nothing here reaches a backend.
+const DEFAULTS = dashboardConfig({ revision: 1, payload: {} })
+const CONFIG: ShellConfig = {
+  ...DEFAULTS,
+  behavior: { ...DEFAULTS.behavior, showMlPanels: true },
+  links: { kibana: 'https://kibana.example.test', evebox: 'https://evebox.example.test', arkime: 'https://arkime.example.test', accountConsole: 'https://sso.example.test/realms/apiary/account/' },
+}
 
 function TabbedPage() {
   const second = useLocation({ select: (location) => location.searchStr.includes('view=two') })
@@ -34,8 +43,8 @@ function TabbedPage() {
 
 const user = { name: 'Test Operator', email: 'op@example.test', roles: ['admin'] }
 
-function renderShell(path: string, { mockScenarios = false }: { mockScenarios?: boolean } = {}) {
-  const root = createRootRoute({ component: () => <ShellAppShell user={user} config={{ ...CONFIG, links: DEPLOYMENT_LINKS }} mockScenarios={mockScenarios} onSettingsPane={() => {}} /> })
+function renderShell(path: string, { openAlerts }: { openAlerts?: number } = {}) {
+  const root = createRootRoute({ component: () => <ShellAppShell user={user} config={CONFIG} onSettingsPane={() => {}} /> })
   const page = (routePath: string, text: string) =>
     createRoute({ getParentRoute: () => root, path: routePath, component: () => <p>{text}</p> })
   const router = createRouter({
@@ -64,8 +73,10 @@ function renderShell(path: string, { mockScenarios = false }: { mockScenarios?: 
     ]),
     history: createMemoryHistory({ initialEntries: [path] }),
   })
+  const client = createQueryClient()
+  if (openAlerts !== undefined) client.setQueryData(openAlertCountQuery().queryKey, openAlerts)
   render(
-    <QueryClientProvider client={createQueryClient()}>
+    <QueryClientProvider client={client}>
       <Theme theme={neutralTheme}>
         <LinkProvider component={RouterLink}>
           <RouterProvider router={router} />
@@ -77,17 +88,6 @@ function renderShell(path: string, { mockScenarios = false }: { mockScenarios?: 
 }
 
 describe('ShellAppShell', () => {
-
-  it('shows the Mock data menu only where mock scenarios are allowed', async () => {
-    renderShell('/alerts')
-    expect(await screen.findByText('alerts content')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /Mock data/ })).toBeNull()
-  })
-
-  it('shows the Mock data menu on a local mock instance', async () => {
-    renderShell('/alerts', { mockScenarios: true })
-    expect(await screen.findByRole('button', { name: /Mock data/ })).toBeTruthy()
-  })
 
   it('renders exactly one shell with one content region', async () => {
     renderShell('/alerts')
@@ -155,25 +155,11 @@ describe('ShellAppShell', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy()
   })
 
-  it('finds entities from the palette and opens their page', async () => {
-    const router = renderShell('/')
-    await screen.findByText('overview content')
-    const u = userEvent.setup()
-    await u.keyboard('{Control>}k{/Control}')
-    const dialog = await screen.findByRole('dialog')
-    await u.keyboard('192.0.2')
-    const hit = await within(dialog).findAllByText(/^192\.0\.2\.\d+ · /, {}, { timeout: 3000 })
-    await u.click(hit[0])
-    await act(async () => {})
-    expect(router.state.location.pathname).toMatch(/^\/sources\/192\.0\.2\.\d+$/)
-    expect(await screen.findByText('source content')).toBeTruthy()
-  })
-
   it('shows the open-alert count on the bell in the top bar', async () => {
-    renderShell('/')
+    renderShell('/', { openAlerts: 7 })
     await screen.findByText('overview content')
     const header = screen.getByRole('navigation', { name: 'Page header' })
-    const bell = await within(header).findByRole('link', { name: /^Alerts, \d+ open$/ }, { timeout: 3000 })
+    const bell = await within(header).findByRole('link', { name: 'Alerts, 7 open' }, { timeout: 3000 })
     expect(bell.getAttribute('href')).toBe('/alerts')
   })
 

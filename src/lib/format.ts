@@ -29,7 +29,7 @@ export function configureTime(next: Partial<TimeSettings>) {
   formats = build(settings)
 }
 
-/** The configured clock: the wall clock, or the mock tier's fixed one. */
+/** The configured clock: the wall clock, unless a test fixes it. */
 export const now = () => settings.now()
 
 /** The short name of the zone times are shown in, e.g. UTC or CEST. */
@@ -44,7 +44,7 @@ export const formatDay = (iso: string) => formats.day.format(new Date(iso))
 export const formatClock = (iso: string) => formats.time.format(new Date(iso))
 
 /** "5 min ago", or "in 3 h" for what is still to come (a scheduled run,
- * an expiry), from the (mock) clock, for the relative-timestamps preference. */
+ * an expiry), from the configured clock, for the relative-timestamps preference. */
 export function formatRelative(iso: string): string {
   const signed = Math.round((settings.now() - Date.parse(iso)) / 1000)
   const seconds = Math.abs(signed)

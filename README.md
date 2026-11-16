@@ -10,20 +10,41 @@ Planning and progress:
 
 The canonical implementation is a behavioral reference, not a component source to copy mechanically. Every migration slice must trace its routes, data, actions, security, and states before being rebuilt with current TanStack and Astryx conventions.
 
-Current stage: every migration slice has a real-backend adapter behind the same server-function seam used by mock scenarios. The [backend coverage matrix](docs/migration/backend-coverage.md) records the remaining query shapes with no production endpoint or adapter; those rows block cutover instead of silently passing as parity.
+Current stage: every query the pages make is answered by the APIARY backend through one server-function seam (`src/data/queries.ts`, typed by `src/data/queries.contract.ts`, implemented by `src/data/api.ts`). There is no mock backend and no built-in data (dash#324): the dashboard is developed and tested against a real backend.
 
 ## Development
 
 ```bash
 bun install
-bun run dev          # vite dev server on 0.0.0.0:3009, usable from the LAN (development settings)
+bun run dev          # vite dev server on 0.0.0.0:3009, usable from the LAN (needs a backend, below)
 bunx tsc --noEmit    # typecheck
 bun run lint
 bun run test
 bun run build        # production build into dist/
-SERVICE_TOKEN=… bun run start   # Bun production server (server.ts)
-bun run smoke        # clean clone → install → every gate → start → HTTP and browser checks
+bun run start        # Bun production server (server.ts), configured by the environment
+bun run server-checks   # the built server's boot refusals and its answers with no backend
+bun run live         # the live checks against a running dashboard (e2e/live/README.md)
 ```
+
+### A backend for local development
+
+The dashboard needs a backend: without `BACKEND_URL` it refuses to start (`E-BACKEND-URL`). Locally, point it at the homeserver's backend through an SSH tunnel. The backend containers publish no host port, so the tunnel goes to their address on the Docker network:
+
+```bash
+scripts/dev-backend-tunnel.sh   # prints BACKEND_URL / BACKEND_MOUNTED_URL, keeps the tunnel open
+```
+
+It resolves `hp-apiary-backend` (port 8081) and `hp-apiary-backend-mounted` (port 8082) with `docker inspect` over `ssh homeserver` and forwards `127.0.0.1:8081` and `127.0.0.1:8082` to them (override with `DEV_SSH_HOST`, `DEV_BACKEND_CONTAINER`, `DEV_LOCAL_PORT`, …). Then, in `.env` (Bun loads it for `bun run dev`):
+
+```bash
+BACKEND_URL=http://127.0.0.1:8081
+BACKEND_MOUNTED_URL=http://127.0.0.1:8082
+SERVICE_TOKEN_FILE=/path/to/your/service-token              # 0600, never in the repository
+ACTOR_ASSERTION_PRIVATE_KEY_FILE=/path/to/your/actor-key.pem # 0600; the backend enforces signed actors
+OIDC_DISABLED=1      # no Keycloak locally: every request is the development operator (an admin)
+```
+
+The backend runs with `ACTOR_ASSERTION_MODE=enforce`, so it answers a dashboard only with the service token **and** an actor assertion signed by a key it trusts. Keep both in your own 0600 files and name them with the `_FILE` variables; never put them on a command line or in the repository. Without them the dev server still starts and pages render, but every read shows "The backend did not answer" (`service token required`): `/readyz` reports the backend reachable either way. With `OIDC_DISABLED=1` every request is an admin, so writes reach the homeserver's real data: treat it like production. To sign in through Keycloak instead, set `OIDC_ISSUER_URL` and its client settings.
 
 ### Design studio
 
@@ -35,8 +56,8 @@ GitHub Actions, on GitHub-hosted runners:
 
 | Workflow | When | What |
 |---|---|---|
-| `ci.yml` | every pull request, pushes to main | public-repository safety (`scripts/check-public-leaks.ts`: no secrets, no real deployment addresses, mock data in documentation ranges only); typecheck, lint, tests, theme and generated-file freshness, build; the release gate `scripts/smoke.sh` with the runner's Chrome; `actionlint` over the workflows |
-| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `SERVICE_TOKEN` and serves once given one, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore-inc/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard:latest --owner Xore-Inc`). Nothing deploys it yet. |
+| `ci.yml` | every pull request, pushes to main | public-repository safety (`scripts/check-public-leaks.ts`: no secrets, no real deployment addresses, test data in documentation ranges only); typecheck, lint, tests, theme and generated-file freshness, build; the release gate's server half, `scripts/server-checks.sh` (job "Release gate (smoke)", the name the ruleset requires); `actionlint` over the workflows. The page, browser and authorization checks need real data and a session: they run against production before and after every release (`e2e/live/`, `docs/release-gates.md`), not in CI |
+| `container.yml` | every pull request, pushes to main, `v*` tags | builds the `Dockerfile`, checks the image refuses to boot without `BACKEND_URL` or `SERVICE_TOKEN` and serves once given them, scans it with Trivy (critical, fixable); on main and tags pushes it to `ghcr.io/xore-inc/apiary-dashboard` (`latest`, `sha-…`, the tag) with an SBOM and a signed provenance attestation (`gh attestation verify oci://ghcr.io/xore-inc/apiary-dashboard:latest --owner Xore-Inc`). Nothing deploys it yet. |
 | `codeql.yml` | pull requests, main, weekly | CodeQL `security-extended` over the TypeScript |
 | `dependency-review.yml` | pull requests | fails on a new dependency with a moderate or worse advisory |
 | `pr-title.yml` | pull requests | the title is a conventional commit (it becomes the squash commit), and its kind sets the release-notes label |
@@ -53,18 +74,18 @@ To release: `git tag v0.1.0 && git push origin v0.1.0`.
 
 ```bash
 docker build -t apiary-dashboard .
-docker run -p 3000:3000 -e SERVICE_TOKEN=… apiary-dashboard
+docker run -p 3000:3000 -e BACKEND_URL=… -e SERVICE_TOKEN=… -e OIDC_ISSUER_URL=… apiary-dashboard
 # or from a mounted secret file:
 # docker run -p 3000:3000 -v ./service-token:/run/secrets/service-token:ro -e SERVICE_TOKEN_FILE=/run/secrets/service-token apiary-dashboard
 ```
 
-`bun run test` covers the authorization matrix, the boot policies, sessions, nav roll-ups, formatters, and invariants over the mock backend: numbers shown on different pages must agree, and every id one page links to must resolve on its target page.
+`bun run test` covers the authorization matrix, the boot policies, sessions, the adapters against recorded wire shapes, nav roll-ups and formatters, with small literal inputs; the backend's answers in a test are stubbed responses, never a mock backend.
 
 ### Signing in and security
 
-Every page needs a session. With `OIDC_ISSUER_URL` set, `/auth/login` sends the browser to Keycloak (authorization code with PKCE; the one-time state waits in Redis under `bff:oidc:pending:` for 10 minutes), `/auth/callback` creates the session, and `/auth/logout` also ends the Keycloak session. The `admin` role of the dashboard client (`resource_access.<client>.roles`) makes an admin, anyone else is a viewer. On a local instance without `OIDC_ISSUER_URL` the mock identity provider stands in: pick **Operator** (admin) or **Analyst** (viewer). The session is real:
+Every page needs a session. With `OIDC_ISSUER_URL` set, `/auth/login` sends the browser to Keycloak (authorization code with PKCE; the one-time state waits in Redis under `bff:oidc:pending:` for 10 minutes), `/auth/callback` creates the session, and `/auth/logout` also ends the Keycloak session. The `admin` role of the dashboard client (`resource_access.<client>.roles`) makes an admin, anyone else is a viewer. Without `OIDC_ISSUER_URL` only a development instance with `OIDC_DISABLED=1` starts, and nobody signs in there: every request is the development operator. The session:
 - an opaque id in the `__Host-apiary_bff` cookie (HttpOnly, Secure, SameSite=Lax, 12 h);
-- the identity behind it in Redis under `bff:session:`, shared by every instance. A local instance keeps it in memory unless `OIDC_SESSION_REDIS_URL` is set, and falls back to memory while that Redis is down.
+- the identity behind it in Redis under `bff:session:`, shared by every instance.
 
 A server function call whose session has gone (401) sends the browser to sign in once, then back to the same page (`src/lib/reauth.ts`).
 
@@ -100,20 +121,17 @@ The server refuses to boot in an environment that would open it:
 | `SERVICE_TOKEN` / `SERVICE_TOKEN_FILE` | Shared secret with the backend, inline or as a path to a file holding it (a swarm secret); exactly one, and a file that is missing or empty refuses to boot. Required, unless `APIARY_ALLOW_UNAUTH_DEV=1` says this is a local instance (`E-SERVICE-TOKEN`). |
 | `EXPORT_TOKEN` / `EXPORT_TOKEN_FILE` | Optional export-only secret (inline or file, as above) for the blocklist export (`X-Export-Token`). Unset turns machine access to the export off. Equal to `SERVICE_TOKEN` refuses to boot (`E-EXPORT-TOKEN`). |
 | `ACTOR_ASSERTION_PRIVATE_KEY` / `ACTOR_ASSERTION_PRIVATE_KEY_FILE` | Ed25519 private key (PEM; `\n` for newlines inline) that signs operator identities for the backend. Both set, or a key that is unparsable or not Ed25519, refuses to boot (`E-ACTOR-ASSERTION-KEY`). Unset signs nothing. |
-| `BACKEND_URL` | Base URL of the backend tier. Unset — the development default — leaves queries answering from the mock. Production requires it. |
+| `BACKEND_URL` | Base URL of the backend tier (an http(s) URL). Required: unset, the server refuses to start (`E-BACKEND-URL`); there is no built-in data. `BACKEND_MOUNTED_URL` names the mounted listener (sandbox, Ghidra, GitHub analysis), else `BACKEND_URL` serves those too. |
 | `APIARY_ALLOW_UNAUTH_DEV` | Exactly `1`: a local development instance. `bun run dev` sets it. |
-| `OIDC_DISABLED` | `1` skips sign-in: everyone is a fixture admin. Only with `NODE_ENV=development` or `APIARY_ALLOW_UNAUTH_DEV=1` (`E-OIDC-DISABLED`). |
+| `OIDC_DISABLED` | `1` skips sign-in: every request is the development operator, an admin. Only with `NODE_ENV=development` or `APIARY_ALLOW_UNAUTH_DEV=1` (`E-OIDC-DISABLED`). |
 | `APIARY_DEV_HTTP_COOKIE` | Exactly `1`: the session cookie works over plain HTTP (`apiary_bff_dev`, not Secure), so a dev server can be used from another machine by its LAN address. Only with `NODE_ENV=development` or `APIARY_ALLOW_UNAUTH_DEV=1` (`E-DEV-HTTP-COOKIE`). `bun run dev` sets it and listens on 0.0.0.0. |
-| `OIDC_ISSUER_URL` | The Keycloak realm, e.g. `https://sso.example.test/realms/apiary`. Required unless this is a local instance, which then uses the mock identity provider (`E-OIDC-ISSUER`). |
+| `OIDC_ISSUER_URL` | The Keycloak realm, e.g. `https://sso.example.test/realms/apiary`. Required unless `OIDC_DISABLED=1` on a development instance (`E-OIDC-ISSUER`). |
 | `OIDC_CLIENT_ID` | The dashboard's Keycloak client. Default `apiary-dashboard`. |
 | `OIDC_CLIENT_SECRET` / `OIDC_CLIENT_SECRET_FILE` | Its secret, or a file holding it (the file wins). |
 | `OIDC_ALLOW_INSECURE` | Exactly `1`: a plain-HTTP issuer, for a local Keycloak only. |
 | `OIDC_SESSION_REDIS_URL` | Redis for sessions and pending sign-ins. Default `redis://127.0.0.1:6379/0`. |
 | `EXTERNAL_URL` | The public origin, when a proxy in front changes the Host the server sees (same-origin check, Keycloak redirect URIs). |
 | `MAP_TILE_URL`, `MAP_TILE_DARK_URL`, `MAP_TILE_ATTRIBUTION`, `MAP_TILE_SUBDOMAINS`, `MAP_TILE_API_KEY` | The attack map's tile provider, read at runtime and served with the shell config, never built into the bundle. Unset: keyless OpenStreetMap, darkened by a CSS filter in dark mode (CARTO's dark tiles now require a key). The URL is a Leaflet template (`{apikey}` takes the key, https only); without a dark URL, dark mode darkens the light tiles. A tile key reaches every browser in the tile URLs by design: keep it in the environment, never the repository or logs, and restrict it to the dashboard's domain at the provider. |
-| `APIARY_MOCK_SLOW_MS` | Mock only: how long the `slow` scenario holds each call (default 2500). The smoke test sets 12000 to prove an answer slower than Bun's default 10 s idle window still arrives. |
-| `APIARY_MOCK_VNC_BRIDGE` | Mock only: a WebSocket VNC bridge (`ws://127.0.0.1:5959`) the mock reports as a running detonation, so the sandbox live view's noVNC console can be tried locally. |
-| `APIARY_MOCK_FAULTS` | Mock only: `session-store` and/or `identity-provider` (comma-separated) stop answering, to exercise the outage paths. Pages then go to sign-in, direct handlers answer 401, and the sign-in pages say sign-in is unavailable or failed; smoke checks both. |
 
 See `.env.example`.
 
@@ -145,41 +163,17 @@ Pages read through TanStack Query (`src/lib/query.ts`), one `QueryClient` per ro
 
 Every backend read is one `queryOptions` in `src/data/resources.ts`, keyed by its server function's name and arguments, so the same source, autonomous system or campaign is fetched once for every page that shows it. Each resource has a freshness class: **live** (alerts, the live feed) is asked again on every visit and when the tab regains focus or the network reconnects; **normal** lists are reused for 30 s; **slow** detail pages, catalogs, configuration and reports for 5 minutes; **static** answers for the life of the page. A loader calls `ensure()`: a cached answer renders at once, without the skeleton, and is revalidated in the background when stale; only a cold load waits and shows the page's own skeleton. Nothing polls, and a failed read is not retried.
 
-The router leaves freshness to Query (`defaultPreloadStaleTime: 0`), so a hover preload's answer is what the click that follows renders. Links preload on hover or focus; a preload answers from the cache and never starts a slow panel. (Preloading a list's first rows as they scrolled into view was tried and dropped: on production each list render fired several entity reads at once and the backend's limiter shed some.) Slow panels (the related panel, entity timelines) are started by the loader without waiting and stream in under their own Suspense boundary (`src/components/Deferred.tsx`), so the page renders first; a failed panel shows as that panel's gap. Switching the mock scenario drops the cache.
+The router leaves freshness to Query (`defaultPreloadStaleTime: 0`), so a hover preload's answer is what the click that follows renders. Links preload on hover or focus; a preload answers from the cache and never starts a slow panel. (Preloading a list's first rows as they scrolled into view was tried and dropped: on production each list render fired several entity reads at once and the backend's limiter shed some.) Slow panels (the related panel, entity timelines) are started by the loader without waiting and stream in under their own Suspense boundary (`src/components/Deferred.tsx`), so the page renders first; a failed panel shows as that panel's gap.
 
 Writes are mutations (`src/data/writes.ts`, `src/lib/mutation.ts`): each names the resources it changes, which are read again when the write lands (the button stays busy until they have answered), then the routes re-run. Saving a preference and acknowledging an alert show at once and are rolled back if the backend refuses. The server functions are unchanged, so the CSRF header, the actor assertion and the sign-in flow apply as before.
 
-### Mock data
+### The data seam
 
-The mock backend (`src/data/queries.impl.ts`, fixtures in `src/data/mock/`) runs on the server only: the browser bundle has none of it. `src/data/queries.ts` is generated by `scripts/gen-queries.ts` and holds one server function per query. After adding or renaming a query, run `bun scripts/gen-queries.ts`; a test fails when the file is stale.
+`src/data/queries.ts` is generated by `scripts/gen-queries.ts` from the contract in `src/data/queries.contract.ts` and holds one server function per query; `src/data/api.ts` answers every one (`LIVE` must implement the whole contract, so a query without a backend answer does not compile). After adding or renaming a query, change the contract and `LIVE`, then run `bun scripts/gen-queries.ts`; CI fails when the file is stale.
 
-Mock writes (acknowledge, block, save, mint, …) change the server's in-memory state, so every page, tab and download sees them. A server restart starts from the fixtures again.
+**Live data:** `/api/live` relays the backend's own event stream as Server-Sent Events while the dashboard is open. The Event explorer and the overview follow it. The **Live** badge in the top bar pauses and resumes every refresh path (the choice is kept in this browser) and turns **Stalled** when the stream breaks.
 
-**Scenarios** make the whole backend behave a given way, so every page's empty, error, loading and role-limited states can be seen. Pick one from the **Mock data** button in the top bar, or add `?mock=<scenario>` to any URL; it sticks while you navigate. The scenario travels with each call, so two tabs in different scenarios don't affect each other.
-
-| `?mock=` | What the backend does |
-|---|---|
-| `empty` | No data yet: every list empty, every count zero (catalogs and KPI tiles stay, at zero) |
-| `large` | A busy deployment: six-digit counts, long lists, long values, any page of them |
-| `slow` | Every call takes 2.5 s: pending skeletons |
-| `partial` | The same third of the reads fail with 502 on every visit; the rest answer |
-| `unavailable` | Every call fails with 502 |
-| `overloaded` | Every call is shed with 503 and Retry-After: 30 |
-| `expired` | Every call answers 401: session expired |
-| `viewer` | The signed-in operator acts as a viewer: admin actions are disabled and refused with 403 |
-
-**Live data:** `/api/live` streams new events as Server-Sent Events while the dashboard is open, in the fleet's proportions, from one generator on the server. The Event explorer and the overview follow it. The **Live** badge in the top bar pauses and resumes every refresh path (the choice is kept in this browser) and turns **Stalled** when the stream breaks.
-
-**Chart and topology payloads:** `/api/chart/{name}` (the 21 allowlisted charts) and `/api/topology/flow` answer in the Rust tier's wire shapes, typed in `src/data/contracts/charts.ts`, built from the same mock data and scenarios the pages read. They are what production's proxies pass through, for the operational checks that call them; the pages themselves read through server functions.
-
-The same menu can **simulate an incident** to see the operational toasts raise and resolve: a sensor goes silent, ingest stalls, the cluster goes red, Filebeat drops, dead letters arrive, or everything recovers. Every open tab hears it through the stream.
-
-`bun scripts/crawl.ts <url> 1 --scenarios` signs in, opens one page of every route shape under each scenario, and fails on a page that crashes or shows the wrong state; smoke runs it.
-
-```bash
-VITE_MOCK_LATENCY_MS=800 bun run dev   # extra latency on every call, any scenario
-VITE_MOCK_FAIL=1 bun run dev           # every call fails, without a scenario
-```
+**Chart and topology payloads:** `/api/chart/{name}` (the 21 allowlisted charts) and `/api/topology/flow` pass the Rust tier's payloads through, typed in `src/data/contracts/charts.ts`, for the operational checks that call them; the pages themselves read through server functions.
 
 In dev, TanStack devtools open with **Ctrl+~** (the floating trigger is hidden so it never covers page actions).
 
@@ -191,7 +185,7 @@ In dev, TanStack devtools open with **Ctrl+~** (the floating trigger is hidden s
 
   ```bash
   bun run theme:build   # regenerates neutral-family.css / .js / .d.ts (every member, one stylesheet)
-  bun run theme:check   # fails if the committed outputs are stale (part of smoke)
+  bun run theme:check   # fails if the committed outputs are stale (CI runs it)
   ```
 
   The theme CLI runs under Bun (`bunx --bun`, with `JITI_TRY_NATIVE=0` so the family build can trace each member's ancestry) and `icons.tsx` carries a `@jsxRuntime automatic` pragma for the same loader. A new member is a new file in `variants/`, picked up by the build's glob, plus an entry in `appTheme.ts`. The palettes' values are APIARY's, imported from its vendored Xore/theme stylesheet by `scripts/import-apiary-palettes.py <APIARY checkout>` into `apiaryPalettes.generated.ts` (change them in Xore/theme, then re-import and `bun run theme:build`); `neutralVariants.ts` maps APIARY's roles onto Astryx tokens. The neutral base's own hues start from `palette.config.json` via `bunx astryx theme palette generate <config> -o <name>.generated.ts -f`.

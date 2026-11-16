@@ -3,18 +3,16 @@
 // this tier already presents on /metrics, and mapped with the adapters that
 // shipped in #167. Server-only; the browser never loads it.
 //
-// The mock stays the default. `runForRequest` (src/data/backend.ts) routes
-// here only when the page carries no `?mock=` AND this process has
-// BACKEND_URL set; every mock scenario, and every query this module does
-// not implement, still answers from the mock — which is what keeps the ten
-// scenarios and the browser checks working.
+// Every query of the data seam is answered here: `runForRequest`
+// (src/data/backend.ts) routes each server function to its entry in `LIVE`,
+// which must implement the whole contract (src/data/queries.contract.ts).
 //
 // Base URL and token: the same two variables the canonical BFF reads
 // (frontend-next/src/lib/backend.server.ts `backendURL()` and the
 // `x-service-token` header), so one deployment configures both tiers.
-// BACKEND_URL is also the opt-in: unset means "this tier talks to nobody",
-// which is the default. The token is never logged, never in a URL, and
-// never in an error message — it only ever rides as a request header.
+// Without BACKEND_URL the server refuses to start (src/server/policy.ts).
+// The token is never logged, never in a URL, and never in an error message
+// — it only ever rides as a request header.
 import { mapTiles } from './mapTiles'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { ApiError } from './errors'
@@ -280,7 +278,8 @@ async function limited<T>(endpoint: string, call: () => Promise<T>): Promise<T> 
   }
 }
 
-/** This process has a real backend to talk to. Its absence is the default. */
+/** This process has a backend to talk to. A running server always does
+ * (`backendUrlPolicy`); a test or a script may not. */
 export const isLiveBackend = (env: NodeJS.ProcessEnv = process.env): boolean => Boolean(env.BACKEND_URL?.trim())
 
 /** The backend's base URL. `mounted` selects the MOUNTED instance — the only
@@ -293,7 +292,13 @@ export const isLiveBackend = (env: NodeJS.ProcessEnv = process.env): boolean => 
  * silently shows an operator an empty list. Unset falls back to BACKEND_URL: a
  * deployment that has collapsed the two into one instance still works, it just
  * loses the distinction. */
-const baseURL = (env: NodeJS.ProcessEnv = process.env, mounted = false): string => (mounted ? env.BACKEND_MOUNTED_URL?.trim() || env.BACKEND_URL! : env.BACKEND_URL!).replace(/\/$/, '')
+const baseURL = (env: NodeJS.ProcessEnv = process.env, mounted = false, endpoint = 'backend'): string => {
+  const standard = env.BACKEND_URL?.trim()
+  // A running server always has one (backendUrlPolicy); a script or a route
+  // reached without it is refused the same way liveQuery refuses, not a 500.
+  if (!standard) throw new ApiError('unavailable', endpoint, { detail: 'BACKEND_URL is not configured' })
+  return ((mounted && env.BACKEND_MOUNTED_URL?.trim()) || standard).replace(/\/$/, '')
+}
 
 /** One wire page's worth of nothing — the degraded answer a 200 with no body
  * maps to. Every real endpoint answers 200 with its envelope, so this is
@@ -389,7 +394,7 @@ async function raw(path: string, opts: { mounted?: boolean; user?: Caller; searc
   const query = queryOf(opts.search)
   let response: Response
   try {
-    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
+    response = await limited(endpoint, () => fetch(`${baseURL(process.env, opts.mounted, endpoint)}${path}${query.size ? `?${query}` : ''}`, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...hopHeaders(opts.user, 'GET', path) }, signal: AbortSignal.timeout(TIMEOUT_MS) }))
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('unavailable', endpoint)
@@ -412,8 +417,7 @@ const queryOf = (search: SearchParams = {}): URLSearchParams => {
 }
 
 /** What a file route answers: the bytes and the type to serve them under.
- * `found: false` is the 404 an endpoint gives when nothing carries the id —
- * distinct from "the mock answers this", which is `null` from `getRaw`. */
+ * `found: false` is the 404 an endpoint gives when nothing carries the id. */
 export type RawFile = { found: true; body: Uint8Array; contentType: string } | { found: false }
 
 /** GET a file the dashboard hands over — a recording, a payload's bytes, a
@@ -431,7 +435,7 @@ export type RawFile = { found: true; body: Uint8Array; contentType: string } | {
  * filename a download carries is this tier's contract (the pages link
  * `events.csv`, the backend answers `honeypot-events.csv`), and a header
  * from the wire is not sanitized the way the route's own `file()` is. */
-export async function getRaw(endpoint: string, path: string, search: SearchParams = {}): Promise<RawFile | null> {
+export async function getRaw(endpoint: string, path: string, search: SearchParams = {}): Promise<RawFile> {
   const response = await raw(path, { search }, endpoint)
   if (response.status === 404) return { found: false }
   return { found: true, body: new Uint8Array(await response.arrayBuffer()), contentType: response.headers.get('content-type') ?? 'application/octet-stream' }
@@ -477,7 +481,7 @@ const hopHeaders = (user: Caller, method: string, path: string): Record<string, 
  * operator cannot tell that from a quiet fleet. */
 async function request<T>(endpoint: string, path: string, opts: { method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; search?: SearchParams; body?: unknown; mounted?: boolean; user?: Caller }): Promise<T | null> {
   const query = queryOf(opts.search)
-  const url = `${baseURL(process.env, opts.mounted)}${path}${query.size ? `?${query}` : ''}`
+  const url = `${baseURL(process.env, opts.mounted, endpoint)}${path}${query.size ? `?${query}` : ''}`
   let response: Response
   try {
     response = await limited(endpoint, () => fetch(url, {
@@ -540,7 +544,7 @@ const post = async <T>(endpoint: string, path: string, body: unknown, opts: { mo
  * next one. `signal` is the caller's — the request's own abort, which is how
  * a disconnect upstream stops the poller rather than leaking it. */
 async function stream(endpoint: string, path: string, signal: AbortSignal): Promise<Response> {
-  const url = `${baseURL()}${path}`
+  const url = `${baseURL(process.env, false, endpoint)}${path}`
   let response: Response
   try {
     response = await fetch(url, { headers: { 'x-service-token': secretValue('SERVICE_TOKEN'), ...assertionHeaders(undefined, 'GET', path) }, signal })
@@ -575,7 +579,7 @@ const paged = (wire: { total: number; offset: number; rows: EventRow[] }): Paged
 
 // ---- the page fields an event row does not carry -----------------------------
 
-/** `type`, read off the sensor's own event name — the same input the mock's
+/** `type`, read off the sensor's own event name — the same input the
  * sensor specs classify. The values are the literals the backend's own
  * canonicalizer fixtures and its DISCONNECT filter use; `pivots.alert`
  * (a Suricata signature, read off the wire) makes a row an IDS alert.
@@ -781,7 +785,7 @@ const provisionCredential: Backend['provisionCredential'] = async (input) => {
  * GAP: both handlers answer the full record (credentials.rs `rotate` L322,
  * `link_token` L373) while the page's seam returns `void` for both — so the
  * returned password and `linked_token_id` are dropped here, and the page
- * re-reads the credential after the write, as it does on the mock. A
+ * re-reads the credential after the write. A
  * generated password (empty `password` in, generated by the backend) is
  * therefore visible on the page only after that re-read.
  *
@@ -862,8 +866,7 @@ const getSettings: Backend['getSettings'] = async () => {
   ])
   return settingsData({
     // The signed-in operator. The wire has no session, so it comes from the
-    // one this process holds — the same SessionUser the mock answers `user`
-    // with, so the identity panel reads the same whichever tier answered.
+    // one this process holds, so the identity panel names who is signed in.
     user: session.user ?? ANONYMOUS_USER,
     config: config ?? { revision: 0, payload: {} },
     templates: reportTemplates(templates ?? { templates: [], elements: [] }).templates,
@@ -931,9 +934,9 @@ const savePreferences: Backend['savePreferences'] = async (next) => {
   await request<PreferencesWire>('savePreferences', '/api/v1/preferences', { method: 'PUT', body: preferencesWriteBody(session.subject, patch, session.username) })
 }
 
-/** What the identity panel shows for a caller no session resolved. The mock
- * has a fixture user; a live call that reached here has no session at all,
- * and saying so beats borrowing a name. */
+/** What the identity panel shows for a caller no session resolved: a call
+ * that reached here has no session at all, and saying so beats borrowing a
+ * name. */
 const ANONYMOUS_USER: SessionUser = { name: '—', email: '', roles: [] }
 
 /** `GET /api/v1/config` for the shell: the presentation and behavior blocks
@@ -1003,7 +1006,7 @@ const saveConfigSection: Backend['saveConfigSection'] = async (section, value, f
 
 /** POST /api/v1/config/rollback. The wire's revision is an integer; the
  * page's history row renders it (the adapter's `id` is `String(revision)`,
- * and the mock uses `rev-41`). Both parse — the prefix is the page's own
+ * and older links use `rev-41`). Both parse — the prefix is the page's own
  * decoration, not a wire key. Anything that is not a revision is refused
  * here rather than sent as one the backend would reject as negative
  * (config.rs `rollback` 400s `revision < 0`). */
@@ -1067,18 +1070,14 @@ const setProblemStatus: Backend['setProblemStatus'] = async (id, status) => {
   await request<null>('setProblemStatus', `/api/v1/problem-reports/${encodeURIComponent(id)}`, { method: 'PATCH', body: problemStatusPatch(status) })
 }
 
-/** Read-only mode, enforced the way the mock enforces it.
+/** Read-only mode: a non-read write is refused with a 423 while
+ * `behavior.read_only` is on.
  *
- * `scenario.ts` refuses a non-read write with a 423 when
- * `CONFIG.behavior.readOnly` is on — but it wraps the MOCK. A live call
- * bypasses that entirely, and nothing in the Rust tier enforces read-only at
- * all: it is a dashboard preference, not a backend guarantee. So without
- * this the guard would silently apply to the mock tier only, which is the
- * worst shape a guard can have — it passes the tests and stops existing in
- * production. One config read per write buys the same 423 the mock gives.
+ * Nothing in the Rust tier enforces read-only at all: it is a dashboard
+ * setting, not a backend guarantee, so this is where it holds. One config
+ * read per write buys the 423.
  *
- * The predicate is the mock's own, inverted exactly as scenario.ts:72 inverts
- * it: a query whose name IS a read is not guarded, and a query that is not
+ * A query whose name IS a read is not guarded, and a query that is not
  * one is. `READ_ONLY_SKIP` is the one addition, because the name alone does
  * not say what the query does — `getMail` STARTS WITH `get` and would read as
  * a read, but it is the page's read of a capture; it needs no exemption and
@@ -1129,8 +1128,7 @@ export async function liveChart<TChart extends ChartName>(name: TChart, search: 
  *
  * The wire shape is `FlowGraph { nodes: Vec<FlowNode>, links: Vec<FlowLink> }`
  * with `{name, layer}` and `{source, target}` (topology.rs:664-679) — already
- * the `FlowGraph` in `contracts/charts.ts`, so it passes through untouched,
- * which is why the mock builds the same shape by hand. */
+ * the `FlowGraph` in `contracts/charts.ts`, so it passes through untouched. */
 export async function liveTopologyFlow(): Promise<FlowGraph | null> {
   const wire = await get<TopologyWire>('topology/flow', '/api/v1/topology')
   return wire?.flow ?? null
@@ -1253,8 +1251,7 @@ const getIpProfile: Backend['getIpProfile'] = async (ip) => {
 }
 
 /** POST /api/v1/ip-block — the block toggle, admin-only (authorize.ts:14),
- * enforced before the fetch by `liveQuery`, the same decision the mock tier
- * makes, so no check is added here.
+ * enforced before the fetch by `liveQuery`, so no check is added here.
  *
  * Blocking sends an explicit `expires_days` (0 = permanent): the backend
  * refuses a block without one. Unblocking sends none. `actor` is bound
@@ -1407,7 +1404,7 @@ const getCluster: Backend['getCluster'] = async (kind, value) => {
 
 /** GET /api/v1/charts/attacker-fusion?id= — the identity page's "Why merged"
  * table. The backend's own per-category shared-value counts, which is
- * exactly what the page's mock computes; a 404 is "no such entity", the
+ * exactly what the page shows; a 404 is "no such entity", the
  * page's null. */
 const getIdentityFusion: Backend['getIdentityFusion'] = async (id) => {
   const wire = await get<FusionWire>('getIdentityFusion', '/api/v1/charts/attacker-fusion', { id })
@@ -1601,9 +1598,9 @@ const getAlertDetail: Backend['getAlertDetail'] = async (key) => {
   const text = `${row.Message} ${row.Link}`
   return {
     group: alertPage({ total: 1, rows: [row] })[0],
-    // The evidence pane's pivots, read off the same two strings the mock
-    // reads them from. A live alert carries no source list of its own, so
-    // an address that is not one the mock knows is still shown: the wire
+    // The evidence pane's pivots, read off the alert's message and link. A
+    // live alert carries no source list of its own, so every address found
+    // there is shown: the wire
     // has no "known source" table to filter against, and dropping an
     // address the alert actually names would be worse than showing it.
     sources: [...new Set(text.match(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g) ?? [])],
@@ -1677,7 +1674,7 @@ const getDeadLetter: Backend['getDeadLetter'] = async (id) => {
  * `q` the GET searched, so this purges exactly the scope the operator was
  * looking at — the page's contract, and the dialog's own wording.
  * `purgeDeadLetters` is admin-only (authorize.ts:15), enforced before the
- * fetch by `liveQuery`, the same decision the mock tier makes. */
+ * fetch by `liveQuery`. */
 const purgeDeadLetters: Backend['purgeDeadLetters'] = async (query) => {
   await guardReadOnly('purgeDeadLetters')
   const wire = await request<PurgeDeadLettersWire>('purgeDeadLetters', '/api/v1/store/dead-letters', { method: 'DELETE', search: { q: query.trim() || undefined }, user: callerOf() })
@@ -1768,7 +1765,7 @@ const deleteGeneratedReport: Backend['deleteGeneratedReport'] = async (id) => {
  *
  * An ephemeral payload-scoped definition the backend builds itself and never
  * persists, so the returned report carries no `definitionId` — the history
- * page's own "one-off" label, which the mock also produces here. */
+ * page's own "one-off" label. */
 const generatePayloadReport: Backend['generatePayloadReport'] = async (hash) => {
   await guardReadOnly('generatePayloadReport')
   const wire = await post<GenerateReportWire>('generatePayloadReport', `/api/v1/payloads/${encodeURIComponent(hash)}/report`, {})
@@ -1786,7 +1783,7 @@ const generatePayloadReport: Backend['generatePayloadReport'] = async (hash) => 
  * `generate_payload_report` has one for `payload` — that is the only
  * template the renderer shortcuts, and a wizard draft is arbitrary. So a
  * one-off is created, generated, then dropped again, which leaves the store
- * in the state the mock's `keep: false` branch leaves.
+ * as it was: a one-off keeps no definition.
  *
  * It composes the three writes above rather than repeating them, so the
  * read-only guard and the bodies are the same code: a one-off re-reads
@@ -1797,10 +1794,8 @@ const generatePayloadReport: Backend['generatePayloadReport'] = async (hash) => 
 const generateReportFrom: Backend['generateReportFrom'] = async (definition, keep) => {
   // A one-off is created, so it carries no id: `create_definition` 400s one.
   const saved = await saveReportDefinition(keep ? definition : { ...definition, id: '' })
-  // `generateReport` is nullable because the mock misses a definition it has
-  // dropped; on the wire the definition was just saved and a miss is a 404
-  // this throws on, so a null here would be the mock, and the mock never
-  // reaches this function.
+  // `generateReport` is nullable in the contract; here the definition was
+  // just saved, so a miss is a 404 it throws on, and a null cannot happen.
   const report = await generateReport(saved.id)
   if (!report) throw new ApiError('unavailable', 'generateReportFrom')
   if (keep) return { report, definition: saved }
@@ -1952,7 +1947,7 @@ const searchAll: Backend['searchAll'] = async (query) => {
 
 /** The session user of the request currently being served, for the mounted
  * mutations below. `liveQuery` runs each dispatch inside this scope rather
- * than widening the mock's signatures (which `queries.ts` is generated from,
+ * than widening the contract's signatures (which `queries.ts` is generated from,
  * and pages are typed against). Never client input: it comes from
  * `runForRequest`'s `resolveUser`, the same source canonical forwards the
  * actor headers from.
@@ -2100,10 +2095,10 @@ const getAnalyzerCatalog: Backend['getAnalyzerCatalog'] = async (hash) => {
  * for publication (mounted, `confirm: 'publish'` is the backend's own
  * required literal). `pdf` has no submit endpoint in the canonical list —
  * the report route is the generated-reports store, a different thing —
- * so that one action stays on the mock rather than silently queueing
- * nothing. */
+ * so that one action is refused as unavailable rather than claiming it
+ * started (the menu shows it disabled). */
 const queuePayloadAction: Backend['queuePayloadAction'] = async (hash, action) => {
-  if (action === 'pdf') return 'PDF report generation started'
+  if (action === 'pdf') throw new ApiError('unavailable', 'queuePayloadAction', { detail: 'PDF report generation has no backend endpoint yet: nothing was queued' })
   const mounted = { mounted: true, user: callerOf() }
   if (action === 'sandbox') await post<SandboxSubmitWire>('queuePayloadAction', '/api/v1/sandbox/submit', { hash }, mounted)
   else if (action === 'ghidra') await post<GhidraSubmitWire>('queuePayloadAction', '/api/v1/ghidra/submit', { hash }, mounted)
@@ -2116,8 +2111,7 @@ const queuePayloadAction: Backend['queuePayloadAction'] = async (hash, action) =
  * `fetchResults` in docs/migration/server-functions.json — the brief's
  * mapping for it does not exist upstream. The page's `AnalysisResultsData`
  * is a composite, so it is answered from the four endpoints that answer
- * without a payload rather than left on the mock, which would show an
- * operator fabricated runs.
+ * without a payload.
  *
  * `analyzers` stays empty: there is no registry-wide catalog. The one
  * catalog endpoint (workbench_api.rs `analyzers`) is per payload, with a
@@ -2128,8 +2122,7 @@ const queuePayloadAction: Backend['queuePayloadAction'] = async (hash, action) =
  *
  * The `range` argument is NOT honoured: the one endpoint that could filter
  * by it (`/store/yara`) pages by offset, not by time, and the other four
- * are the queue and the catalogs — always shown whole, which is what the
- * mock does with them too. Results therefore cover the rows those endpoints
+ * are the queue and the catalogs — always shown whole. Results therefore cover the rows those endpoints
  * return, not a date window. */
 const getAnalysisResults: Backend['getAnalysisResults'] = async () => {
   // The workbench orchestrator surface is spool-mounted (canonical L68).
@@ -2331,8 +2324,7 @@ const DASHBOARD_GAPS: { [K in keyof DashboardViews]: null } = {
 }
 
 /** The page's own `CountRow` rollup: group by a key, count, keep the top
- * `limit`. The mock's `countBy`, verbatim in behaviour — three lines, no shared
- * helper exists for the seam. */
+ * `limit`: three lines, no shared helper exists for the seam. */
 const counted = (values: Array<string | undefined>, limit: number): CountRow[] => {
   const counts = new Map<string, number>()
   for (const value of values) if (value !== undefined) counts.set(value, (counts.get(value) ?? 0) + 1)
@@ -2412,7 +2404,7 @@ const scorePoints = (series: SeriesWire[]): ScorePoint[] => {
  * returned `changed` is what the backend says it changed and the page re-reads
  * the list for the rest. Admin-only by `authorize`, before this runs.
  *
- * One deliberate divergence from the mock: a row carrying a DISPOSITION is
+ * One deliberate divergence from the page's own rule: a row carrying a DISPOSITION is
  * refused by this endpoint (the handler will not overwrite an operator
  * verdict with an acknowledgement), so a live `changed` can be lower than the
  * number of open rows on screen. That is the backend's own answer, not a
@@ -2442,7 +2434,7 @@ const actorOf = async (): Promise<string> => (await sessionOf()).username
  * the anomaly panel's toggle reopens a row; the page's signature
  * `acknowledgeAnomalies(ids)` carries no flag, so the seam reads the intent
  * off the ids it was handed — every id is acked, which is what that query
- * means on the mock and what its only call site does. Returns how many
+ * means and what its only call site does. Returns how many
  * changed, read back off the records the POST wrote. */
 const acknowledgeAnomalies: Backend['acknowledgeAnomalies'] = async (ids) => {
   await guardReadOnly('acknowledgeAnomalies')
@@ -2455,7 +2447,7 @@ const acknowledgeAnomalies: Backend['acknowledgeAnomalies'] = async (ids) => {
 /** POST /api/v1/ml-anomalies/disposition (detail.rs `ml_anomaly_disposition`,
  * L857) — the operator's verdict, written ONTO the anomaly document. The
  * response echoes what was sent, so the seam's `void` return drops it and the
- * page re-reads the anomaly, as it does on the mock. `mlDispositionBody`
+ * page re-reads the anomaly. `mlDispositionBody`
  * refuses 'acknowledged': the backend's closed set is the three verdicts plus
  * the 'open' retraction, and the ack lives only in the sidecar, so nothing the
  * page can send is lost. */
@@ -2466,8 +2458,7 @@ const setAnomalyDisposition: Backend['setAnomalyDisposition'] = async (ids, stat
 }
 
 /** GET /api/v1/store/llm-analysis (stores.rs `generic` over the
- * `llm-analysis` allowlist key, L491) — the page's own list, unpaged like the
- * mock's. The handler clamps `size` to 100 (L128), so that is the page size
+ * `llm-analysis` allowlist key, L491) — the page's own list, unpaged. The handler clamps `size` to 100 (L128), so that is the page size
  * asked for rather than one this seam invents. */
 const getLlmAnalyses: Backend['getLlmAnalyses'] = async () => ((await get<StorePage<LlmAnalysisRow>>('getLlmAnalyses', '/api/v1/store/llm-analysis', { offset: 0, size: 100 })) ?? { total: 0, rows: [] }).rows.map(toLlmAnalysis)
 
@@ -2485,8 +2476,8 @@ const semanticSearch: Backend['semanticSearch'] = async (query) => {
 }
 
 /** GET /api/v1/store/agent-campaigns (stores.rs `generic` over the
- * `agent-campaigns` allowlist key, L500) — the page's list, unpaged like the
- * mock's and clamped to the handler's own 100. */
+ * `agent-campaigns` allowlist key, L500) — the page's list, unpaged and
+ * clamped to the handler's own 100. */
 const getAgentCampaigns: Backend['getAgentCampaigns'] = async () => ((await get<StorePage<AgentCampaignRow>>('getAgentCampaigns', '/api/v1/store/agent-campaigns', { offset: 0, size: 100 })) ?? { total: 0, rows: [] }).rows.map(toAgentCampaign)
 
 /** GET /api/v1/store/agent-campaigns/{id}. PR #3535 did not add the brief's
@@ -2572,8 +2563,8 @@ const eventsWire = async (endpoint: string, search: EventsQueryWire): Promise<Ev
 const getSourceEvents: Backend['getSourceEvents'] = async (ip, range) => paged(await eventsWire('getSourceEvents', { ip, ...sinceOf(range) })).rows
 
 /** GET /api/v1/events?ip=&since= as the source's timeline (sourceTimeline).
- * Only this source's events: see the adapter for what the mock adds that the
- * backend does not serve for a source yet. */
+ * Only this source's events: see the adapter for what the backend does not
+ * serve for a source yet. */
 const getSourceTimeline: Backend['getSourceTimeline'] = async (ip, range) => sourceTimeline((await eventsWire('getSourceTimeline', { ip, ...sinceOf(range) })).rows)
 
 /** GET /api/v1/sources/{ip}/sessions (APIARY#3557) — the server-side session
@@ -2772,9 +2763,9 @@ const previewReport: Backend['previewReport'] = async (definition) => {
   }
 }
 
-/** This slice's queries, and nothing else. Each keeps the mock
- * implementation's signature exactly — `queries.ts` is generated from it and
- * pages are typed against it.
+/** Every query of the contract (src/data/queries.contract.ts), each with its
+ * signature exactly — `queries.ts` is generated from the contract and pages
+ * are typed against it.
  *
  * DELIBERATELY ABSENT, and the reason is the one thing in this slice worth
  * reading before changing anything:
@@ -2787,7 +2778,7 @@ const previewReport: Backend['previewReport'] = async (definition) => {
  * lossy scope filters, the scope keys with no page field, `schedule.enabled`
  * and `schedule.failures`, the wire fields the page types do not carry, and
  * the `{ deleted }` responses nothing adapts. */
-const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>>> = {
+const LIVE: Backend = {
   getEvents,
   getCommands,
   searchHistory,
@@ -2909,25 +2900,24 @@ const LIVE: Partial<Record<keyof Backend, (...args: never[]) => Promise<unknown>
   getSessionUser: async () => callerOf() ?? null,
 }
 
-/** The guarded live implementation of `name`, or undefined when this slice
- * does not implement it or when no BACKEND_URL is configured.
+/** The guarded live implementation of `name`, or undefined for a name that
+ * is not a query.
  *
- * The authorization decision is the same one `backend()` applies, so a role
- * is refused identically whichever tier answers. */
+ * The authorization decision (src/server/authorize.ts) is applied before
+ * anything is fetched, so a refused call never reaches the backend. */
 export function liveQuery(name: string, user: Caller, requestId: string = crypto.randomUUID()): ((...args: unknown[]) => Promise<unknown>) | undefined {
-  if (!isLiveBackend()) return undefined
-  const query = LIVE[name as keyof Backend] as ((...args: unknown[]) => Promise<unknown>) | undefined
-  if (!query) return undefined
+  if (!Object.hasOwn(LIVE, name)) return undefined
+  const query = LIVE[name as keyof Backend] as (...args: unknown[]) => Promise<unknown>
   return async (...args) => {
     if (user !== undefined) {
       const decision = authorize(name, user)
       if (decision === 'sign-in') throw new ApiError('expired', name)
       if (decision === 'admin-only') throw new ApiError('forbidden', name)
     }
+    if (!isLiveBackend()) throw new ApiError('unavailable', name, { detail: 'BACKEND_URL is not configured' })
     // The mounted mutations read the actor off the request's scope rather
-    // than taking it as a parameter: the mock's signatures are the contract
-    // and none of them carry a caller. run(), not an assignment — see
-    // requestScope.
+    // than taking it as a parameter: the contract's signatures carry no
+    // caller. run(), not an assignment — see requestScope.
     return requestScope.run({ user, requestId }, () => query(...args))
   }
 }

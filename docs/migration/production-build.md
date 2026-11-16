@@ -5,10 +5,10 @@ The release artifact is the Vite production output served by `bun run server.ts`
 ## Reproducible check
 
 ```bash
-scripts/smoke.sh <git-url-or-path> <branch-or-tag>
+bun install --frozen-lockfile && bun run build && scripts/server-checks.sh
 ```
 
-The script creates a clean temporary clone, runs `bun install --frozen-lockfile`, typecheck, lint, all tests, generated-theme verification, `bun run build`, boot-policy refusals, `bun run start`, HTTP checks, route/scenario crawls, responsive checks, accessibility, and performance. CI runs the same script from a temporary branch on every pull request.
+CI's "Release gate (smoke)" job runs exactly this on every pull request: a frozen install, the production build, the boot-policy refusals (no backend, no service token, unsafe OIDC settings), and the built server against a backend that does not answer (outages reported with their statuses, CSP nonces, same-origin sign-out). The page and browser checks need real data: they run against production (`e2e/live/`, `docs/release-gates.md`).
 
 ## Result
 

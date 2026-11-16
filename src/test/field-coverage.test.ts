@@ -1,6 +1,6 @@
-// Mock parity (#98): every field a canonical page reads is in the mock data
-// the rewrite's pages show, carried under another name, or waived with a
-// reason; and the report says so.
+// Field parity (#98): every field a canonical page reads is in the data the
+// rewrite's pages show, carried under another name, or waived with a reason;
+// and the report says so.
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'

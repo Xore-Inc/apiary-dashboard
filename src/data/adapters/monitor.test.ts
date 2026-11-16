@@ -161,14 +161,14 @@ describe('monitor adapters', () => {
       total_unique: 29303,
       truncated: true,
       rows: [
-        { ip: '85.217.149.4', country: 'DE', events: 896629, logins: 0, sessions: 0, sensors: ['zeek', 'suricata'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
-        { ip: '85.217.149.16', country: '', events: 896623, logins: 0, sessions: 0, sensors: ['zeek'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
-        { ip: '45.156.129.136', country: '', events: 896621, logins: 0, sessions: 0, sensors: ['zeek'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
+        { ip: '198.51.100.204', country: 'DE', events: 896629, logins: 0, sessions: 0, sensors: ['zeek', 'suricata'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
+        { ip: '198.51.100.216', country: '', events: 896623, logins: 0, sessions: 0, sensors: ['zeek'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
+        { ip: '203.0.113.136', country: '', events: 896621, logins: 0, sessions: 0, sensors: ['zeek'], first: '2026-09-29T14:57:13.871Z', last: '2026-10-09T14:56:22.158Z' },
       ],
     }
     expect(overviewSources(wire, 2)).toEqual([
-      { ip: '85.217.149.4', country: 'DE', events: 896629, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
-      { ip: '85.217.149.16', events: 896623, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
+      { ip: '198.51.100.204', country: 'DE', events: 896629, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
+      { ip: '198.51.100.216', events: 896623, firstSeen: '2026-09-29T14:57:13.871Z', lastSeen: '2026-10-09T14:56:22.158Z' },
     ])
   })
 

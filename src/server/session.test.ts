@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fakeRedis } from './fakeRedis.test-util'
-import { DEV_SESSION_COOKIE, MemorySessionStore, RedisSessionStore, SESSION_COOKIE, withMemoryFallback, SESSION_TTL_SECONDS, clearSessionCookie, sessionCookie, sidFrom } from './session'
+import { DEV_SESSION_COOKIE, MemorySessionStore, RedisSessionStore, SESSION_COOKIE, SESSION_TTL_SECONDS, clearSessionCookie, sessionCookie, sidFrom } from './session'
 
 const account = { sub: 's', username: 'u', displayName: 'U', email: 'u@example.test', role: 'viewer' as const }
 
@@ -19,16 +19,6 @@ describe('sessions', () => {
     await store.destroy(sid)
     expect(await store.get(sid)).toBeNull()
     expect(redis.keys.size).toBe(0)
-  })
-
-  it('falls back to memory on a local instance while Redis is down', async () => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const down = { set: () => Promise.reject(new Error('ECONNREFUSED')), get: () => Promise.reject(new Error('ECONNREFUSED')), del: () => Promise.reject(new Error('ECONNREFUSED')) }
-    const store = withMemoryFallback(new RedisSessionStore(down as never), new MemorySessionStore())
-    const sid = await store.create(account)
-    expect(await store.get(sid)).toMatchObject(account)
-    await store.destroy(sid)
-    expect(await store.get(sid)).toBeNull()
   })
 
   it('keeps a session behind an opaque id until it expires', async () => {

@@ -1,5 +1,5 @@
-// Monitor slice (#74): backend wire shapes → the page types the mock seam
-// already serves, and back again for the admin writes. One pure function
+// Monitor slice (#74): backend wire shapes → the page types the data seam
+// serves, and back again for the admin writes. One pure function
 // per endpoint; nothing calls the backend yet. Wire shapes:
 // ../contracts/monitor.ts. A page field the wire does not carry is left out
 // of the return type (Omit/Pick) rather than invented, so wiring cannot

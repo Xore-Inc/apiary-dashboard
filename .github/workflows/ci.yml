@@ -1,9 +1,11 @@
 name: CI
 
-# Every pull request and every push to main: the fast gates in one job,
-# the release gate (scripts/smoke.sh: clean clone, production build, HTTP,
-# crawl, responsive, accessibility and performance checks) in another.
-# GitHub-hosted runners only.
+# Every pull request and every push to main: the fast gates in one job, and
+# the release gate's server half in another (scripts/server-checks.sh: the
+# production build's boot refusals and its answers with no backend). The
+# page, browser and authorization checks need real data and a session: they
+# run against production before and after every release (e2e/live/,
+# docs/release-gates.md), not here. GitHub-hosted runners only.
 
 on:
   push:
@@ -34,7 +36,6 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun scripts/check-public-leaks.ts
-      - run: bun scripts/check-no-mock-imports.ts
 
   checks:
     name: Typecheck, lint, test, build
@@ -78,10 +79,11 @@ jobs:
       - name: Generated route tree is current
         run: git diff --exit-code -- src/routeTree.gen.ts
 
+  # The job keeps its name: the main-branch ruleset requires this check.
   smoke:
     name: Release gate (smoke)
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -94,11 +96,10 @@ jobs:
           path: ~/.bun/install/cache
           key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: bun-${{ runner.os }}-
-      # The browser checks use the runner image's Google Chrome.
-      - run: test -x /usr/bin/google-chrome
-      # smoke.sh clones a branch; give the checked-out commit one.
-      - run: git checkout -B ci-smoke
-      - run: scripts/smoke.sh "$PWD" ci-smoke
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - name: Production server checks (no backend, no session)
+        run: scripts/server-checks.sh
 
   actionlint:
     name: Workflow lint

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// The identity graph at fleet scale: the mock's identities are small, the
-// real ones are not, so the cap and the overflow node are checked here.
+// The identity graph at fleet scale: real identities can be large, so the
+// cap and the overflow node are checked here.
 import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import { RouterProvider, createMemoryHistory, createRootRoute, createRouter } from '@tanstack/react-router'

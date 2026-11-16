@@ -1,15 +1,12 @@
-// /auth/login: where every sign-in starts. In production it redirects to
-// Keycloak straight away, and this page never renders; when Keycloak or the
-// session store does not answer, it renders "temporarily unavailable" (503).
-// Without OIDC_ISSUER_URL (a local instance) the mock stands in for the
-// Keycloak form: pick who to sign in as.
+// /auth/login: where every sign-in starts. It redirects to Keycloak straight
+// away, and this page never renders; when Keycloak or the session store does
+// not answer, it renders "temporarily unavailable". On a development
+// instance with OIDC_DISABLED=1 nobody signs in, and the page says so.
 import { Banner } from '@astryxdesign/core/Banner'
 import { Button } from '@astryxdesign/core/Button'
-import { VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { createFileRoute } from '@tanstack/react-router'
 import { AuthFrame, AuthProblem } from '#/components/auth/AuthFrame'
-import { getSignInAvailable } from '#/data/auth'
 import { returnAfterSignIn, safeReturnTo } from '#/lib/returnTo'
 
 type LoginSearch = { return_to?: string; signed_out?: boolean; fail?: 'unavailable' }
@@ -23,8 +20,8 @@ export const Route = createFileRoute('/auth/login')({
   server: {
     handlers: {
       GET: async ({ request, next }) => {
-        const [{ mockIdentityProvider }, { recordNamedEvent }] = await Promise.all([import('#/server/policy'), import('#/server/obs')])
-        if (mockIdentityProvider() || new URL(request.url).searchParams.has('fail')) return next()
+        const [{ oidcConfigured }, { recordNamedEvent }] = await Promise.all([import('#/server/policy'), import('#/server/obs')])
+        if (!oidcConfigured() || new URL(request.url).searchParams.has('fail')) return next()
         try {
           const { beginLogin } = await import('#/server/oidc.server')
           return new Response(null, { status: 303, headers: { location: await beginLogin(request) } })
@@ -37,28 +34,22 @@ export const Route = createFileRoute('/auth/login')({
       },
     },
   },
-  loader: async () => ({ available: await getSignInAvailable() }),
   head: () => ({ meta: [{ title: 'Sign in · APIARY' }] }),
   component: Login,
 })
 
 function Login() {
   const { return_to, signed_out, fail } = Route.useSearch()
-  const { available } = Route.useLoaderData()
   const returnTo = safeReturnTo(return_to)
-  if (fail === 'unavailable' || !available) {
+  if (fail === 'unavailable') {
     return <AuthProblem heading="Sign-in is temporarily unavailable" detail="The identity provider or session store did not answer, so this sign-in could not start. Reload to retry; if it persists the Keycloak tier may be degraded." />
   }
-  const callback = (role: 'admin' | 'viewer') => `/auth/callback?code=mock&role=${role}&return_to=${encodeURIComponent(returnTo)}`
+  // Only reachable without Keycloak: a development instance (OIDC_DISABLED=1).
   return (
     <AuthFrame title="Sign in">
-      {signed_out && <Banner status="success" title="You are signed out" description="Your session here and at the identity provider has ended." />}
-      <Text color="secondary">Mock sign-in. In production this step is the Keycloak sign-in page, and the dashboard never sees a password.</Text>
-      <VStack gap={2}>
-        <Button label="Continue as Operator (admin)" variant="primary" href={callback('admin')} width="100%" />
-        <Button label="Continue as Analyst (viewer)" variant="secondary" href={callback('viewer')} width="100%" />
-      </VStack>
-      {returnTo !== '/' && <Text type="supporting" color="secondary">{`Afterwards you go back to ${returnAfterSignIn(returnTo)}.`}</Text>}
+      {signed_out && <Banner status="success" title="You are signed out" description="Your session here has ended." />}
+      <Text color="secondary">Sign-in is off on this development instance (OIDC_DISABLED=1): every request is the development operator. With Keycloak configured this step is its sign-in page, and the dashboard never sees a password.</Text>
+      <Button label="Continue" variant="primary" href={returnAfterSignIn(returnTo)} width="100%" />
     </AuthFrame>
   )
 }

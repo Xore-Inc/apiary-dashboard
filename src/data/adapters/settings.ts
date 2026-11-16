@@ -26,7 +26,7 @@ import type {
   SettingsData,
   ShellConfig,
 } from '../types'
-import type { ProblemReportInput } from '../queries.impl'
+import type { ProblemReportInput } from '../queries.contract'
 import type {
   AttackVectorsWire,
   AuditWire,
@@ -186,8 +186,7 @@ export const preferencesResetBody = (subject: string, username?: string, timezon
  * and nothing on the wire serves a document for a subject who has not
  * signed in. It is the one place in this slice where the backend's Rust
  * default is restated in TypeScript, and the values were read off the
- * function rather than taken from the mock — they differ (the mock's
- * `notifyCanary` is true and has no wire field at all).
+ * function: `notifyCanary` has no wire field at all, so it is false here.
  *
  * If the Rust default ever moves, this is the line that goes stale; the
  * adapter's own test is what catches it. */
@@ -313,9 +312,8 @@ export const configSectionPath = (section: ConfigSection): 'presentation' | 'hon
  *
  * The rules this mirrors are the Rust tier's, not Go's: it constrains the
  * enum and range fields below and leaves the rest to the page. Two bounds
- * differ from the page's own `validateSection` and the wire wins —
- * `source_stale_minutes` is 2..120 there and 1..1440 in `src/data/mock`,
- * `ml_alert_threshold` is 0.5..0.99 there and 0..1 in the mock. */
+ * are the wire's own: `source_stale_minutes` is 2..120 and
+ * `ml_alert_threshold` 0.5..0.99. */
 /** Page field → wire key, per section whose fields map one to one. */
 const CONFIG_WIRE_KEYS = {
   presentation: {
@@ -351,7 +349,7 @@ export function configSetFields(wire: ConfigWire): Partial<Record<ConfigSection,
 
 /** Page → wire body, keeping only the given page fields (a section's report
  * presets are a map of overrides and always go whole). Without `fields`
- * every field is sent, as the mock tier stores whole sections. */
+ * every field is sent: the whole section. */
 export function configSectionBody(section: ConfigSection, value: DashboardConfig[ConfigSection], fields?: readonly string[]): Record<string, unknown> {
   const body = fullConfigSectionBody(section, value)
   if (!fields || section === 'reportPresets') return body

@@ -53,7 +53,7 @@ export function GithubResult({ g }: { g: GithubAnalysis }) {
           <Text type="supporting">{formatDateTime(g.at)}</Text>
         </HStack>
         {g.status !== 'published' && <Banner status="warning" title={STATUS_BANNER[g.status].title} description={g.dailyCap ? `The cap is ${g.dailyCap} publications per day. ${STATUS_BANNER[g.status].description}` : STATUS_BANNER[g.status].description} />}
-        {queued && <Banner status="success" title={queued} description="Mock: nothing was actually submitted." isDismissable onDismiss={() => setQueued(null)} />}
+        {queued && <Banner status="success" title={queued} isDismissable onDismiss={() => setQueued(null)} />}
         <Grid columns={{ minWidth: 170, repeat: 'fit' }} gap={4}>
           <StatTile label="Detections" value={g.detections} caption={`of ${g.engines} engines`} />
           <Panel title="Risk level">

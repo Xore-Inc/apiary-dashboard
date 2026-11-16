@@ -1,6 +1,6 @@
 // The download slice on the real backend (#83): the file routes reach the
-// APIARY Rust tier through `getRaw` (src/data/api.ts) when BACKEND_URL is
-// set, and answer from the mock when it is not.
+// APIARY Rust tier through `getRaw` (src/data/api.ts). The backend's answers
+// are literal responses from a stubbed fetch.
 //
 // The regression this file exists for: a wired route rendering an EMPTY FILE
 // when the backend cannot serve it. A zero-byte export reads as "no events
@@ -9,8 +9,7 @@
 // are about bodies the endpoints really send.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { artifactFile, blackholeExport, canarytokenFile, exportFile, payloadFile, rawReport, recordingFile, reportPdf, serveDownload } from './downloads'
-import { backend } from './backend'
-import type { Backend } from './backend'
+import type { Caller } from './backend'
 import type { Builder } from './downloads'
 
 /** Serves one raw body per path prefix and records the URLs asked for. The
@@ -46,14 +45,13 @@ const config = (maxExportRows: number) => bytes(JSON.stringify({ revision: 41, p
 const CSV = 'timestamp,sensor\n2026-10-04T20:41:03Z,cowrie\n2026-10-04T20:41:04Z,cowrie\n'
 
 /** Runs one download the way a route file runs it: through `serveDownload`,
- * unguarded (`session: false`, as the file handlers are), so `getSessionUser`
- * answers the mock's admin — the trusted internal caller. */
+ * unguarded (`session: false`), as the trusted internal caller. */
 const serve = (url: string, build: Builder): Promise<Response> => serveDownload(new Request(url), build, { session: false })
 
-/** Runs one builder directly, with the caller under test — the only way a
- * role reaches these routes, since the file handlers read the session out of
- * the mock backend rather than through the guard. */
-const asUser = (build: Builder, user: Parameters<typeof backend>[1]): Promise<Response> => build(new URLSearchParams(), backend('normal', user), { mock: undefined, user })
+/** Runs one builder directly, with the caller under test. */
+const asUser = (build: Builder, user: Caller): Promise<Response> => build(new URLSearchParams(), { user })
+
+const operator = { name: 'Operator', email: 'operator@example.test', roles: ['admin'] }
 
 beforeEach(() => {
   process.env.SERVICE_TOKEN = 'test-token'
@@ -93,7 +91,7 @@ describe('the file routes reach the backend when it is configured', () => {
   it('serves a payload from payload_detail.rs::raw, as octet-stream', async () => {
     const hash = 'a'.repeat(64)
     const calls = stub({ '/api/v1/payloads/': bytes('MZ\x90\x00malware', 'application/octet-stream') })
-    const response = await serve(`http://dashboard.test/api/payload/${hash}/download`, payloadFile(hash))
+    const response = await asUser(payloadFile(hash), operator)
     expect(response.status).toBe(200)
     expect(response.headers.get('content-type')).toBe('application/octet-stream')
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
@@ -128,52 +126,6 @@ describe('the file routes reach the backend when it is configured', () => {
   })
 })
 
-describe('each route falls back to the mock unchanged', () => {
-  it('serves the mock CSV when no BACKEND_URL is configured', async () => {
-    delete process.env.BACKEND_URL
-    const response = await serve('http://dashboard.test/api/export/events.csv', exportFile('events.csv'))
-    expect(response.status).toBe(200)
-    expect(await response.text()).toContain('timestamp,sensor,persona')
-  })
-
-  it('serves the mock CSV under a ?mock= scenario, with no call at all', async () => {
-    const calls = stub({})
-    const response = await serve('http://dashboard.test/api/export/events.csv?mock=normal', exportFile('events.csv'))
-    expect(response.status).toBe(200)
-    expect(await response.text()).toContain('timestamp,sensor,persona')
-    // A scenario in force must not reach the backend even when one is
-    // configured — that is what keeps the ten mock scenarios working.
-    expect(calls).toEqual([])
-  })
-
-  it('honours the outage scenario as a 502, not a file', async () => {
-    const response = await serve('http://dashboard.test/api/export/commands.csv?mock=unavailable', exportFile('commands.csv'))
-    expect(response.status).toBe(502)
-    // The mock's own refusal, from the query the CSV is built from — not a
-    // file. `serveDownload` renders it as `<endpoint>: <kind>`.
-    expect(await response.text()).toBe('getCommands: unavailable')
-  })
-
-  it('ignores a mock scenario on a live backend without the development override', async () => {
-    delete process.env.APIARY_ALLOW_UNAUTH_DEV
-    const calls = stub({ '/api/v1/config': config(5000), '/api/v1/export/events.csv': bytes(CSV, 'text/csv') })
-    const response = await serve('http://dashboard.test/api/export/events.csv?mock=unavailable', exportFile('events.csv'))
-    expect(response.status).toBe(200)
-    expect(await response.text()).toContain('2026-10-04T20:41:03Z')
-    expect(calls.map((url) => new URL(url).searchParams.has('mock'))).toEqual([false, false])
-  })
-
-  it('serves the mock artifact bytes when the backend is not configured', async () => {
-    delete process.env.BACKEND_URL
-    const q: Backend = backend()
-    const key = (await q.getPayloads()).payloads[0].hash
-    const response = await asUser(artifactFile('ghidra', key, 'decompiled.c'), undefined)
-    expect(response.status).toBe(200)
-    // The mock's stand-in is decompiled C for that payload's Ghidra run.
-    expect(await response.text()).toContain('void main')
-  })
-})
-
 describe('a name or an id the backend does not know is an honest error', () => {
   it('404s an unknown export name without calling anything', async () => {
     const calls = stub({})
@@ -185,9 +137,8 @@ describe('a name or an id the backend does not know is an honest error', () => {
 
   it('502s an allowlisted export the backend refuses, never an empty file', async () => {
     // Every EXPORTS key is a route the backend registers (lib.rs:531-536),
-    // so a 404 there is the backend refusing. Answering from the mock's
-    // fixtures instead would hand an operator a CSV of honeypot.example.test
-    // rows and call it real.
+    // so a 404 there is the backend refusing: a 502, never an empty file
+    // an operator would read as "nothing matched".
     stub({ '/api/v1/export/events.csv': bytes('not found', 'text/plain', 404) })
     const response = await serve('http://dashboard.test/api/export/events.csv', exportFile('events.csv'))
     expect(response.status).toBe(502)
@@ -243,8 +194,6 @@ describe('the export cap: the tighter of the configured setting and the endpoint
 
 describe('the payload download stays admin-only', () => {
   const hash = '320cbb5e902f6bc9d8ea8edd7974b7829b1e4f08f477b7e3aadb240c18e9cc37'
-  const operator = { name: 'Operator', email: 'op@example.test', roles: ['admin' as const] }
-
   it('refuses a viewer before any call', async () => {
     const calls = stub({})
     const response = await asUser(payloadFile(hash), { name: 'Analyst', email: 'a@example.test', roles: ['viewer'] })
@@ -295,7 +244,7 @@ describe('the infrastructure routes', () => {
   })
 
   it('the blackhole body is handed over unchanged from ip_block.rs::export', async () => {
-    // The handler sorts and joins the same way the mock does and says so
+    // The handler sorts and joins the legacy body byte for byte and says so
     // (ip_block.rs:132), so re-deriving it here from an unsorted list is
     // exactly the way a firewall puller silently drops a rule.
     const body = '198.51.100.7\n203.0.113.4\n'
@@ -332,19 +281,18 @@ describe('the reports, canarytokens and raw reports', () => {
     expect(new URL(calls[0]).pathname).toBe('/api/v1/reports/rpt-8256dc8894/pdf')
   })
 
-  it('404s a generated report the backend does not have, rather than rendering a mock PDF', async () => {
+  it('404s a generated report the backend does not have, rather than rendering one', async () => {
     stub({ '/api/v1/reports/': bytes('no such report', 'text/plain', 404) })
     const response = await serve('http://dashboard.test/api/report/rpt-unknown/pdf', reportPdf('rpt-unknown'))
     expect(response.status).toBe(404)
     expect(await response.text()).toBe('report unavailable')
   })
 
-  it('refuses a payload report with no live endpoint instead of rendering a mock PDF', async () => {
+  it('refuses a payload report with no backend endpoint instead of rendering one', async () => {
     // `rpt-payload-<sha256>-<n>` names a report the reporter builds on
     // demand; reports.rs reads stored `pdf_base64` only. Asking for it would
     // be asking a route about a document that does not exist.
-    const q: Backend = backend()
-    const hash = (await q.getPayloads()).payloads[0].hash
+    const hash = 'a'.repeat(64)
     const calls = stub({})
     const response = await serve(`http://dashboard.test/api/report/rpt-payload-${hash}-1/pdf`, reportPdf(`rpt-payload-${hash}-1`))
     expect(response.status).toBe(502)

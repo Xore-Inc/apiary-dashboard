@@ -35,11 +35,11 @@ The dashboard reads one deployment's own captured attack traffic: real sessions,
 
 - Clean-room rewrite of the running APIARY dashboard on TanStack Start, Bun and Astryx; the running implementation is the behavioral reference, not a component source.
 - Built on Astryx, Meta's design system: its guidelines are binding (the Astryx block in `AGENTS.md`, `bunx astryx docs <topic>`). Components for everything they cover, semantic tokens for every value, color only in the theme.
-- Current stage: every page runs on a mock backend behind the real server-function, session and security layer; real data is wired per route slice later (#6).
+- Current stage: every page reads the APIARY backend through the real server-function, session and security layer; there is no mock backend (dash#324), and pages are tested against production with the live checks (`e2e/live/`).
 - Roles: Operator (admin) and Analyst (viewer); the server enforces every permission, the UI only hides what a role cannot do.
 - Reads go through Elasticsearch, never straight from sensor logs (canonical rule).
-- Public repository: mock data uses documentation IP ranges and example.test; no real deployment addresses, credentials or tokens.
-- Undecided: when the real backend is wired, and the cutover from the running dashboard (#7).
+- Public repository: test data uses documentation IP ranges and example.test; the live checks take the dashboard's URL from the environment; no real deployment addresses, credentials or tokens.
+- Undecided: the cutover from the running dashboard (#7).
 
 ## Brand Commitments
 
@@ -64,4 +64,4 @@ The dashboard reads one deployment's own captured attack traffic: real sessions,
 
 ## Accessibility & Inclusion
 
-WCAG 2.1 A/AA, enforced by the axe gate in the smoke run (`docs/baselines/accessibility.json`) on every palette's default theme; high-contrast variants of every palette are offered in Settings.
+WCAG 2.1 A/AA, enforced by the axe check of the live checks (`e2e/live/a11y.ts`, `docs/baselines/accessibility.json`) on every palette's default theme; high-contrast variants of every palette are offered in Settings.

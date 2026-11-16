@@ -4,7 +4,7 @@ Every route module of the canonical dashboard (`Xore/APIARY@62ee45d`, listed in 
 
 **63 routes**: 46 implemented, 17 replaced, 0 pending.
 
-- **implemented**: the behavior lives at the destination; backend deviations are explicit in `backend-coverage.md`
+- **implemented**: the behavior lives at the destination, answered by the live adapters (`src/data/api.ts`)
 - **replaced**: the old path redirects to its new home, or its transport is owned by the named server module
 - **pending**: not in the rewrite yet; the note says what stands in and where it is tracked
 
@@ -57,18 +57,18 @@ Every route module of the canonical dashboard (`Xore/APIARY@62ee45d`, listed in 
 | `source-health.tsx` | `/source-health` | implemented |  | navigation guard; function middleware | #77 |
 | `topology.tsx` | `/topology` | implemented |  | navigation guard; function middleware | #77 |
 | `tty-replay.$shasum.tsx` | `/tty-replay/$shasum`<br>`/recordings/$shasum` | replaced | Redirects to the recording entity page. | navigation guard; function middleware | #75 |
-| `auth/login.ts` | `/auth/login` | implemented | Keycloak authorization-code flow with PKCE; the local-only mock provider exercises the same pages. | public; PKCE state and verifier kept one-time in Redis; safe `return_to`; the mock provider is refused outside development | #5 |
+| `auth/login.ts` | `/auth/login` | implemented | Keycloak authorization-code flow with PKCE. | public; PKCE state and verifier kept one-time in Redis; safe `return_to` | #5 |
 | `auth/callback.ts` | `/auth/callback` | implemented | Exchanges the Keycloak code, consumes one-time state, creates the Redis session, and renders provider, state, and exchange failures. | public; completes the PKCE exchange against the one-time state; provider errors render as pages | #5 |
 | `auth/logout.ts` | `/auth/logout` | implemented | Destroys the Redis session, clears the cookie, and performs Keycloak RP-initiated logout; cross-site requests get 403. | same-origin `Origin`/`Referer` required (cross-origin 403, #3153); destroys the Redis session, then Keycloak end-session | #5 |
-| `api/artifact.$kind.$key.$filename.ts` | `/api/artifact/$kind/$key/$filename` | implemented | Mock files built from the run. | handler's own session check; artifact admission gate | #83 |
+| `api/artifact.$kind.$key.$filename.ts` | `/api/artifact/$kind/$key/$filename` | implemented | Proxied from the Rust tier's artifacts.rs::download. | handler's own session check; artifact admission gate | #83 |
 | `api/canarytoken.$id.download.ts` | `/api/canarytoken/$id/download` | implemented | The token file proxied off the Rust tier's own /api/v1/canarytokens/{id}/download; a 404 there is a 404 here. | handler's own session check; admission gate | #80 |
 | `api/export.$name.ts` | `/api/export/$name` | implemented | Same allowlist; full scope, capped at the export limit. | handler's own session check; name allowlist; export admission gate | #83 |
-| `api/payload.$hash.download.ts` | `/api/payload/$hash/download` | implemented | Admins only; a harmless stand-in for the live bytes. | handler's own session check, then admin role; hash validated; payload admission gate | #83 |
+| `api/payload.$hash.download.ts` | `/api/payload/$hash/download` | implemented | Admins only; the captured bytes from the Rust tier's payload_detail.rs::raw, unchanged. | handler's own session check, then admin role; hash validated; payload admission gate | #83 |
 | `api/raw-report.$kind.$sha.ts` | `/api/raw-report/$kind/$sha` | implemented |  | handler's own session check; kind allowlist; admission gate | #83 |
 | `api/recording.$shasum.$format.ts` | `/api/recording/$shasum/$format` | implemented | asciicast v2 and the raw log. | handler's own session check; shasum and format validated; admission gate | #83 |
 | `api/report.$id.pdf.ts` | `/api/report/$id/pdf` | implemented | A real PDF from the report's sections, proxied off the Rust tier's own reports::pdf. | handler's own session check; PDF admission gate | #79 |
 | `api/chart.$name.ts` | `/api/chart/$name` | implemented | The 21-name allowlist, checked before the backend is called, then proxied to the Rust tier's own /api/v1/charts/{name}; a chart it cannot answer is 502, never a wrong payload. | handler's own session check; chart allowlist | #82 |
-| `api/live.ts` | `/api/live` | implemented | Server-Sent Events proxied off the Rust tier's /api/v1/live, behind the same stream admission gate (LIVE_MAX_STREAMS) that guards the mock feed; frames are mapped into this tier's own wire shape. | handler's own session check; stream admission gate (503 when full) | #82 |
+| `api/live.ts` | `/api/live` | implemented | Server-Sent Events proxied off the Rust tier's /api/v1/live, behind a stream admission gate (LIVE_MAX_STREAMS); frames are mapped into this tier's own wire shape. | handler's own session check; stream admission gate (503 when full) | #82 |
 | `api/topology.flow.ts` | `/api/topology/flow` | implemented | The flow graph proxied off the Rust tier's /api/v1/topology, which answers the whole document; only its flow slice is served, as canonical serves it. | handler's own session check | #82 |
 | `healthz.ts` | `/healthz` | implemented | Unauthenticated, always 200: the Traefik and Docker probe. | public by design: the infrastructure probe | #83 |
 | `export.portbridge-manual-blackhole[.]txt.ts` | `/export/portbridge-manual-blackhole.txt` | implemented | The firewall puller's list, byte for byte; 5xx on outage. | `X-Export-Token` equal to `EXPORT_TOKEN` (constant-time; never read from the URL; refused when unset; `SERVICE_TOKEN` is not accepted), or a signed-in session the `getBlockedIps` policy allows; 401 without either, 403 for a refused role | #83 |

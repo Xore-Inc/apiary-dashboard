@@ -7,7 +7,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { crossOriginResponse, hasSameOriginHeader } from '#/server/origin'
 import { warnThrottled } from '#/server/faults'
 import { logoutURL } from '#/server/oidc.server'
-import { mockIdentityProvider } from '#/server/policy'
+import { oidcConfigured } from '#/server/policy'
 import { clearSessionCookie, sessions, sidFrom } from '#/server/session'
 
 export const Route = createFileRoute('/auth/logout')({
@@ -20,7 +20,7 @@ export const Route = createFileRoute('/auth/logout')({
         const sid = sidFrom(request)
         const session = await sessions.get(sid).catch(() => null)
         await sessions.destroy(sid).catch((error: unknown) => warnThrottled('[session] could not end a session:', error))
-        const location = mockIdentityProvider() ? '/auth/login?signed_out=1' : await logoutURL(request, session?.idToken).catch(() => '/auth/login?signed_out=1')
+        const location = oidcConfigured() ? await logoutURL(request, session?.idToken).catch(() => '/auth/login?signed_out=1') : '/auth/login?signed_out=1'
         return new Response(null, { status: 303, headers: { location, 'set-cookie': clearSessionCookie() } })
       },
     },

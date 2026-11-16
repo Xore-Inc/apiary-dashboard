@@ -2,7 +2,7 @@
 // topology slice at /api/v1/topology (backend-service charts.rs,
 // kill_chain.rs, fusion.rs, topology.rs), as they arrive on the wire. The
 // dashboard passes them through /api/chart/{name} and /api/topology/flow
-// unchanged; the mock backend builds the same shapes.
+// unchanged.
 
 export interface Point {
   time: string

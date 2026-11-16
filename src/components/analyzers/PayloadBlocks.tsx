@@ -44,7 +44,7 @@ export function PayloadOperatorMenu({ hash }: { hash: string }) {
   if (!isAdmin) return null
   const run = async (action: PayloadAction) => {
     try {
-      toast({ body: `${await queue.mutateAsync([hash, action])} (mock: nothing was actually queued)` })
+      toast({ body: await queue.mutateAsync([hash, action]) })
     } catch (e) {
       toast({ type: 'error', body: `Not queued: ${describeError(e)}` })
     }
@@ -58,7 +58,8 @@ export function PayloadOperatorMenu({ hash }: { hash: string }) {
         button={{ label: 'Operator actions', size: 'sm', variant: 'secondary', icon: <Icon icon={WrenchScrewdriverIcon} size="sm" /> }}
       >
         <DropdownMenuItem label="New analysis run…" description="Pick analyzers or a recipe for this sample" onClick={() => setAnalyzing(true)} />
-        <DropdownMenuItem label="Generate PDF report" description="Queued; appears under Reports when done" onClick={() => void run('pdf')} />
+        {/* No backend endpoint generates a payload's PDF yet (api.ts queuePayloadAction): shown, not offered. */}
+        <DropdownMenuItem label="Generate PDF report" description="Not available yet: the backend has no PDF generation for a sample" isDisabled />
         <DropdownMenuItem label="Publish to GitHub…" description="Public, and sent to third-party scanners" onClick={() => setConfirmPublish(true)} />
         <DropdownMenuItem label="Download sample" description="Live malware: the captured bytes, unchanged" endContent={<Icon icon={ArrowDownTrayIcon} size="sm" />} onClick={() => void window.location.assign(apiHref(`/api/payload/${encodeURIComponent(hash)}/download`))} />
       </DropdownMenu>

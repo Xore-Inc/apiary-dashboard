@@ -21,13 +21,8 @@ export const isRead = (query: string): boolean => /^(get|search|semanticSearch)/
  * bridge (dash#305) is at least as sensitive as starting one. */
 export const ADMIN_READS: ReadonlySet<string> = new Set(['getSandboxVncBridge'])
 
-/** Controls of the mock itself (src/data/scenario.ts), never backend calls:
- * the mock's incident switch works in every role so the viewer's states can
- * be designed. Gone with the mock (dash#324). */
-export const MOCK_CONTROLS: ReadonlySet<string> = new Set(['simulateIncident', 'resolveIncidents'])
-
 /** Refused to anyone but an admin: every write, and the admin-only reads. */
-export const isAdminOnly = (query: string): boolean => ADMIN_READS.has(query) || (!isRead(query) && !MOCK_CONTROLS.has(query))
+export const isAdminOnly = (query: string): boolean => ADMIN_READS.has(query) || !isRead(query)
 
 export type Decision = 'allowed' | 'sign-in' | 'admin-only'
 

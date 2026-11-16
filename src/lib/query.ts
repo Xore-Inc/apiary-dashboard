@@ -58,8 +58,7 @@ export const FRESHNESS: Record<Freshness, { staleTime: number; gcTime: number; r
   /** Detail pages, catalogs, configuration, admin, reports: minutes. An
    * operator bouncing list → detail → back finds the detail kept. */
   slow: { staleTime: 5 * MINUTE, gcTime: 30 * MINUTE, refetchOnWindowFocus: false, refetchOnReconnect: false },
-  /** Fixed for the life of the page: the mock clock, whether mock scenarios
-   * may show. */
+  /** Fixed for the life of the page: never asked again. */
   static: { staleTime: Infinity, gcTime: Infinity, refetchOnWindowFocus: false, refetchOnReconnect: false },
 }
 
@@ -190,7 +189,7 @@ export async function ensureAll<TQueries extends readonly AnyResource[]>(cache: 
 /** The shell's reads (session, preferences, configuration, the bell's
  * count): refreshed by the navigation guard and the bell's own minute, not
  * by a page's live refresh. */
-const SHELL_READS = new Set(['getSessionUser', 'getPreferences', 'getShellConfig', 'getMockClock', 'getMockScenariosAllowed', 'getOpenAlertCount'])
+const SHELL_READS = new Set(['getSessionUser', 'getPreferences', 'getShellConfig', 'getOpenAlertCount'])
 
 /** A live page's refresh (a live event, the live interval, live resuming):
  * every read the page shows is asked again in the background, the cached

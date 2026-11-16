@@ -184,7 +184,8 @@ sync and deployment operator-controlled.
 
 1. Run the repository's release gates on the exact commit to deploy:
    `bun run typecheck`, `bun run lint`, `bun run test`, `bun run build`, and
-   `bun run smoke`.
+   `bun run server-checks`; then the live checks against the version in
+   production (`docs/release-gates.md`).
 2. Create and push `vX.Y.Z`. Wait for `container.yml` to publish the matching
    image, SBOM, and provenance attestation.
 3. Verify the image before it reaches the homeserver:
@@ -309,7 +310,7 @@ HONEYPOT_DOMAIN=honeypot.example.test
 ```
 
 Production must leave `APIARY_ALLOW_UNAUTH_DEV`, `APIARY_DEV_HTTP_COOKIE`,
-`OIDC_DISABLED`, `OIDC_ALLOW_INSECURE`, and `APIARY_MOCK_FAULTS` unset.
+`OIDC_DISABLED`, and `OIDC_ALLOW_INSECURE` unset.
 
 Create the secret directory without replacing the Arcane-created project
 directory. Install only the rewrite client's secret as
@@ -481,7 +482,7 @@ ticket.
 - Overview counts and at least one list/detail pair agree with the canonical
   dashboard and the backend response.
 - Event explorer filtering, pagination, a payload/detail route, source health,
-  monitor views, and tool links use real data rather than mock fixtures.
+  monitor views, and tool links show the backend's data.
 - `/api/live` delivers events and reconnects after a deliberate browser
   refresh/network interruption.
 - One export/download returns the expected content type and non-empty body.

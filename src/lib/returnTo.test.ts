@@ -12,13 +12,9 @@ describe('safeReturnTo', () => {
 })
 
 describe('returnAfterSignIn', () => {
-  it('keeps the path, its filters and a design scenario', () => {
-    expect(returnAfterSignIn('/alerts?range=7d&mock=large')).toBe('/alerts?range=7d&mock=large')
-  })
-
-  it('drops the scenarios a session replaces', () => {
-    expect(returnAfterSignIn('/events?mock=expired&sensor=cowrie')).toBe('/events?sensor=cowrie')
-    expect(returnAfterSignIn('/events?mock=viewer')).toBe('/events')
+  it('keeps the path and its filters', () => {
+    expect(returnAfterSignIn('/alerts?range=7d&sensor=cowrie')).toBe('/alerts?range=7d&sensor=cowrie')
+    expect(returnAfterSignIn('/events#row-3')).toBe('/events#row-3')
   })
 
   it('stays on the dashboard', () => {

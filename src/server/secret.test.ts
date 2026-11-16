@@ -15,7 +15,7 @@ const file = (content: string) => {
   return path
 }
 const req = (headers: Record<string, string>) => new Request('http://dashboard.example.test/x', { headers })
-const oidc = { OIDC_ISSUER_URL: 'https://kc.example.test/realms/apiary' }
+const oidc = { BACKEND_URL: 'http://backend.example.test:8080', OIDC_ISSUER_URL: 'https://kc.example.test/realms/apiary' }
 
 describe('readSecret', () => {
   it('reads the inline form', () => {

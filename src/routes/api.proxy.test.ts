@@ -3,21 +3,19 @@
 //
 // What this file exists to hold, in the order the issue states it:
 //
-// - the routes REACH the backend when BACKEND_URL is set and no `?mock=`
-//   rides along, and fall back to the mock otherwise, unchanged;
+// - the routes REACH the backend, with its token as a header;
 // - the chart allowlist is checked BEFORE the backend is called, and every
 //   one of its 21 names is a route the Rust tier actually registers — an
 //   allowlisted-but-unavailable chart is 502, never a wrong chart;
-// - the admission gate covers the REAL stream, not only the mock one, and
-//   still counts its sheds;
+// - the admission gate covers the stream, and counts its sheds;
 // - the session checks are the ones that were already there.
 //
 // Every endpoint asserted here was read out of the APIARY source, not
 // inferred: the chart paths from the `#[utoipa::path]` attributes in
 // backend-service charts.rs / kill_chain.rs / fusion.rs, `/api/v1/live` from
-// live.rs:129, and `/api/v1/topology` from topology.rs:698. The mock
-// fixtures below are built in the wire shapes those handlers declare.
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+// live.rs:129, and `/api/v1/topology` from topology.rs:698. The fixtures
+// below are built in the wire shapes those handlers declare.
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Route as ChartRoute } from '#/routes/api.chart.$name'
 import { Route as LiveRoute } from '#/routes/api.live'
 import { Route as FlowRoute } from '#/routes/api.topology.flow'
@@ -119,8 +117,8 @@ describe('/api/chart/$name — the allowlist is the contract', () => {
     // payload, renders as real data that was never there.
     //
     // Every refusal collapses to 502, including a 503 and a 422: canonical's
-    // chart proxy folds `serviceJSON`'s null over any failure into one 502,
-    // and the mock arm answers 502 for a chart it cannot build. This route
+    // chart proxy folds `serviceJSON`'s null over any failure into one 502.
+    // This route
     // exists to serve one named chart, so there is one rendering for "the
     // tier will not give it to us" — not a status per upstream fault.
     for (const status of [404, 422, 500, 502, 503]) {
@@ -131,7 +129,7 @@ describe('/api/chart/$name — the allowlist is the contract', () => {
     }
   })
 
-  it('502s on a socket failure too, rather than serving the mock as a stand-in', async () => {
+  it('502s on a socket failure too, rather than serving a stand-in', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => {
@@ -145,8 +143,7 @@ describe('/api/chart/$name — the allowlist is the contract', () => {
   it('forwards the query string, because attacker-fusion is the one chart that takes one', async () => {
     // fusion.rs:21 `FusionQuery { id: String }` — the only chart handler
     // with a query extractor. Its id is an attacker identity, so dropping it
-    // would 404 every fusion chart (the mock's own contract says the same:
-    // without ?id= there is no payload).
+    // would 404 every fusion chart: without ?id= there is no payload.
     const fusion = { categories: ['HASSH'], values: [3], ips: ['203.0.113.42'] }
     const calls = backend({ '/api/v1/charts/attacker-fusion': json(fusion) })
     const response = await get({ request: asUser('/api/chart/attacker-fusion?id=attr-9f2c'), params: { name: 'attacker-fusion' } })
@@ -155,56 +152,10 @@ describe('/api/chart/$name — the allowlist is the contract', () => {
     expect(calls[0]).toBe('http://backend.test/api/v1/charts/attacker-fusion?id=attr-9f2c')
   })
 
-  it('502s attacker-fusion with no id, as the tier does — and as the mock does today', async () => {
+  it('502s attacker-fusion with no id, as the tier does', async () => {
     backend({ '/api/v1/charts/attacker-fusion': fails(422) })
     const response = await get({ request: asUser('/api/chart/attacker-fusion'), params: { name: 'attacker-fusion' } })
     expect(response.status).toBe(502)
-  })
-
-  it('keeps the mock when the link names a scenario, even with a backend configured', async () => {
-    // The ten scenarios and the browser checks depend on this: ?mock= wins
-    // over BACKEND_URL, exactly as the server-function funnel decides.
-    const calls = backend({})
-    const response = await get({ request: asUser('/api/chart/os-distribution?mock=normal'), params: { name: 'os-distribution' } })
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual(expect.arrayContaining([expect.objectContaining({ name: expect.any(String) })]))
-    expect(calls).toEqual([])
-  })
-
-  it('keeps the mock for an outage scenario, which the backend would answer instead', async () => {
-    backend({})
-    const response = await get({ request: asUser('/api/chart/os-distribution?mock=unavailable'), params: { name: 'os-distribution' } })
-    expect(response.status).toBe(502)
-  })
-
-  it('ignores a mock scenario on a live backend without the development override', async () => {
-    delete process.env.APIARY_ALLOW_UNAUTH_DEV
-    const calls = backend({ '/api/v1/charts/os-distribution': json([{ name: 'Live', value: 7 }]) })
-    const response = await get({ request: asUser('/api/chart/os-distribution?mock=unavailable'), params: { name: 'os-distribution' } })
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual([{ name: 'Live', value: 7 }])
-    expect(calls).toEqual(['http://backend.test/api/v1/charts/os-distribution'])
-  })
-
-  it('falls back to the mock when no backend is configured at all', async () => {
-    delete process.env.BACKEND_URL
-    const calls = backend({})
-    const response = await get({ request: asUser('/api/chart/os-distribution'), params: { name: 'os-distribution' } })
-    expect(response.status).toBe(200)
-    expect(calls).toEqual([])
-  })
-
-  it('treats an unrecognised ?mock= as no scenario, exactly as the funnel does', async () => {
-    // `?mock=` only means anything when it names one of the ten
-    // (`isScenario`). A value outside them is not a request to bypass the
-    // mock, so the backend answers it — the same rule the server-function
-    // funnel applies (src/data/backend.ts `runForRequest`, which sends
-    // anything that is not a scenario upstream). One rule decides the tier
-    // for a given URL, whichever way it is reached.
-    const calls = backend({ '/api/v1/charts/os-distribution': json([]) })
-    const response = await get({ request: asUser('/api/chart/os-distribution?mock=nonsense'), params: { name: 'os-distribution' } })
-    expect(response.status).toBe(200)
-    expect(calls).toEqual(['http://backend.test/api/v1/charts/os-distribution?mock=nonsense'])
   })
 
   it('refuses a caller with no session, before the backend is reached', async () => {
@@ -214,17 +165,14 @@ describe('/api/chart/$name — the allowlist is the contract', () => {
     expect(calls).toEqual([])
   })
 
-  it('serves a viewer: these charts are not admin-only, on either tier', async () => {
-    // Canonical's chart route has no role check — session only. A viewer
-    // scenario downgrades the mock user, and the live path must not be a
-    // way around that or into a stricter tier than canonical's.
+  it('serves a viewer: these charts are not admin-only', async () => {
+    // Canonical's chart route has no role check — session only, and this
+    // route is no stricter.
     const v = await sessions.create({ ...viewer, sub: 'viewer' })
     const calls = backend({ '/api/v1/charts/os-distribution': json([{ name: 'Linux', value: 1 }]) })
     const response = await get({ request: asUser('/api/chart/os-distribution', v), params: { name: 'os-distribution' } })
     expect(response.status).toBe(200)
     expect(calls).toHaveLength(1)
-    const mocked = await get({ request: asUser('/api/chart/os-distribution?mock=viewer', v), params: { name: 'os-distribution' } })
-    expect(mocked.status).toBe(200)
   })
 
   it('every allowlisted name is a route the Rust tier registers', () => {
@@ -273,36 +221,6 @@ describe('/api/topology/flow — one slice of the tier\'s document', () => {
     }
   })
 
-  it('keeps the mock when a scenario is named, and when no backend is configured', async () => {
-    const calls = backend({})
-    const scoped = await get({ request: asUser('/api/topology/flow?mock=normal') })
-    expect(scoped.status).toBe(200)
-    expect(calls).toEqual([])
-    delete process.env.BACKEND_URL
-    expect((await get({ request: asUser('/api/topology/flow') })).status).toBe(200)
-    expect(calls).toEqual([])
-  })
-
-  it('ignores a mock scenario on a live backend without the development override', async () => {
-    delete process.env.APIARY_ALLOW_UNAUTH_DEV
-    const flow = { nodes: [{ name: 'Live', layer: 0 }], links: [] }
-    const calls = backend({ '/api/v1/topology': json({ flow }) })
-    const response = await get({ request: asUser('/api/topology/flow?mock=unavailable') })
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual(flow)
-    expect(calls).toEqual(['http://backend.test/api/v1/topology'])
-  })
-
-  it('treats an unrecognised ?mock= as no scenario, exactly as the funnel does', async () => {
-    // As on the chart route: only one of the ten names a scenario, so a
-    // value outside them is an ordinary unscoped request and the backend
-    // answers it. One rule decides the tier, for every route.
-    const calls = backend({ '/api/v1/topology': json({ flow: { nodes: [], links: [] } }) })
-    const response = await get({ request: asUser('/api/topology/flow?mock=nonsense') })
-    expect(response.status).toBe(200)
-    expect(calls).toEqual(['http://backend.test/api/v1/topology'])
-  })
-
   it('refuses a caller with no session, before the backend is reached', async () => {
     const calls = backend({ '/api/v1/topology': json({ flow: { nodes: [], links: [] } }) })
     const response = await get({ request: asUser('/api/topology/flow', '') })
@@ -313,13 +231,6 @@ describe('/api/topology/flow — one slice of the tier\'s document', () => {
 
 describe('/api/live — the gate covers the real stream', () => {
   const get = handler(LiveRoute)
-  // The mock arm loads its feed on first use (src/routes/api.live.ts). That
-  // one-time load is CPU work, and the gate reads the event-loop lag it
-  // causes, so load it here rather than inside a test that measures the gate.
-  beforeAll(async () => {
-    await import('#/data/mock/liveFeed')
-  })
-
   /** One upstream SSE connection, ending when `close` resolves. */
   const upstream = (frames: string[], close?: () => void) => () =>
     new Response(
@@ -454,60 +365,6 @@ describe('/api/live — the gate covers the real stream', () => {
     const response = await get({ request: asUser('/api/live', '') })
     expect(response.status).toBe(401)
     expect(calls).toEqual([])
-  })
-
-  it('keeps the mock feed when a scenario is named, even with a backend configured', async () => {
-    const calls = backend({})
-    const response = await get({ request: asUser('/api/live?mock=normal') })
-    expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toBe('text/event-stream')
-    expect(calls).toEqual([])
-    await response.body?.cancel()
-  })
-
-  it('ignores a mock scenario on a live backend without the development override', async () => {
-    delete process.env.APIARY_ALLOW_UNAUTH_DEV
-    const calls = backend({ '/api/v1/live': upstream([': live\n\n']) })
-    const response = await get({ request: asUser('/api/live?mock=unavailable') })
-    expect(response.status).toBe(200)
-    expect(await read(response)).toBe(': live\n\n')
-    expect(calls).toEqual(['http://backend.test/api/v1/live'])
-  })
-
-  it('falls back to the mock when the link names no scenario and no backend is configured', async () => {
-    delete process.env.BACKEND_URL
-    const calls = backend({})
-    const response = await get({ request: asUser('/api/live') })
-    expect(response.status).toBe(200)
-    expect(response.headers.get('content-type')).toBe('text/event-stream')
-    expect(calls).toEqual([])
-    await response.body?.cancel()
-  })
-
-  it('treats an unrecognised ?mock= as no scenario, exactly as the funnel does', async () => {
-    // `?mock=` names a scenario only when it is one of the ten, so
-    // `?mock=nonsense` is an ordinary unscoped request and the Rust tier's
-    // stream answers it — the same rule (src/data/backend.ts
-    // `runForRequest`) the server-function funnel applies. The mock is
-    // bypassed by a value that is NOT a scenario, which is why the ten
-    // are the whole contract here.
-    const calls = backend({ '/api/v1/live': upstream([]) })
-    const response = await get({ request: asUser('/api/live?mock=nonsense') })
-    expect(response.status).toBe(200)
-    expect(calls).toEqual(['http://backend.test/api/v1/live'])
-    await response.body?.cancel()
-  })
-
-  it('answers the outage scenarios with their statuses, on either tier', async () => {
-    backend({})
-    for (const [scenario, status] of [
-      ['unavailable', 502],
-      ['overloaded', 503],
-      ['expired', 401],
-    ] as const) {
-      const response = await get({ request: asUser(`/api/live?mock=${scenario}`) })
-      expect({ scenario, status: response.status }).toEqual({ scenario, status })
-    }
   })
 
   it('reassembles a frame the upstream split across chunks', async () => {

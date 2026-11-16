@@ -386,7 +386,7 @@ export function SandboxResult({ run, section }: { run: SandboxRun; section: Sand
           </EntityLink>
           <Text type="supporting">{`detonated ${formatDateTime(run.at)} · ${run.route.name} · ${run.durationSeconds} s`}</Text>
         </HStack>
-        {queued && <Banner status="success" title={queued} description="Mock: nothing was actually queued." isDismissable onDismiss={() => setQueued(null)} />}
+        {queued && <Banner status="success" title={queued} isDismissable onDismiss={() => setQueued(null)} />}
         {shown === 'verdict' && <Verdict run={run} />}
         {shown === 'behavior' && <Behavior run={run} />}
         {shown === 'network' && <Network run={run} />}
