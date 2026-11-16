@@ -77,9 +77,16 @@ check(findings.length === 0, 'every kind of page paints, then replaces its skele
 
 {
   const page = await context.newPage()
+  // Its HTTP 404 is crawl.ts's fixed answer; here, what the browser shows.
   await page.goto(`${base}/sources/10.0.0.1`, { waitUntil: 'load', timeout: 90_000 })
-  await page.waitForTimeout(2000)
-  check(await page.getByText('Nothing to show').first().isVisible().catch(() => false), 'a missing source shows the not-found page')
+  const shown = await page
+    .getByText('Nothing to show')
+    .locator('visible=true')
+    .first()
+    .waitFor({ timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false)
+  check(shown, 'a missing source shows the not-found page')
   await page.close()
 }
 await done(browser)
