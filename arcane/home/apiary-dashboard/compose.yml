@@ -22,7 +22,7 @@ services:
   # memory-only, nothing persisted, reachable only on the internal network.
   oidc-sessions:
     <<: *runtime-defaults
-    image: valkey/valkey:9.1.2-alpine3.24@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    image: valkey/valkey:9.1.3-alpine3.24@sha256:bf09d58e96d6b4524a15396b65b242bbe18beebbcc15a04d8ee75ddac62fae0b
     container_name: hp-apiary-dashboard-oidc-sessions
     restart: unless-stopped
     command:
