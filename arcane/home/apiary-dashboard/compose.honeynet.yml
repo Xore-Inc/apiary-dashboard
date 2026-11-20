@@ -1,6 +1,17 @@
 # Co-located transition only: attach the standalone dashboard to APIARY's
 # existing host-local bridge while the backend still uses Docker DNS there.
 # Use with: docker compose -f compose.yml -f compose.honeynet.yml up -d
+#
+# On the APIARY homeserver the session store is not the Valkey in compose.yml
+# but APIARY's Swarm stack `dashboard-sessions` (Xore-Inc/APIARY#3596, phase 9
+# leg C). The dashboard keeps OIDC_SESSION_REDIS_URL=redis://oidc-sessions:6379/0
+# and stays on its own bridges only: `oidc-sessions-relay` answers as
+# `oidc-sessions` on the private oidc-session network and forwards to the
+# stack's Valkey on the overlay `dashboard-sessions_store`. Only the relay
+# joins the overlay, so the dashboard never depends on the Swarm being up when
+# it starts. If dockerd starts the relay before the overlay exists, APIARY's
+# apiary-overlay-attach service starts it afterwards. The session client
+# reconnects by name, so the dashboard waits through that without a restart.
 services:
   dashboard:
     environment:
@@ -9,7 +20,53 @@ services:
       - /opt/stacks/apiary/logs/dashboard-bff:/logs/dashboard-bff
     networks:
       - honeynet
+    depends_on:
+      # The Compose Valkey below is the rollback only (profile legacy); the
+      # dashboard does not wait for it, or for the relay.
+      oidc-sessions:
+        condition: service_healthy
+        required: false
+
+  # Rollback only: kept stopped. Start it with `docker start
+  # hp-apiary-dashboard-oidc-sessions` after stopping the relay; never run
+  # both, since both answer as `oidc-sessions`.
+  oidc-sessions:
+    profiles: [legacy]
+
+  oidc-sessions-relay:
+    image: alpine/socat:latest@sha256:71131702f671a88b3808a70b7330f9679cd9b9933adcafadc191508edfe55bba
+    container_name: hp-apiary-dashboard-oidc-sessions-relay
+    restart: unless-stopped
+    # The stack's Valkey uses endpoint_mode dnsrr (no VIP, so no IPVS idle
+    # cutoff on the pooled connection); socat resolves the name per
+    # connection, so a new task is found on the next reconnect.
+    command: ['TCP4-LISTEN:6379,fork,reuseaddr', 'TCP4:dashboard-sessions_valkey:6379,connect-timeout=5']
+    networks:
+      oidc-session:
+        aliases: [oidc-sessions]
+      sessions-store: {}
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      # busybox nc in this image has no -z; socat probes its own listener.
+      test: ['CMD', 'socat', '-u', '/dev/null', 'TCP4:127.0.0.1:6379,connect-timeout=2']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    labels:
+      - autoheal=true
+    deploy:
+      resources:
+        limits: { cpus: '0.25', memory: 32M }
+
 networks:
   honeynet:
     name: honeynet
+    external: true
+  # APIARY's swarm/stacks/dashboard-sessions overlay (attachable, internal,
+  # encrypted). Only the relay joins it.
+  sessions-store:
+    name: dashboard-sessions_store
     external: true
