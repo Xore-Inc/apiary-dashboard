@@ -161,7 +161,13 @@ host's container log collector to ship those lines. For the existing
 homeserver transition, set both backend URLs to the Docker service names and
 include `compose.honeynet.yml`; that override joins the local `honeynet` and
 keeps the existing `rewrite.jsonl` file sink. It requires that network and log
-directory to exist on the same Docker host. The cross-host auth, mounted
+directory to exist on the same Docker host. On that host the override also
+swaps the session store: the `oidc-sessions` Valkey in `compose.yml` becomes a
+stopped rollback (profile `legacy`), and `oidc-sessions-relay` answers as
+`oidc-sessions` on the private session network and forwards to APIARY's
+Swarm stack `dashboard-sessions` (overlay `dashboard-sessions_store`, which
+must exist; [APIARY #3596](https://github.com/Xore-Inc/APIARY/issues/3596)).
+The dashboard keeps its session URL and never joins the overlay. The cross-host auth, mounted
 write, SSE, download, and rollback smoke in [APIARY #3579](https://github.com/Xore-Inc/APIARY/issues/3579)
 is still the deployment acceptance gate.
 
