@@ -18,6 +18,7 @@ const reading = ({ cowrie = 'fresh', ingest = 'fresh' }: { cowrie?: FeedState; i
   pipeline: { state: 'running', acked: 1, failed: 0, dropped: 0, active: 1, decodeFailures: 0 },
   deadLetters: 0,
   unattributed24h: 0,
+  modbusPdus: 0,
 })
 
 describe('operational conditions', () => {

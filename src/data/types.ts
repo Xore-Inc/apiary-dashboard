@@ -577,6 +577,9 @@ export interface SensorFeed extends Record<string, unknown> {
   state: FeedState
   documents: number
   lastSeen: string
+  /** Zeek's per-PDU Modbus documents from this sensor, NOT in `documents`
+   * (#3908). Only on the sensors that write that log. */
+  modbusPdus?: number
 }
 
 export interface SourceHealth {
@@ -591,6 +594,9 @@ export interface SourceHealth {
   /** Events in the last 24 h that arrived over the WireGuard tunnel with no
    * recoverable client address: in every total, attributed to no source. */
   unattributed24h: number
+  /** Zeek's per-PDU Modbus documents, left out of every other figure here
+   * (#3908); 0 when none or unknown. */
+  modbusPdus: number
 }
 
 export interface TopologySensor extends Record<string, unknown> {

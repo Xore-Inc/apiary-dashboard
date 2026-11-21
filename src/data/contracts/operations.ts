@@ -265,11 +265,14 @@ export interface DeliveryHealthWire {
  *   bare HTTP status string (e.g. "503 Service Unavailable"), or
  *   "healthy".
  * - `dead_letters` is the all-time count, `ingest.recent_dead_letters`
- *   the last-24h one. */
+ *   the last-24h one.
+ * - `modbus_pdus` (#3908) counts Zeek's per-PDU Modbus log, which every
+ *   other figure leaves out; the zeek rows carry their own share. Absent
+ *   on a backend older than that change. */
 export interface SourceHealthWire {
   cluster_status: string
   total_documents: number
-  sensors: Array<{ sensor: string; documents: number; last_seen: string; state: string }>
+  sensors: Array<{ sensor: string; documents: number; last_seen: string; state: string; modbus_pdus?: number }>
   yara: { enabled: boolean; last_scan: string; rules_sha256: string; samples: number; matched: number; errors: number }
   runtime: { uptime_seconds: number; rss_bytes: number; vm_bytes: number }
   ingest: { state: string; last_ingest: string; age_seconds: number; recent_dead_letters: number }
@@ -277,6 +280,7 @@ export interface SourceHealthWire {
   pipeline: { state: string; acked: number; failed: number; dropped: number; active: number; decode_failures: number }
   webhook: DeliveryHealthWire
   unattributed_24h: number
+  modbus_pdus?: number
 }
 
 // ---- Fleet topology --------------------------------------------------------

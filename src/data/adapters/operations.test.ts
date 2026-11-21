@@ -254,6 +254,19 @@ describe('operations adapters', () => {
       expect(page).not.toHaveProperty('dead_letters')
     })
 
+    it('carries the separately counted Modbus PDUs (#3908), and none from an older backend', () => {
+      const wire: SourceHealthWire = {
+        ...health,
+        modbus_pdus: 218_332_307,
+        sensors: [...health.sensors, { sensor: 'zeek', documents: 64_066_788, last_seen: '2026-10-04T21:02:00Z', state: 'ACTIVE', modbus_pdus: 178_222_049 }],
+      }
+      const page = sourceHealth(wire)
+      expect(page.modbusPdus).toBe(218_332_307)
+      expect(page.feeds.find((feed) => feed.sensor === 'zeek')?.modbusPdus).toBe(178_222_049)
+      expect(page.feeds.find((feed) => feed.sensor === 'cowrie')).not.toHaveProperty('modbusPdus')
+      expect(sourceHealth(health).modbusPdus).toBe(0)
+    })
+
     it('falls back on cluster status and reads pipeline verdicts, including unreachable ES', () => {
       expect(sourceHealth({ ...health, cluster_status: 'unreachable' }).clusterStatus).toBe('yellow')
       expect(sourceHealth({ ...health, cluster_status: 'red' }).clusterStatus).toBe('red')

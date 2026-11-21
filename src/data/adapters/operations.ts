@@ -113,7 +113,7 @@ export const sensorCatalog = (wire: SensorCatalogWire): SensorSummary[] => wire.
  * documented one and silent is never inferred from a quiet sensor. */
 export const sensorState = (state: string): FeedState => (state === 'ACTIVE' ? 'fresh' : state === 'QUIET' ? 'delayed' : state === 'STALE' ? 'stale' : 'silent')
 
-export const sensorFeeds = (wire: Pick<SourceHealthWire, 'sensors'>): SensorFeed[] => wire.sensors.map((s) => ({ sensor: s.sensor, state: sensorState(s.state), documents: s.documents, lastSeen: s.last_seen }))
+export const sensorFeeds = (wire: Pick<SourceHealthWire, 'sensors'>): SensorFeed[] => wire.sensors.map((s) => ({ sensor: s.sensor, state: sensorState(s.state), documents: s.documents, lastSeen: s.last_seen, ...(s.modbus_pdus === undefined ? {} : { modbusPdus: s.modbus_pdus }) }))
 
 /** The backend's pipeline verdict — "disabled" / "unreachable" / a bare HTTP
  * status string / "healthy" — onto the page's running / degraded / stopped.
@@ -143,6 +143,7 @@ export function sourceHealth(wire: SourceHealthWire): SourceHealth {
     pipeline: { state: pipelineState(pipeline.state), acked: pipeline.acked, failed: pipeline.failed, dropped: pipeline.dropped, active: pipeline.active, decodeFailures: pipeline.decode_failures },
     deadLetters: wire.ingest.recent_dead_letters,
     unattributed24h: wire.unattributed_24h,
+    modbusPdus: wire.modbus_pdus ?? 0,
   }
 }
 
