@@ -82,7 +82,7 @@ function SourceHealthPage() {
           <StatTile
             label="Indexed documents"
             value={health?.indexedDocuments}
-            caption={health && health.modbusPdus > 0 ? `plus ${formatNumber(health.modbusPdus)} Modbus PDUs` : ''}
+            caption={health && health.modbusPdus > 0 ? `plus ${formatNumber(health.modbusPdus)} Modbus detail records` : ''}
             href="/history"
           />
           <Panel title="Filebeat">
@@ -112,8 +112,8 @@ function SourceHealthPage() {
         {health && health.modbusPdus > 0 && (
           <Banner
             status="info"
-            title={`${formatNumber(health.modbusPdus)} Modbus PDUs are counted separately`}
-            description={`Zeek logs every Modbus request and response from the ICS decoy's pollers. They are searchable and shown on the Zeek and ICS views, but left out of these totals and the fleet-wide counts, where they were most of all events. ${health.feeds
+            title={`${formatNumber(health.modbusPdus)} Modbus detail records are counted separately`}
+            description={`Zeek's per-PDU Modbus log (modbus_detailed) is searchable and shown on the Zeek and ICS views, but left out of these totals and the fleet-wide counts, where it was most of all events. Almost all of these records are repeated copies of a few unanswered requests: until the 2026-11-21 sensor fix, the Zeek Modbus package logged every pending request again on each connection close. The copies age out with the 42-day Zeek retention. ${health.feeds
               .filter((feed) => feed.modbusPdus)
               .map((feed) => `${feed.sensor}: ${formatNumber(feed.modbusPdus ?? 0)}`)
               .join(', ')}.`}
