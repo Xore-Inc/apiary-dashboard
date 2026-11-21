@@ -75,7 +75,6 @@ import {
   membersGroup,
   networkCampaign,
   networkCampaigns,
-  profileMember,
   sharedSignals,
   sessionSummaries,
   sessionBuckets,
@@ -1309,7 +1308,7 @@ const getNetwork: Backend['getNetwork'] = async (cidr) => {
 /** GET /api/v1/investigate/identity/{id} (the attackers-v1 document), then
  * the group of its first 50 addresses: GET /api/v1/events?ips= for their
  * newest events, and each address's profile, from GET /api/v1/sources (the
- * top 1000) or GET /api/v1/investigate/ip/{ip} for one that list does not
+ * top 1000) or GET /api/v1/sources?ips= for the ones that list does not
  * hold. An address with no events in the 10-day window has no profile and is
  * not listed as a member; the identity's own `ips` still names it. A 404 on
  * the document is "no such identity", the page's null. */
@@ -1324,22 +1323,29 @@ const getIdentity: Backend['getIdentity'] = async (id) => {
   return { identity, group: membersGroup(members, rows, events.total), shared: sharedSignals(rows) }
 }
 
-/** Each address's profile, from GET /api/v1/sources (the top 1000) or
- * GET /api/v1/investigate/ip/{ip} for one that list does not hold. An
- * address with no events in the 10-day window has no profile and is left
- * out. */
+/** The most addresses one `GET /api/v1/sources?ips=` names (backend
+ * aggregates.rs `SOURCES_IPS_MAX`; more is a 400). */
+const SOURCES_IPS_MAX = 50
+
+/** Each address's profile, from GET /api/v1/sources (the top 1000) or, for
+ * the addresses that list does not hold, from GET /api/v1/sources?ips= (up to
+ * 50 per call, one search each; APIARY#3909). It used to ask
+ * GET /api/v1/investigate/ip/{ip} once per address, about seven Elasticsearch
+ * searches each, up to 50 a page. An address with no events in the 10-day
+ * window has no row and is left out. Members come back in the order given. */
 async function memberProfiles(endpoint: string, ips: string[]): Promise<SourceProfile[]> {
   const sources = await get<SourcesPageWire>(endpoint, '/api/v1/sources', { offset: 0, size: 1000 })
-  const listed = new Map(sourceProfiles(listOf(endpoint, sources)).map((row) => [row.ip, row]))
-  const members = await Promise.all(
-    ips.map(async (ip) => {
-      const row = listed.get(ip)
-      if (row) return row
-      const profile = await get<IpProfileWire>(endpoint, `/api/v1/investigate/ip/${encodeURIComponent(ip)}`)
-      return profile ? profileMember(profile) : null
-    }),
-  )
-  return members.filter((row): row is SourceProfile => row !== null)
+  const profiles = new Map(sourceProfiles(listOf(endpoint, sources)).map((row) => [row.ip, row]))
+  const missing = [...new Set(ips)].filter((ip) => !profiles.has(ip))
+  const chunks = Array.from({ length: Math.ceil(missing.length / SOURCES_IPS_MAX) }, (_, i) => missing.slice(i * SOURCES_IPS_MAX, (i + 1) * SOURCES_IPS_MAX))
+  const answers = await Promise.all(chunks.map((chunk) => get<SourcesPageWire>(endpoint, '/api/v1/sources', { ips: chunk.join(',') })))
+  // Only the addresses asked for: a backend that predates `ips=` would answer
+  // with its top list, and none of that belongs to this page's members.
+  const wanted = new Set(missing)
+  for (const answer of answers) {
+    for (const row of sourceProfiles(listOf(endpoint, answer))) if (wanted.has(row.ip)) profiles.set(row.ip, row)
+  }
+  return ips.flatMap((ip) => profiles.get(ip) ?? [])
 }
 
 /** GET /api/v1/investigate/asn/{id} (APIARY#3557) — the AS aggregated over

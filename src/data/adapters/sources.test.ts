@@ -92,10 +92,15 @@ const shared: CorrelationWire = {
 }
 
 describe('sources adapters', () => {
-  it('maps GET /sources, dropping the org the wire row has no field for', () => {
+  it('maps GET /sources, reading the org as empty where the listing row has none', () => {
     expect(sourceProfiles({ total_unique: 2, truncated: false, rows: [sourceRow] })).toEqual([
       { ip: '203.0.113.42', country: 'NL', org: '', events: 812, logins: 96, sessions: 31, sensors: ['cowrie', 'suricata', 'dionaea'], first: '2026-09-25T04:11:00Z', last: '2026-10-04T21:02:00Z' },
     ])
+  })
+
+  it('carries the org of a GET /sources?ips= row (APIARY#3909)', () => {
+    const [named, unknown] = sourceProfiles({ total_unique: 2, truncated: false, rows: [{ ...sourceRow, org: 'Example Net' }, { ...sourceRow, ip: '203.0.113.43', org: '' }] })
+    expect([named.org, unknown.org]).toEqual(['Example Net', ''])
   })
 
   it('maps the map_points slice, dropping city and the drill-down url', () => {

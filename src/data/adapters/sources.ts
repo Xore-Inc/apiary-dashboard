@@ -60,14 +60,15 @@ const scanOf = (scan: string | undefined): 'horizontal' | 'vertical' | undefined
 // ---- GET /api/v1/sources ----------------------------------------------------
 
 /** GET /api/v1/sources — one row per address. The page's `SourceProfile`
- * wants an `org`; this wire row has no organization field at all (a terms
- * aggregation over `source.ip` never asks for one), so it reads as "".
+ * wants an `org`; the listing's wire row has none (its terms aggregation
+ * never asks for one), so it reads as "". A request that names addresses
+ * (`ips=`, APIARY#3909) gets the organization back, and it is carried.
  * `truncated` and `total_unique` have no page field. */
 export const sourceProfiles = (wire: SourcesPageWire): SourceProfile[] =>
   wire.rows.map((row) => ({
     ip: row.ip,
     country: row.country,
-    org: '',
+    org: row.org ?? '',
     events: row.events,
     logins: row.logins,
     sessions: row.sessions,
@@ -484,21 +485,6 @@ export const sourceCounts = (events: HoneypotEvent[]): CountRow[] => {
  * thousands of addresses; the first 50 are read and the page's header states
  * the identity's own total (`AttackerEntity.ips.length`). */
 export const MEMBER_LIMIT = 50
-
-/** One ip profile (GET /api/v1/investigate/ip/{ip}) as a group member: the
- * same row `sourceProfiles` builds from /sources, for an address the source
- * list's top 1000 does not hold. `asn` on this wire is the organization name. */
-export const profileMember = (wire: IpProfileWire): SourceProfile => ({
-  ip: wire.ip,
-  country: wire.country,
-  org: wire.asn,
-  events: wire.total,
-  logins: 0,
-  sessions: wire.sessions.reduce((sum, row) => sum + row.count, 0),
-  sensors: wire.sensors.map((row) => row.key),
-  first: wire.first,
-  last: wire.last,
-})
 
 /** The identity's `SourceGroup`: the members are given (profiled per
  * address), and every other field is folded from the events read for those

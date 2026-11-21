@@ -11,7 +11,7 @@ import fixtures from './__fixtures__/entity-reads.json'
 import groups from './__fixtures__/entity-groups.json'
 
 type Failure = { status: number }
-type Route = unknown | Failure
+type Route = unknown | Failure | ((url: URL) => unknown)
 
 /** Serves one body per path (longest prefix wins), and records each URL. */
 function stub(routes: Record<string, Route>) {
@@ -24,7 +24,7 @@ function stub(routes: Record<string, Route>) {
       const path = new URL(url).pathname
       const match = prefixes.find(([prefix]) => path.startsWith(prefix))
       if (!match) throw new TypeError(`no fixture for ${path}`)
-      const value = match[1]
+      const value = typeof match[1] === 'function' ? (match[1] as (url: URL) => unknown)(new URL(url)) : match[1]
       if (typeof value === 'object' && value !== null && 'status' in value && Object.keys(value).length === 1) {
         return new Response('boom', { status: (value as Failure).status })
       }
@@ -35,6 +35,15 @@ function stub(routes: Record<string, Route>) {
 }
 
 const params = (url: string) => Object.fromEntries(new URL(url).searchParams)
+/** The backend's /sources: the listing, or, when `ips=` names addresses, a row (with `org`) for each of
+ * `known` that was asked for. `seen` records every `ips` value. */
+const sourcesRoute = (listing: unknown, known: string[] = [], seen: string[] = []) => (url: URL) => {
+  const asked = url.searchParams.get('ips')
+  if (asked === null) return listing
+  seen.push(asked)
+  const rows = asked.split(',').filter((ip) => known.includes(ip)).map((ip) => ({ ip, country: 'NL', events: 7, logins: 0, sessions: 2, sensors: ['cowrie', 'zeek'], first: '2026-10-01T00:00:00Z', last: '2026-10-09T00:00:00Z', org: `Net of ${ip}` }))
+  return { total_unique: rows.length, truncated: false, rows }
+}
 /** The live query, typed as the seam function it stands in for. */
 const live = <TQuery extends keyof Backend>(name: TQuery): Backend[TQuery] => liveQuery(name, undefined) as Backend[TQuery]
 /** The same, by name from a table: its arguments are checked by the table. */
@@ -227,6 +236,20 @@ describe('the single-entity reads', () => {
     expect(asn!.group).toMatchObject({ totalMatches: 512, first: '2026-09-01T00:00:00Z', last: '2026-10-01T00:00:00Z' })
   })
 
+  it('profiles an AS\'s members the top 1000 lacks through `ips=`', async () => {
+    const seen: string[] = []
+    const calls = stub({
+      '/api/v1/investigate/asn/': { asn: 64496, organization: 'Example Net', provider: 'hosting', events: 512, sources_total: 3, first: '2026-09-01T00:00:00Z', last: '2026-10-01T00:00:00Z', sources: [{ key: '203.0.113.4', count: 500 }, { key: '198.51.100.7', count: 8 }, { key: '198.51.100.8', count: 4 }] },
+      '/api/v1/events': fixtures.eventsIp,
+      '/api/v1/sources': sourcesRoute(fixtures.sources, ['198.51.100.7', '198.51.100.8'], seen),
+    })
+    const asn = await live('getAsn')('64496')
+    expect(seen).toEqual(['198.51.100.7,198.51.100.8'])
+    expect(calls.filter((url) => new URL(url).pathname.startsWith('/api/v1/investigate/ip/'))).toEqual([])
+    expect(asn!.group.members.map((m) => m.ip)).toEqual(['203.0.113.4', '198.51.100.7', '198.51.100.8'])
+    expect(asn!.group.members[1]).toMatchObject({ org: 'Net of 198.51.100.7', events: 7 })
+  })
+
   it('answers null for an AS with no events, and for an id that is not an AS number, without calling the backend for the latter', async () => {
     const calls = stub({ '/api/v1/investigate/asn/': { status: 404 } })
     expect(await live('getAsn')('AS64511')).toBeNull()
@@ -245,32 +268,55 @@ describe('the identity and campaign pages', () => {
   const sources = { total_unique: 1, truncated: false, rows: [{ ip: listed, country: 'NL', events: 12, logins: 0, sessions: 0, sensors: ['zeek'], first: '2026-10-01T00:00:00Z', last: '2026-10-09T00:00:00Z' }] }
 
   it('builds an identity from its document, its events and a profile for every member', async () => {
+    const seen: string[] = []
     const calls = stub({
       '/api/v1/investigate/identity/': groups.identity,
       '/api/v1/events': groups.events,
-      '/api/v1/sources': sources,
-      '/api/v1/investigate/ip/': fixtures.ipProfile,
+      '/api/v1/sources': sourcesRoute(sources, unlisted, seen),
     })
     const entity = await live('getIdentity')(groups.identity.id)
     const paths = calls.map((url) => new URL(url).pathname)
     expect(paths[0]).toBe(`/api/v1/investigate/identity/${groups.identity.id}`)
     expect(params(calls.find((url) => url.includes('/events?'))!)).toEqual({ offset: '0', size: '100', ips: groups.memberIps.join(','), since: '365d' })
-    expect(paths.filter((path) => path.startsWith('/api/v1/investigate/ip/'))).toHaveLength(unlisted.length)
+    // APIARY#3909: the members the top 1000 does not hold are one `ips=` call, never one investigate/ip each.
+    expect(paths.filter((path) => path.startsWith('/api/v1/investigate/ip/'))).toEqual([])
+    expect(seen).toEqual([unlisted.join(',')])
     expect(entity!.identity).toMatchObject({ id: groups.identity.id, ips: groups.memberIps })
-    expect(entity!.group.members).toHaveLength(groups.memberIps.length)
-    expect(entity!.group.members[0]).toMatchObject({ ip: listed, country: 'NL', events: 12 })
+    expect(entity!.group.members.map((m) => m.ip)).toEqual(groups.memberIps)
+    expect(entity!.group.members[0]).toMatchObject({ ip: listed, country: 'NL', events: 12, org: '' })
+    expect(entity!.group.members[1]).toEqual({ ip: unlisted[0], country: 'NL', org: `Net of ${unlisted[0]}`, events: 7, logins: 0, sessions: 2, sensors: ['cowrie', 'zeek'], first: '2026-10-01T00:00:00Z', last: '2026-10-09T00:00:00Z' })
     expect(entity!.group.totalMatches).toBe(groups.events.total)
     expect(entity!.group.events).toHaveLength(groups.events.rows.length)
     expect(entity!.group.tunnelConnections).toBe(0)
   })
 
-  it('reads at most 50 members of a wider identity and drops a member the backend has no profile for', async () => {
+  it('makes no `ips=` call when the top 1000 holds every member', async () => {
+    const seen: string[] = []
+    const all = { ...sources, rows: groups.memberIps.map((ip) => ({ ...sources.rows[0], ip })) }
+    const calls = stub({ '/api/v1/investigate/identity/': groups.identity, '/api/v1/events': groups.events, '/api/v1/sources': sourcesRoute(all, [], seen) })
+    const entity = await live('getIdentity')(groups.identity.id)
+    expect(seen).toEqual([])
+    expect(calls.filter((url) => new URL(url).pathname === '/api/v1/sources')).toHaveLength(1)
+    expect(entity!.group.members).toHaveLength(groups.memberIps.length)
+  })
+
+  it('reads at most 50 members of a wider identity in one `ips=` call and drops a member the backend has no row for', async () => {
     const wide = { ...groups.identity, ips: Array.from({ length: 80 }, (_, i) => `198.51.100.${i + 1}`) }
-    const calls = stub({ '/api/v1/investigate/identity/': wide, '/api/v1/events': groups.events, '/api/v1/sources': sources, '/api/v1/investigate/ip/': { status: 404 } })
+    const seen: string[] = []
+    // The backend knows 10 of the 50 addresses asked for (and one past them).
+    const known = [...wide.ips.slice(0, 10), wide.ips[60]]
+    const calls = stub({ '/api/v1/investigate/identity/': wide, '/api/v1/events': groups.events, '/api/v1/sources': sourcesRoute(sources, known, seen) })
     const entity = await live('getIdentity')(groups.identity.id)
     expect(params(calls.find((url) => url.includes('/events?'))!).ips.split(',')).toHaveLength(50)
+    expect(seen).toHaveLength(1)
+    expect(seen[0].split(',')).toEqual(wide.ips.slice(0, 50))
     expect(entity!.identity.ips).toHaveLength(80)
-    expect(entity!.group.members).toEqual([])
+    expect(entity!.group.members.map((m) => m.ip)).toEqual(wide.ips.slice(0, 10))
+  })
+
+  it('answers an identity none of whose members has events with no members', async () => {
+    stub({ '/api/v1/investigate/identity/': groups.identity, '/api/v1/events': groups.events, '/api/v1/sources': sourcesRoute({ ...sources, rows: [] }) })
+    expect((await live('getIdentity')(groups.identity.id))!.group.members).toEqual([])
   })
 
   it('answers null for an unknown identity, and throws when the events read fails', async () => {
@@ -365,6 +411,25 @@ describe('the IOC and entity reads (APIARY#3572)', () => {
     expect(ioc!.group.members.map((m) => m.ip)).toEqual(['203.0.113.4'])
     expect(ioc!.sessions).toEqual([expect.objectContaining({ id: 'ca4616fbf9f0', events: 3 })])
     expect(ioc!.payloads).toEqual([{ id: 'd41d8cd98f00b204e9800998ecf8427e', label: 'd41d8cd98f00b204e9800998ecf8427e', count: 2 }])
+  })
+
+  it('profiles an indicator\'s sources that the top 1000 lacks with one `ips=` call per 50, not one call each', async () => {
+    const ips = Array.from({ length: 120 }, (_, i) => `198.51.100.${i + 1}`)
+    const seen: string[] = []
+    const calls = stub({
+      '/api/v1/ioc/': { ...iocDetail, sources: ips.map((key) => ({ key, count: 1 })) },
+      '/api/v1/sources': sourcesRoute(fixtures.sources, ips, seen),
+    })
+    const ioc = await live('getIoc')('command', 'uname -a')
+    expect(seen.map((value) => value.split(',').length)).toEqual([50, 50, 20])
+    expect(calls.filter((url) => new URL(url).pathname.startsWith('/api/v1/investigate/ip/'))).toEqual([])
+    expect(ioc!.group.members.map((m) => m.ip)).toEqual(ips)
+    expect(ioc!.group.members[119]).toMatchObject({ org: 'Net of 198.51.100.120' })
+  })
+
+  it('keeps only the addresses it asked for when the backend ignores `ips=` and answers its top list', async () => {
+    stub({ '/api/v1/ioc/': { ...iocDetail, sources: [{ key: '198.51.100.9', count: 1 }] }, '/api/v1/sources': fixtures.sources })
+    expect((await live('getIoc')('command', 'uname -a'))!.group.members).toEqual([])
   })
 
   it('answers null for an indicator not seen, and for a kind the backend has no such thing as, without asking', async () => {
