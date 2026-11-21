@@ -79,7 +79,12 @@ function SourceHealthPage() {
       <VStack gap={6}>
         <Grid columns={{ minWidth: 200, repeat: 'fit' }} gap={4}>
           <StatTile label="Configured feeds" value={health?.feeds.length} caption={unhealthy === undefined ? '' : unhealthy ? `${unhealthy} not fresh` : 'all fresh'} />
-          <StatTile label="Indexed documents" value={health?.indexedDocuments} href="/history" />
+          <StatTile
+            label="Indexed documents"
+            value={health?.indexedDocuments}
+            caption={health && health.modbusPdus > 0 ? `plus ${formatNumber(health.modbusPdus)} Modbus PDUs` : ''}
+            href="/history"
+          />
           <Panel title="Filebeat">
             <HStack gap={2} vAlign="center">
               <Pending>
@@ -100,6 +105,18 @@ function SourceHealthPage() {
             status="info"
             title={`${formatNumber(health.unattributed24h)} ${health.unattributed24h === 1 ? 'event' : 'events'} in the last 24 hours with no source address`}
             description="They arrived over the WireGuard tunnel with no recoverable client address, so they count in every total above but belong to no source IP: the tunnel peer is our own VPS, not an attacker. The per-sensor counts below will not add up to the totals. Sensors reached over UDP, or on ports without a PROXY-protocol rule, have no way back to the real address."
+          />
+        )}
+
+        {/* #3908: the per-PDU Modbus log is counted apart from every figure above. */}
+        {health && health.modbusPdus > 0 && (
+          <Banner
+            status="info"
+            title={`${formatNumber(health.modbusPdus)} Modbus PDUs are counted separately`}
+            description={`Zeek logs every Modbus request and response from the ICS decoy's pollers. They are searchable and shown on the Zeek and ICS views, but left out of these totals and the fleet-wide counts, where they were most of all events. ${health.feeds
+              .filter((feed) => feed.modbusPdus)
+              .map((feed) => `${feed.sensor}: ${formatNumber(feed.modbusPdus ?? 0)}`)
+              .join(', ')}.`}
           />
         )}
 
