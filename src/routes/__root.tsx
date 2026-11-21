@@ -13,6 +13,7 @@ import type { Preferences } from '#/data/types'
 import { browserTimeZone, rememberBrowserZone } from '#/lib/browserZone'
 import { configureTime } from '#/lib/format'
 import { refreshWhenSettled } from '#/lib/refreshWhenSettled'
+import { whenIdle } from '#/lib/idle'
 import { usePreferences } from '#/lib/prefs'
 import type { RootPreferences } from '#/lib/prefs'
 
@@ -87,8 +88,8 @@ function useTimePreferences(prefs: RootPreferences | undefined) {
     // page has hydrated with the zone the server used.
     // Only the root's loader resolves the zone: the page's own reads stay
     // as the server and the cache have them.
-    const idle = requestIdleCallback(() => refreshWhenSettled(router, { filter: (match) => match.routeId === '__root__' }), { timeout: 2000 })
-    return () => cancelIdleCallback(idle)
+    const idle = whenIdle(() => refreshWhenSettled(router, { filter: (match) => match.routeId === '__root__' }))
+    return idle.cancel
   }, [rendered, router])
   if (!prefs) return
   configureTime({ timeZone: prefs.timezone, hour12: prefs.clock === 'h12', relative: prefs.timestamps === 'relative' })
