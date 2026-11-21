@@ -59,11 +59,13 @@ export interface AttackerPageWire {
  * no identity has that id. */
 export type IdentityDocWire = AttackerEntityWire
 
-// ---- GET /api/v1/sources?offset&size ----------------------------------------
+// ---- GET /api/v1/sources?offset&size, GET /api/v1/sources?ips ---------------
 
 /** One row of GET /api/v1/sources (aggregates.rs `SourceRow`). This is the
  * only row in the slice the backend builds itself: a terms aggregation over
- * `source.ip` with per-bucket sub-aggregations, not a stored document. */
+ * `source.ip` with per-bucket sub-aggregations, not a stored document.
+ * `org` (the AS organization, "" when unknown) is only there when the request
+ * named addresses with `ips` (APIARY#3909); the listing carries none. */
 export interface SourceRowWire {
   ip: string
   country: string
@@ -73,12 +75,17 @@ export interface SourceRowWire {
   sensors: string[]
   first: string
   last: string
+  org?: string
 }
 
 /** GET /api/v1/sources?offset&size. `total_unique` counts the whole 10-day
  * window while `rows` is the requested slice; `truncated` is true when the
  * terms aggregation hit its 1000-bucket ceiling, so `total_unique` counts
- * addresses no row shows. */
+ * addresses no row shows.
+ *
+ * With `ips=a,b,...` (at most 50, APIARY#3909) `rows` holds exactly the named
+ * addresses that have events in the window, `offset` and `size` are ignored,
+ * and the backend answers live rather than from its top-1000 snapshot. */
 export interface SourcesPageWire {
   total_unique: number
   truncated: boolean
