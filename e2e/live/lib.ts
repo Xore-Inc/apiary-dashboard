@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { chromium } from 'playwright-core'
+import { chromium, webkit } from 'playwright-core'
 import type { Browser, BrowserContext, BrowserContextOptions, Page } from 'playwright-core'
 
 export const EXIT = { pass: 0, fail: 1, skipped: 2, session: 3 } as const
@@ -49,6 +49,18 @@ export async function launch(): Promise<Browser> {
     return await chromium.launch({ executablePath, args: ['--no-sandbox'] })
   } catch (error) {
     console.log(`SKIP no browser (set CHROME_PATH): ${error instanceof Error ? error.message.split('\n')[0] : error}`)
+    process.exit(EXIT.skipped)
+  }
+}
+
+/** WebKit, the engine of Safari and of every browser on iOS. Playwright's own
+ * build (`bunx playwright-core install webkit`; on Linux it also needs the
+ * system libraries `playwright-core install-deps` names). */
+export async function launchWebkit(): Promise<Browser> {
+  try {
+    return await webkit.launch()
+  } catch (error) {
+    console.log(`SKIP no WebKit (bunx playwright-core install webkit): ${error instanceof Error ? error.message.split('\n').find((l) => l.trim()) : error}`)
     process.exit(EXIT.skipped)
   }
 }

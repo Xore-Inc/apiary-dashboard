@@ -11,6 +11,7 @@
 // canonical dashboard.
 import { useEffect } from 'react'
 import { useRouter, useRouterState } from '@tanstack/react-router'
+import { whenIdle } from '#/lib/idle'
 
 /** Where operators go next: sidebar neighbours and the investigation flow
  * (overview → events → sources; campaigns and clusters ↔ attackers). */
@@ -61,11 +62,10 @@ export function usePredictivePrefetch() {
         /* a missed prediction costs nothing */
       })
     }
-    const idle = typeof requestIdleCallback === 'function' ? requestIdleCallback(run, { timeout: 2000 }) : window.setTimeout(run, 350)
+    const idle = whenIdle(run)
     return () => {
       cancelled = true
-      if (typeof cancelIdleCallback === 'function') cancelIdleCallback(idle)
-      else clearTimeout(idle)
+      idle.cancel()
     }
   }, [router, pathname])
 }
