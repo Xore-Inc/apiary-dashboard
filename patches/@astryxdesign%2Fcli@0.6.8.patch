@@ -1,8 +1,8 @@
 diff --git a/api/theme/build/build.mjs b/api/theme/build/build.mjs
-index a060bf3d2bbe6270099104bbae7eb2d6f778d453..eecdf50ceda51f89bb3e9625fc0f7870b3ece91c 100644
+index 13573fe8bc9a5469fa967dc5cbf112976191e80a..e51ac9ceb80d35fc55cff69901d41cbd509e796c 100644
 --- a/api/theme/build/build.mjs
 +++ b/api/theme/build/build.mjs
-@@ -306,6 +306,17 @@ function toPascalCase(name) {
+@@ -561,6 +561,17 @@ function toPascalCase(name) {
      .join('');
  }
  
@@ -20,7 +20,7 @@ index a060bf3d2bbe6270099104bbae7eb2d6f778d453..eecdf50ceda51f89bb3e9625fc0f7870
  /** @type {Promise<Record<string, Record<string, string[]>>> | null} */
  let _knownValuesIndexPromise = null;
  
-@@ -324,7 +335,9 @@ async function loadKnownValuesIndex() {
+@@ -579,7 +590,9 @@ async function loadKnownValuesIndex() {
    const docs = [];
    /** @param {string} dir */
    async function scan(dir) {
@@ -31,7 +31,7 @@ index a060bf3d2bbe6270099104bbae7eb2d6f778d453..eecdf50ceda51f89bb3e9625fc0f7870
        const full = path.join(dir, entry.name);
        if (entry.isDirectory()) {
          if (entry.name !== 'node_modules' && entry.name !== '__tests__') {
-@@ -374,17 +387,29 @@ async function loadKnownValuesIndex() {
+@@ -629,17 +642,29 @@ async function loadKnownValuesIndex() {
      return result;
    };
  
@@ -65,7 +65,7 @@ index a060bf3d2bbe6270099104bbae7eb2d6f778d453..eecdf50ceda51f89bb3e9625fc0f7870
        }
      }
    }
-@@ -544,8 +569,7 @@ async function resolveAugmentationTargetCandidates(componentName) {
+@@ -799,8 +824,7 @@ async function resolveAugmentationTargetCandidates(componentName) {
  
    /** @param {string} dir */
    async function scan(dir) {
