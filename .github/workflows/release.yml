@@ -23,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: ${{ env.BUN_VERSION }}
       - run: bun install --frozen-lockfile
@@ -37,7 +37,7 @@ jobs:
           name="apiary-dashboard-${GITHUB_REF_NAME}"
           tar -czf "$name.tar.gz" dist server.ts src/server/policy.ts src/server/actorAssertion.ts src/server/secret.ts package.json bun.lock
           sha256sum "$name.tar.gz" > "$name.tar.gz.sha256"
-      - uses: actions/attest-build-provenance@v4
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: apiary-dashboard-*.tar.gz
       - name: Publish the release
