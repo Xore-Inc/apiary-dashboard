@@ -197,7 +197,7 @@ Effective access for every generated HTTP route and every server query. “Viewe
 
 The two canonical catch-all BFF routes are intentionally absent: browser-selected upstream paths were removed. `src/data/api.ts` owns fixed server-side backend calls and sends the service token. Static assets are served by `server.ts` and contain no protected data.
 
-## Server queries (109)
+## Server queries (111)
 
 Every TanStack server function first passes the same-origin middleware in `src/start.ts`. State-changing calls also require `x-csrf-token`; the role decision below is then enforced by `liveQuery` in `src/data/api.ts` before the backend is called. `e2e/live/authorization.ts` proves this table on the running dashboard.
 
@@ -223,6 +223,7 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `getArtifactFile` | 401 | allow | allow |
 | `getArtifacts` | 401 | allow | allow |
 | `getAsn` | 401 | allow | allow |
+| `getAttackVectors` | 401 | allow | allow |
 | `getAttackers` | 401 | allow | allow |
 | `getAuthEvents` | 401 | allow | allow |
 | `getBlockedIps` | 401 | allow | allow |
@@ -239,6 +240,7 @@ Every TanStack server function first passes the same-origin middleware in `src/s
 | `getEventDetail` | 401 | allow | allow |
 | `getEvents` | 401 | allow | allow |
 | `getFacets` | 401 | allow | allow |
+| `getFilterValues` | 401 | allow | allow |
 | `getGhidraAnalysis` | 401 | allow | allow |
 | `getGithubAnalyses` | 401 | allow | allow |
 | `getGithubAnalysis` | 401 | allow | allow |

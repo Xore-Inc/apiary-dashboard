@@ -13,16 +13,23 @@ describe('freshness by data class', () => {
   it('live views are asked again on every visit', () => {
     for (const read of [resources.alertsQuery, resources.eventsQuery, resources.sourceHealthQuery]) expect(classOf(read)).toBe('live')
   })
+  it('the filter vocabulary is not part of the live event list', () => {
+    expect(classOf(resources.filterValuesQuery)).toBe('slow')
+    expect(resources.filterValuesQuery().queryKey).toEqual(['getFilterValues'])
+  })
   it('lists and aggregates are reused for 30 s', () => {
-    for (const read of [resources.sourceProfilesQuery, resources.networkCampaignsQuery, resources.attackersQuery, resources.overviewQuery, resources.payloadsQuery, resources.openAlertCountQuery]) expect(classOf(read)).toBe('normal')
+    for (const read of [resources.sourceProfilesQuery, resources.networkCampaignsQuery, resources.attackersQuery, resources.overviewQuery, resources.overviewViewsQuery, resources.attackVectorsQuery, resources.payloadsQuery, resources.openAlertCountQuery]) expect(classOf(read)).toBe('normal')
     expect(FRESHNESS.normal.staleTime).toBe(30_000)
   })
   it('detail pages, catalogs, configuration and reports are reused for minutes', () => {
-    for (const read of [resources.ipProfileQuery, resources.asnQuery, resources.campaignQuery, resources.clusterQuery, resources.payloadAnalysisQuery, resources.ghidraAnalysisQuery, resources.sensorCatalogQuery, resources.settingsQuery, resources.reportsQuery, resources.shellConfigQuery, resources.relatedQuery]) expect(classOf(read)).toBe('slow')
+    for (const read of [resources.ipProfileQuery, resources.asnQuery, resources.campaignQuery, resources.clusterQuery, resources.payloadAnalysisQuery, resources.ghidraAnalysisQuery, resources.sensorCatalogQuery, resources.settingsQuery, resources.reportsQuery, resources.shellConfigQuery, resources.relatedQuery, resources.filterValuesQuery]) expect(classOf(read)).toBe('slow')
   })
   it('keys are the server function and its arguments, so pages share an entity', () => {
     expect(resources.ipProfileQuery('192.0.2.1').queryKey).toEqual(['getIpProfile', '192.0.2.1'])
     expect(resources.relatedQuery('asn', 'AS4134').queryKey).toEqual(['getRelated', 'asn', 'AS4134'])
+    // One sensor per read: each sensor of the overview's attack-vectors panel is its own entry.
+    expect(resources.attackVectorsQuery('').queryKey).toEqual(['getAttackVectors', ''])
+    expect(resources.attackVectorsQuery('cowrie').queryKey).toEqual(['getAttackVectors', 'cowrie'])
   })
 })
 

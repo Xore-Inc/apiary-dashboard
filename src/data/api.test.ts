@@ -116,6 +116,7 @@ describe('which queries the real backend answers', () => {
         'getCommands',
         'getEventDetail',
         'getEvents',
+        'getFilterValues',
         'getRecordings',
         'getReplayDetail',
         'getSessionDetail',
@@ -225,6 +226,7 @@ describe('which queries the real backend answers', () => {
         'getLlmAnalyses',
         'getAnomaly',
         'getMlAnomalies',
+        'getAttackVectors',
         'getOverview',
         'getOverviewViews',
         'semanticSearch',
@@ -338,7 +340,7 @@ describe('the responses it maps', () => {
   it('maps the explorer page, filling only what the row cannot carry', async () => {
     stub({ '/api/v1/events': page, '/api/v1/filter-values': values })
     const out = await live('getEvents')({})
-    expect(out).toMatchObject({ total: 1, values: { sensors: ['cowrie'], countries: ['NL'], ports: [22] } })
+    expect(out).toMatchObject({ total: 1 })
     expect(out.rows[0]).toMatchObject({ id: 'ev_9f2c1a', srcIp: '203.0.113.42', dstPort: 22, command: 'uname -a' })
     // The gap fields the seam fills. The row carries no severity, source
     // port or city, so those are absent: never a placeholder.
@@ -347,6 +349,14 @@ describe('the responses it maps', () => {
     expect(out.rows[0].srcPort).toBeUndefined()
     expect(out.rows[0].city).toBeUndefined()
     expect(out.rows[0].organization).toBeUndefined()
+  })
+
+  it('reads the filter vocabularies on their own, not with every page of events', async () => {
+    const calls = stub({ '/api/v1/events': page, '/api/v1/filter-values': values })
+    await live('getEvents')({})
+    expect(calls.map((url) => new URL(url).pathname)).toEqual(['/api/v1/events'])
+    expect(await live('getFilterValues')()).toEqual({ sensors: ['cowrie'], countries: ['NL'], protos: expect.any(Array), ports: [22] })
+    expect(calls.map((url) => new URL(url).pathname)).toEqual(['/api/v1/events', '/api/v1/filter-values'])
   })
 
   it('maps ics_severity to severity, and leaves severity absent on every other row', async () => {
@@ -480,7 +490,8 @@ describe('the responses it maps', () => {
 describe('a degraded body degrades, and a failed call errors', () => {
   it('maps an empty-but-valid envelope to an empty list, which is what it means', async () => {
     stub({ '/api/v1/events': { total: 0, offset: 0, rows: [], fingerprint_ips: null }, '/api/v1/filter-values': { sensors: [], countries: [], cities: [], protos: [], ports: [], kinds: [] } })
-    expect(await live('getEvents')({})).toMatchObject({ total: 0, rows: [], values: { sensors: [], ports: [] } })
+    expect(await live('getEvents')({})).toMatchObject({ total: 0, rows: [] })
+    expect(await live('getFilterValues')()).toEqual({ sensors: [], countries: [], protos: [], ports: [] })
     stub({ '/api/v1/sessions/': { ...sessionWire, events: [], sensors: [], commands: [], credentials: [], payloads: [] } })
     expect((await live('getSessionDetail')('sess-77a1'))!.events).toEqual([])
     stub({ '/api/v1/recordings': { total: 0, rows: [] } })
@@ -2476,9 +2487,8 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     const calls = stub(monitorFixtures())
     const views = await live('getOverviewViews')()
     const paths = calls.map((url) => new URL(url).pathname)
-    // The recorded catalog's sensors last reported weeks ago, so no
-    // attack-vectors read is made for them.
-    expect(paths.filter((p) => !p.startsWith('/api/v1/charts/')).sort()).toEqual(['/api/v1/campaigns', '/api/v1/overview/dashboard', '/api/v1/payloads', '/api/v1/sensors/catalog'])
+    // Neither the sensor catalog nor an attack-vectors read: the vectors are `getAttackVectors`.
+    expect(paths.filter((p) => !p.startsWith('/api/v1/charts/')).sort()).toEqual(['/api/v1/campaigns', '/api/v1/overview/dashboard', '/api/v1/payloads'])
     // Sixteen chart routes, each read through the same chart proxy path.
     expect(paths.filter((p) => p.startsWith('/api/v1/charts/'))).toHaveLength(16)
     expect(views.protocols).toEqual([{ id: 'ssh', label: 'ssh', count: 412 }])
@@ -2501,27 +2511,65 @@ describe('the Monitor slice reads the endpoints the Rust tier actually serves', 
     expect(views.mlBacklog).toEqual([])
   })
 
-  it('reads attack vectors for every sensor that reported in the last 24 h, skipping the two the endpoint refuses', async () => {
+  it('does not read attack vectors with the deep-dive views, and makes no per-sensor call there', async () => {
     const recent = new Date(Date.now() - 3_600_000).toISOString()
-    const calls = stub(monitorFixtures({
-      '/api/v1/sensors/catalog': { window: 'now-14d', sensors: [
+    const calls = stub(monitorFixtures({ '/api/v1/sensors/catalog': { window: 'now-14d', sensors: [{ sensor: 'cowrie', events: 900, last_seen: recent }, { sensor: 'hellpot', events: 12, last_seen: recent }] } }))
+    const views = await live('getOverviewViews')()
+    expect(calls.map((url) => new URL(url).pathname)).not.toContain('/api/v1/attack-vectors')
+    expect(views).not.toHaveProperty('vectors')
+  })
+
+  describe('getAttackVectors', () => {
+    const recent = new Date(Date.now() - 3_600_000).toISOString()
+    const earlier = new Date(Date.now() - 2 * 3_600_000).toISOString()
+    const catalog = {
+      window: 'now-14d',
+      sensors: [
+        { sensor: 'hellpot', events: 12, last_seen: earlier },
         { sensor: 'cowrie', events: 900, last_seen: recent },
         { sensor: 'suricata', events: 9000, last_seen: recent },
         { sensor: 'portbridge', events: 9000, last_seen: recent },
         { sensor: 'conpot', events: 4, last_seen: '2026-09-30T19:25:19.534Z' },
-        { sensor: 'hellpot', events: 12, last_seen: recent },
-      ] },
-      '/api/v1/attack-vectors': { sensor: 'cowrie', ports: [{ key: '2223', count: 172464, link: '/events?sensor=cowrie&port=2223' }], protocols: [{ key: 'tcp', count: 196432, link: '/events?sensor=cowrie&proto=tcp' }] },
-    }))
-    const views = await live('getOverviewViews')()
-    const asked = calls.filter((url) => new URL(url).pathname === '/api/v1/attack-vectors').map((url) => new URL(url).searchParams.get('sensor')).sort()
-    expect(asked).toEqual(['cowrie', 'hellpot'])
-    expect(views.vectors?.cowrie).toEqual({ ports: [{ id: '2223', label: '2223', count: 172464 }], protocols: [{ id: 'tcp', label: 'tcp', count: 196432 }] })
-  })
+        { sensor: 'idle', events: 0, last_seen: recent },
+      ],
+    }
+    const vectors = (sensor: string) => ({ sensor, ports: [{ key: '2223', count: 172464, link: `/events?sensor=${sensor}&port=2223` }], protocols: [{ key: 'tcp', count: 196432, link: `/events?sensor=${sensor}&proto=tcp` }] })
+    const asked = (calls: string[]) => calls.filter((url) => new URL(url).pathname === '/api/v1/attack-vectors').map((url) => new URL(url).searchParams.get('sensor'))
 
-  it('leaves the attack vectors unavailable when the sensor catalog has no answer', async () => {
-    stub(monitorFixtures({ '/api/v1/sensors/catalog': fail(404) }))
-    expect((await live('getOverviewViews')()).vectors).toBeNull()
+    it('reads the newest sensor, with the catalog, in one aggregation', async () => {
+      const calls = stub(monitorFixtures({ '/api/v1/sensors/catalog': catalog, '/api/v1/attack-vectors': vectors('cowrie') }))
+      const out = await live('getAttackVectors')('')
+      // Only sensors that reported in the last 24 h and have events, newest first; the two the endpoint refuses are not offered.
+      expect(out).toEqual({ sensors: ['cowrie', 'hellpot'], sensor: 'cowrie', vectors: { ports: [{ id: '2223', label: '2223', count: 172464 }], protocols: [{ id: 'tcp', label: 'tcp', count: 196432 }] } })
+      expect(asked(calls)).toEqual(['cowrie'])
+    })
+
+    it('reads the sensor asked for when the catalog names it', async () => {
+      const calls = stub(monitorFixtures({ '/api/v1/sensors/catalog': catalog, '/api/v1/attack-vectors': vectors('hellpot') }))
+      expect((await live('getAttackVectors')('hellpot'))?.sensor).toBe('hellpot')
+      expect(asked(calls)).toEqual(['hellpot'])
+    })
+
+    it('never sends a sensor the catalog does not offer to the endpoint', async () => {
+      for (const wrong of ['suricata', 'conpot', 'nope', '../x', 'a&sensor=b']) {
+        const calls = stub(monitorFixtures({ '/api/v1/sensors/catalog': catalog, '/api/v1/attack-vectors': vectors('cowrie') }))
+        expect((await live('getAttackVectors')(wrong))?.sensor).toBe('cowrie')
+        expect(asked(calls)).toEqual(['cowrie'])
+      }
+    })
+
+    it('names no sensor and reads nothing when none reported in the last 24 h', async () => {
+      const calls = stub(monitorFixtures({ '/api/v1/sensors/catalog': { window: 'now-14d', sensors: [{ sensor: 'conpot', events: 4, last_seen: '2026-09-30T19:25:19.534Z' }] } }))
+      expect(await live('getAttackVectors')('')).toEqual({ sensors: [], sensor: null, vectors: null })
+      expect(asked(calls)).toEqual([])
+    })
+
+    it('is unavailable when the sensor catalog has no answer, and keeps the sensors when the sensor read has none', async () => {
+      stub(monitorFixtures({ '/api/v1/sensors/catalog': fail(404) }))
+      expect(await live('getAttackVectors')('')).toBeNull()
+      stub(monitorFixtures({ '/api/v1/sensors/catalog': catalog, '/api/v1/attack-vectors': fail(404) }))
+      expect(await live('getAttackVectors')('')).toEqual({ sensors: ['cowrie', 'hellpot'], sensor: 'cowrie', vectors: null })
+    })
   })
 
   it('reads the protocol-conformance violations from the anomaly-trend chart', async () => {

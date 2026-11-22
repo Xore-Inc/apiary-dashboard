@@ -50,6 +50,8 @@ import {
   getOpenAlertCount,
   getOverview,
   getOverviewViews,
+  getAttackVectors,
+  getFilterValues,
   getPayloadAnalysis,
   getPayloadDelivery,
   getPayloads,
@@ -90,6 +92,10 @@ export const sessionUserQuery = resource('getSessionUser', getSessionUser, 'norm
 export const preferencesQuery = resource('getPreferences', getPreferences, 'normal')
 /** Presentation, map tiles, feature switches: deployment configuration. */
 export const shellConfigQuery = resource('getShellConfig', getShellConfig, 'slow')
+/** What the event filters offer (sensors, countries, protocols, ports): a
+ * vocabulary that moves over days, so it is not asked again with every
+ * visit to the live event list. */
+export const filterValuesQuery = resource('getFilterValues', getFilterValues, 'slow')
 
 // ---- live: asked again on every visit, and on focus/reconnect ----------
 
@@ -106,6 +112,10 @@ export const sandboxLiveStatusQuery = resource('getSandboxLiveStatus', getSandbo
 export const openAlertCountQuery = resource('getOpenAlertCount', getOpenAlertCount, 'normal')
 export const overviewQuery = resource('getOverview', getOverview, 'normal')
 export const overviewViewsQuery = resource('getOverviewViews', getOverviewViews, 'normal')
+/** The overview's attack-vectors panel: one sensor per read, so opening the
+ * page asks for one aggregation and a sensor switch for another. An empty
+ * sensor is the newest one. */
+export const attackVectorsQuery = resource('getAttackVectors', getAttackVectors, 'normal')
 export const sourceProfilesQuery = resource('getSourceProfiles', getSourceProfiles, 'normal')
 export const networkCampaignsQuery = resource('getNetworkCampaigns', getNetworkCampaigns, 'normal')
 export const attackersQuery = resource('getAttackers', getAttackers, 'normal')

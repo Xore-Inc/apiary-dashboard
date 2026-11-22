@@ -244,7 +244,7 @@ import type {
   SourcesPageWire,
 } from './contracts/sources'
 import type { Backend, Caller } from './backend'
-import type { AttackVectors, ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
+import type { ClusterEntity, CountRow, EventType, HoneypotEvent, IocHubKind, RelatedGroup, TimelineEntity, Kpi, MlAnomaly, Paged, Preferences, ScorePoint, Sensor, SensorFields, SessionUser, ShellConfig, SourceProfile } from './types'
 
 /** A dashboard that hangs forever is worse than one that errors. */
 const TIMEOUT_MS = envInt('BACKEND_TIMEOUT_MS', 30_000)
@@ -1810,17 +1810,18 @@ const generateReportFrom: Backend['generateReportFrom'] = async (definition, kee
 }
 
 const getEvents: Backend['getEvents'] = async (filters) => {
-  const [rows, values] = await Promise.all([
-    get<EventsPageWire>('getEvents', '/api/v1/events', eventsQueryWindowed(filters, filters)),
-    get<FilterValuesWire>('getEvents', '/api/v1/filter-values'),
-  ])
+  const rows = await get<EventsPageWire>('getEvents', '/api/v1/events', eventsQueryWindowed(filters, filters))
   // Built here rather than with `eventsPage`, which maps the rows straight
   // through `toHoneypotEvent` and would leave the seven gap fields — the
   // explorer's Severity column among them — undefined on every live row.
-  // `values` are this page's filter-picker vocabularies: this endpoint serves
-  // keys only. Counted facets use the live `/api/v1/facets/:kind` adapter.
-  return { ...paged(rows ?? EMPTY_PAGE), values: filterValues(values ?? EMPTY_VALUES) }
+  // The filter-picker vocabularies are `getFilterValues`: a vocabulary that
+  // moves slowly does not ride along with every page of a live list.
+  return paged(rows ?? EMPTY_PAGE)
 }
+
+/** GET /api/v1/filter-values: the sensors, countries, protocols and ports the
+ * event filters offer, keys only. */
+const getFilterValues: Backend['getFilterValues'] = async () => filterValues((await get<FilterValuesWire>('getFilterValues', '/api/v1/filter-values')) ?? EMPTY_VALUES)
 
 const getCommands: Backend['getCommands'] = async (page) => paged((await get<EventsPageWire>('getCommands', '/api/v1/events', commandsQuery(page))) ?? EMPTY_PAGE)
 
@@ -2230,8 +2231,9 @@ const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique s
  * come from elsewhere: ml-backlog, netflow, conformance (`anomaly-trend`),
  * CVEs and the OS/TCP/ICS/decoy/JA4/TLS/SSH/endlessh breakdowns are the
  * `/api/v1/charts/*` routes, read here through the chart proxy's own
- * `liveChart`, and the attack vectors are `/api/v1/attack-vectors`, one read
- * per sensor that reported in the last 24 h.
+ * `liveChart`. The attack vectors are not in this read: `getAttackVectors`
+ * reads one sensor at a time (the panel shows one), where this used to make
+ * one call per sensor that reported in the last 24 h, up to forty.
  *
  * `campaigns` and `payloads` are the two views the dashboard DOES carry, but
  * not in the shape the table renders: `payloads` is `DashboardPayloadRow`
@@ -2243,8 +2245,7 @@ const KPI_GAPS: Kpi[] = [kpiGap('events', 'Events'), kpiGap('sources', 'Unique s
  * sources slices already make. */
 const getOverviewViews: Backend['getOverviewViews'] = async () => {
   const chart = <TChart extends ChartName>(name: TChart) => liveChart(name, new URLSearchParams())
-  const [vectors, dashboard, payloads, campaigns, osDistribution, tcpClusters, icsFunctions, decoyRequests, decoyClients, ja4h, ja4l, ja4x, tls, ssh, endlessh, cves, mlBacklog, netflowBytes, netflowPackets, anomalyTrend] = await Promise.all([
-    attackVectors(),
+  const [dashboard, payloads, campaigns, osDistribution, tcpClusters, icsFunctions, decoyRequests, decoyClients, ja4h, ja4l, ja4x, tls, ssh, endlessh, cves, mlBacklog, netflowBytes, netflowPackets, anomalyTrend] = await Promise.all([
     get<Dashboard>('getOverviewViews', '/api/v1/overview/dashboard'),
     get<PayloadPageWire>('getOverviewViews', '/api/v1/payloads', { offset: 0, size: 15, aggs: 'sources' }),
     get<CampaignPageWire>('getOverviewViews', '/api/v1/campaigns', { offset: 0, size: 15 }),
@@ -2270,7 +2271,6 @@ const getOverviewViews: Backend['getOverviewViews'] = async () => {
     ...(dashboard ? toOverviewViews(dashboard) : DASHBOARD_GAPS),
     payloads: payloads ? capturedPayloads(payloads).payloads : null,
     campaigns: campaigns ? networkCampaigns(campaigns) : null,
-    vectors,
     // charts.rs `anomaly_trend`: protocol-conformance violations per claimed
     // app protocol, hourly over 48 h (suricata anomaly events).
     conformance: mapped(anomalyTrend, seriesPoints),
@@ -2296,28 +2296,26 @@ const getOverviewViews: Backend['getOverviewViews'] = async () => {
 /** Sensors the attack-vectors read skips: detail.rs `attack_vectors`
  * refuses these two with a 400 (they ship to their own index families). */
 const NO_VECTORS = new Set(['suricata', 'portbridge'])
-/** At most this many sensors are read, newest first: one small aggregation each. */
-const VECTOR_SENSORS = 40
 
-/** GET /api/v1/attack-vectors?sensor= for every sensor that reported in
- * the last 24 h (the endpoint's own window), from the sensor catalog.
- * A sensor whose read fails is left out; the whole view is unavailable
- * only when the catalog itself has no answer. */
-const attackVectors = async (): Promise<Record<string, AttackVectors> | null> => {
-  const catalog = await get<SensorCatalogWire>('getOverviewViews', '/api/v1/sensors/catalog')
+/** The overview's attack-vectors panel: the sensors that reported in the
+ * last 24 h (the endpoint's own window, from the sensor catalog), newest
+ * first, and the vectors of one of them, GET /api/v1/attack-vectors?sensor=.
+ * `sensor` is the one asked for when it is among them, else the newest, so
+ * nothing but a sensor the catalog names reaches the endpoint. Unavailable
+ * when the catalog has no answer; a sensor whose own read has no answer has
+ * unavailable vectors, and the sensors it can switch to are still named. */
+const getAttackVectors: Backend['getAttackVectors'] = async (sensor) => {
+  const catalog = await get<SensorCatalogWire>('getAttackVectors', '/api/v1/sensors/catalog')
   if (!catalog) return null
   const since = Date.now() - 24 * 3_600_000
   const sensors = catalog.sensors
     .filter((row) => !NO_VECTORS.has(row.sensor) && row.events > 0 && Date.parse(row.last_seen) >= since)
     .sort((a, b) => b.last_seen.localeCompare(a.last_seen))
-    .slice(0, VECTOR_SENSORS)
     .map((row) => row.sensor)
-  const reads = await Promise.all(sensors.map((sensor) => get<AttackVectorsWire>('getOverviewViews', '/api/v1/attack-vectors', { sensor }).catch(() => null)))
-  const out: Record<string, AttackVectors> = {}
-  reads.forEach((wire, i) => {
-    if (wire && (wire.ports.length || wire.protocols.length)) out[sensors[i]] = attackVectorRows(wire)
-  })
-  return out
+  const picked = typeof sensor === 'string' && sensors.includes(sensor) ? sensor : (sensors.at(0) ?? null)
+  if (picked === null) return { sensors, sensor: null, vectors: null }
+  const wire = await get<AttackVectorsWire>('getAttackVectors', '/api/v1/attack-vectors', { sensor: picked })
+  return { sensors, sensor: picked, vectors: wire ? attackVectorRows(wire) : null }
 }
 
 /** Maps a chart the route answered, and passes its `null` (no route) through as unavailable. */
@@ -2786,6 +2784,7 @@ const previewReport: Backend['previewReport'] = async (definition) => {
  * the `{ deleted }` responses nothing adapts. */
 const LIVE: Backend = {
   getEvents,
+  getFilterValues,
   getCommands,
   searchHistory,
   getEventDetail,
@@ -2887,6 +2886,7 @@ const LIVE: Backend = {
   // Monitor (#74)
   getOverview,
   getOverviewViews,
+  getAttackVectors,
   getMlAnomalies,
   getAnomaly,
   acknowledgeAnomalies,

@@ -112,6 +112,11 @@ const getAsnFn = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => (await (await import('./backend')).runForRequest('getAsn', data)) as Json)
 export const getAsn = announced('getAsn', getAsnFn) as Queries['getAsn']
 
+const getAttackVectorsFn = createServerFn({ method: 'GET' })
+  .validator((args: unknown[]) => args)
+  .handler(async ({ data }) => (await (await import('./backend')).runForRequest('getAttackVectors', data)) as Json)
+export const getAttackVectors = announced('getAttackVectors', getAttackVectorsFn) as Queries['getAttackVectors']
+
 const getAttackersFn = createServerFn({ method: 'GET' })
   .validator((args: unknown[]) => args)
   .handler(async ({ data }) => (await (await import('./backend')).runForRequest('getAttackers', data)) as Json)
@@ -191,6 +196,11 @@ const getFacetsFn = createServerFn({ method: 'GET' })
   .validator((args: unknown[]) => args)
   .handler(async ({ data }) => (await (await import('./backend')).runForRequest('getFacets', data)) as Json)
 export const getFacets = announced('getFacets', getFacetsFn) as Queries['getFacets']
+
+const getFilterValuesFn = createServerFn({ method: 'GET' })
+  .validator((args: unknown[]) => args)
+  .handler(async ({ data }) => (await (await import('./backend')).runForRequest('getFilterValues', data)) as Json)
+export const getFilterValues = announced('getFilterValues', getFilterValuesFn) as Queries['getFilterValues']
 
 const getGhidraAnalysisFn = createServerFn({ method: 'GET' })
   .validator((args: unknown[]) => args)

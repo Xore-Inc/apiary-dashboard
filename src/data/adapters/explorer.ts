@@ -15,6 +15,7 @@ import type {
   EventDetail,
   EventFilters,
   EventsPage,
+  FilterValues,
   FacetValue,
   Facets,
   HoneypotEvent,
@@ -130,10 +131,9 @@ export const commandsQuery = (window: { offset?: number; limit?: number } = {}):
  * attribution for any recording older than that. */
 export const recordingSourceIpQuery = (shasum: string): EventsQueryWire => ({ kind: 'cowrie.log.closed', shasum, offset: 0, size: 1, since: '365d' })
 
-/** GET /api/v1/events — the explorer list. The page's EventsPage wants the
- * filter vocabularies alongside the rows, and the wire splits them into a
- * second endpoint, so `values` is left to `filterValues` and this returns
- * the paged rows the seam's own shape expects. `offset` is the handler's
+/** GET /api/v1/events — the explorer list. The filter vocabularies are a
+ * second endpoint with its own read (`filterValues`), so this returns the
+ * paged rows the seam's own shape expects. `offset` is the handler's
  * clamped value, not the one requested. */
 export const eventRows = (wire: { total: number; offset: number; rows: EventRow[] }): Paged<ExplorerEvent> => ({
   total: wire.total,
@@ -142,25 +142,24 @@ export const eventRows = (wire: { total: number; offset: number; rows: EventRow[
 })
 
 /** The same rows with the explorer's own envelope filled in. */
-export const eventsPage = (wire: { total: number; offset: number; rows: EventRow[] }, values: EventsPage['values']): Omit<EventsPage, 'rows'> & { rows: ExplorerEvent[] } => ({
+export const eventsPage = (wire: { total: number; offset: number; rows: EventRow[] }): Omit<EventsPage, 'rows'> & { rows: ExplorerEvent[] } => ({
   total: wire.total,
   offset: wire.offset,
   rows: wire.rows.map(toHoneypotEvent),
-  values,
 })
 
 // ---- GET /api/v1/filter-values ----------------------------------------------
 
-/** GET /api/v1/filter-values → the EventsPage `values` block. `ports` are
+/** GET /api/v1/filter-values → the filter vocabularies. `ports` are
  * strings on the wire and numbers on the page, so they are parsed; a port
  * that is not numeric is dropped rather than becoming NaN, since the page
  * renders them as numbers. `protos` is already `Protocol` (a string alias)
  * so it passes through. The aggregation caps (60 sensors, 200 countries,
  * 500 cities, 60 protos, 60 ports, 40 kinds) are the backend's, so a
  * vocabulary longer than its cap arrives short — not a value this adapter
- * chose to drop. `cities` has no field on EventsPage's `values` and is
+ * chose to drop. `cities` has no field on `FilterValues` and is
  * dropped with it. */
-export const filterValues = (wire: FilterValuesWire): EventsPage['values'] => ({
+export const filterValues = (wire: FilterValuesWire): FilterValues => ({
   sensors: wire.sensors,
   countries: wire.countries,
   protos: wire.protos,

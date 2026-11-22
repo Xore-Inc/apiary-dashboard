@@ -107,9 +107,9 @@ describe('explorer adapters', () => {
     expect(out.rows[0]).toMatchObject({ id: 'ev_9f2c1a', timestamp: row.time, srcIp: '203.0.113.42', dstPort: 22, protocol: 'ssh', sessionId: 'sess-77a1', command: 'uname -a', username: 'root', provider: 'hosting' })
   })
 
-  it('fills the explorer envelope with the filter values', () => {
-    const out = eventsPage(page, { sensors: ['cowrie'], countries: ['NL'], protos: ['ssh'], ports: [22] })
-    expect(out.values).toEqual({ sensors: ['cowrie'], countries: ['NL'], protos: ['ssh'], ports: [22] })
+  it('fills the explorer envelope', () => {
+    const out = eventsPage(page)
+    expect(out).toMatchObject({ total: 1, offset: 0 })
     expect(out.rows).toHaveLength(1)
   })
 

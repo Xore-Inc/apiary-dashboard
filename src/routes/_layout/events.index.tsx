@@ -18,11 +18,11 @@ import { entityHref } from '#/lib/entities'
 import { createFileRoute } from '@tanstack/react-router'
 import { RecordList } from '#/components/RecordList'
 import { SeverityToken } from '#/components/SeverityToken'
-import { eventsQuery, facetsQuery } from '#/data/resources'
+import { eventsQuery, facetsQuery, filterValuesQuery } from '#/data/resources'
 import { isBackendGap } from '#/lib/backendGap'
 import { FilterSelect, listParam, toNumericParam, toParam } from '#/components/FilterSelect'
 import type { FilterOption } from '#/components/FilterSelect'
-import type { EventFilters, EventKind, EventsPage, Facets, HoneypotEvent } from '#/data/types'
+import type { EventFilters, EventKind, EventsPage, Facets, FilterValues, HoneypotEvent } from '#/data/types'
 import { apiHref } from '#/lib/apiHref'
 import { downloadJson } from '#/lib/export'
 import { formatClock, formatNumber } from '#/lib/format'
@@ -95,6 +95,9 @@ export const Route = createFileRoute('/_layout/events/')({
   // rows carry (facetsQuery answers a gap).
   loader: async ({ deps: { page, ...filters }, context }) => {
     const [events, facets] = await Promise.all([pageRequest(context, page).then((request) => ensure(context, eventsQuery({ ...filters, ...request }))), ensure(context, facetsQuery())])
+    // Only without the counted facets does a picker need the vocabulary,
+    // and that read is `slow`: a revisit does not ask for it again.
+    if (isBackendGap(facets)) await ensure(context, filterValuesQuery())
     return { ...events, facets }
   },
   component: EventsPage,
@@ -102,14 +105,14 @@ export const Route = createFileRoute('/_layout/events/')({
 })
 
 /** A filter's picker options. With the counted facets, their lists. Without
- * them, the filter-values vocabulary the explorer's own read carries: keys,
- * no counts, for the four filters it covers. The rest offer no list, and the
- * two that take any value still accept a typed one. */
-function optionsOf(key: (typeof FILTERS)[number]['key'], data: (EventsPage & { facets: Facets | { gap: string } }) | undefined): FilterOption[] {
+ * them, the filter-values vocabulary: keys, no counts, for the four filters
+ * it covers. The rest offer no list, and the two that take any value still
+ * accept a typed one. */
+function optionsOf(key: (typeof FILTERS)[number]['key'], data: (EventsPage & { facets: Facets | { gap: string } }) | undefined, values: FilterValues | undefined): FilterOption[] {
   if (!data) return []
   const facets = data.facets
   if (!isBackendGap(facets)) return FILTERS.find((f) => f.key === key)!.options(facets)
-  const { values } = data
+  if (!values) return []
   switch (key) {
     case 'sensor':
       return values.sensors.map((value) => ({ value }))
@@ -177,6 +180,7 @@ function EventsPage() {
   const request = usePageRequest(page)
   const events = usePageQuery(request && eventsQuery({ ...filters, ...request }))
   const facets = usePageQuery(facetsQuery())
+  const vocabulary = usePageQuery(facets && isBackendGap(facets) ? filterValuesQuery() : undefined)
   const data = events && facets && { ...events, facets }
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
@@ -224,7 +228,7 @@ function EventsPage() {
                 size="sm"
                 width={f.width}
                 placeholder={f.label}
-                options={optionsOf(f.key, data)}
+                options={optionsOf(f.key, data, vocabulary)}
                 allowCustom={f.key === 'ip' || f.key === 'port'}
                 value={listParam(search[f.key])}
                 onChange={(values) => setFilter({ [f.key]: f.key === 'port' ? toNumericParam(values) : toParam(values) })}

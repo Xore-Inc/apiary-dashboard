@@ -46,6 +46,7 @@ import type {
   CredEdge,
   EventFilters,
   EventsPage,
+  FilterValues,
   InfraCluster,
   KillChainData,
   MapPoint,
@@ -60,6 +61,8 @@ import type {
   LlmAnalysis,
   MlAnomaliesData,
   SemanticSearchResult,
+  SensorVectors,
+  Unavailable,
   HoneypotEvent,
   OverviewData,
   OverviewViews,
@@ -135,6 +138,7 @@ export interface Queries {
   getAgentCampaigns: () => Promise<AgentCampaign[]>
   getAuthEvents: () => Promise<AuthEventsData>
   getEvents: (filters: EventFilters & PageRequest) => Promise<EventsPage>
+  getFilterValues: () => Promise<FilterValues>
   getSourceProfiles: () => Promise<{ sources: SourceProfile[]; mapPoints: MapPoint[] }>
   getNetworkCampaigns: () => Promise<{ campaigns: NetworkCampaign[]; credReuse: CredEdge[] }>
   getInfraClusters: () => Promise<InfraCluster[]>
@@ -211,6 +215,8 @@ export interface Queries {
   getGithubAnalyses: () => Promise<GithubAnalysis[]>
   getGithubAnalysis: (sha: string) => Promise<GithubAnalysis | null>
   getOverviewViews: () => Promise<OverviewViews>
+  /** One sensor's attack vectors, the newest sensor's when `sensor` is empty or not one that reported. */
+  getAttackVectors: (sensor: string) => Promise<Unavailable<SensorVectors>>
   getSourceEvents: (ip: string, range?: string) => Promise<HoneypotEvent[]>
   getSourceSessions: (ip: string, range?: string) => Promise<SessionSummary[]>
   getSourceTimeline: (ip: string, range?: string) => Promise<TimelineItem[]>

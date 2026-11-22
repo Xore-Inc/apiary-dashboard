@@ -2,6 +2,7 @@ import { pageSsr } from '#/lib/pageSsr'
 import { ActionLink } from '#/components/ActionLink'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { virusTotalLink } from '#/lib/toolLinks'
 import { conformanceSeries } from '#/lib/conformance'
 import { OpenInMenu } from '#/components/OpenInMenu'
@@ -18,15 +19,19 @@ import { Histogram, ProtocolTimeline, RankBars, SensorHeatmap, SeriesLines } fro
 import { CountTable, MiniTable, NotAvailable, Panel, SkeletonTiles, StatTile } from '#/components/DashboardBlocks'
 import { SkeletonBlock, SkeletonPanels } from '#/components/EntityBlocks'
 import { SkeletonTable } from '#/components/SkeletonTable'
-import { ensure, usePageQuery } from '#/lib/query'
+import { ensure, startQuery, usePageQuery } from '#/lib/query'
+import { Deferred } from '#/components/Deferred'
+import { PanelBackendGap } from '#/components/PanelBackendGap'
+import { isBackendGap } from '#/lib/backendGap'
+import { orPending } from '#/lib/pending'
 import { FeedStateLabel } from '#/components/FeedState'
 import { PageFrame } from '#/components/PageFrame'
 import { SeverityToken } from '#/components/SeverityToken'
 import { BugAntIcon, ChartBarIcon, CpuChipIcon, FingerPrintIcon, KeyIcon, UserGroupIcon } from '@heroicons/react/24/outline'
 import { searchTabs, sectionOf } from '#/components/ViewTabs'
 import { WorldMap } from '#/components/WorldMap'
-import { overviewQuery, overviewViewsQuery } from '#/data/resources'
-import type { AttackVectors, CapturedPayload, HoneypotEvent, NetworkCampaign, OverviewViews, SensorFeed, SeriesPoint, TimeBucket, Unavailable } from '#/data/types'
+import { attackVectorsQuery, overviewQuery, overviewViewsQuery } from '#/data/resources'
+import type { CapturedPayload, HoneypotEvent, NetworkCampaign, OverviewViews, SensorFeed, SeriesPoint, TimeBucket, Unavailable } from '#/data/types'
 import { formatClock, formatDateTime, formatNumber, formatTime } from '#/lib/format'
 import { EntityLink } from '#/components/EntityLink'
 import { FilterSelect } from '#/components/FilterSelect'
@@ -76,9 +81,14 @@ export const Route = createFileRoute('/_layout/')({
     view: VIEWS.some((v) => v.id === search.view) && search.view !== 'live' ? (search.view as View) : undefined,
     section: typeof search.section === 'string' && search.section ? search.section : undefined,
   }),
+  // The headline numbers, the recent events and the timeline are the page's
+  // first content: the loader waits for that read only. The deep-dive panels'
+  // charts (about twenty reads behind one call) and the attack vectors start
+  // here and fill in under their own boundaries when they answer.
   loader: async ({ context }) => {
-    const [overview, views] = await Promise.all([ensure(context, overviewQuery()), ensure(context, overviewViewsQuery())])
-    return { overview, views }
+    startQuery(context, overviewViewsQuery())
+    startQuery(context, attackVectorsQuery(''))
+    return { overview: await ensure(context, overviewQuery()) }
   },
   component: OverviewPage,
   pendingComponent: OverviewPage,
@@ -111,29 +121,51 @@ const eventColumns: TableColumn<HoneypotEvent>[] = [
   { key: 'summary', header: 'Detail', width: proportional(3), renderCell: (row) => <EntityLink kind="event" id={row.id}><Text type="code">{row.summary ?? '—'}</Text></EntityLink> },
 ]
 
-function AttackVectorsPanel({ views }: { views: OverviewViews }) {
-  const bySensor: Partial<Record<string, AttackVectors>> = views.vectors ?? {}
-  const sensors = Object.keys(bySensor).filter((s) => !s.startsWith('suricata'))
-  const [sensor, setSensor] = useState(sensors[0])
-  const vectors = bySensor[sensor]
-  if (views.vectors === null) return <Panel title="Attack vectors"><NotAvailable /></Panel>
+/** The deep-dive panels' read, under its own Suspense boundary: `fallback`
+ * while it loads, the panel's backend gap if the backend has no answer. */
+function Views({ fallback, children }: { fallback: ReactNode; children: (views: OverviewViews) => ReactNode }) {
+  return (
+    <Deferred query={overviewViewsQuery()}>
+      {(views) => (views === undefined ? fallback : isBackendGap(views) ? <PanelBackendGap detail={views.gap} /> : children(views))}
+    </Deferred>
+  )
+}
+
+/** One sensor's ports and protocols. Opening the page reads the newest
+ * sensor's; picking another reads that one (and keeps what is shown until it
+ * answers), so the panel costs one aggregation, not one per sensor. */
+function AttackVectorsPanel() {
+  const [picked, setPicked] = useState('')
+  const { data, isError, isPlaceholderData } = useQuery({ ...attackVectorsQuery(picked), placeholderData: keepPreviousData })
+  const read = orPending(data)
+  const title = 'Attack vectors'
+  if (isError || read === null) return <Panel title={title}><NotAvailable /></Panel>
+  if (read === undefined) return <Panel title={title}><SkeletonBlock height={260} /></Panel>
+  const { sensors, vectors } = read
+  const sensor = picked || read.sensor || ''
   return (
     <Panel
-      title="Attack vectors"
+      title={title}
       action={
-        <FilterSelect
-          label="Sensor drill-down"
-          isLabelHidden
-          size="sm"
-          width={200}
-          mode="single"
-          options={sensors.map((s) => ({ value: s }))}
-          value={[sensor]}
-          onChange={([next]) => next && setSensor(next)}
-        />
+        sensors.length > 0 && (
+          <FilterSelect
+            label="Sensor drill-down"
+            isLabelHidden
+            size="sm"
+            width={200}
+            mode="single"
+            options={sensors.map((s) => ({ value: s }))}
+            value={[sensor]}
+            onChange={([next]) => next && setPicked(next)}
+          />
+        )
       }
     >
-      {vectors && (
+      {isPlaceholderData ? (
+        <SkeletonBlock height={260} />
+      ) : vectors === null ? (
+        <NotAvailable />
+      ) : (
         <Grid columns={{ minWidth: 240, repeat: 'fit' }} gap={4}>
           {/* Each table its own container, or both bleed to the card's edges and overlap. */}
           <Card variant="transparent" padding={0}>
@@ -154,18 +186,18 @@ function AttackVectorsPanel({ views }: { views: OverviewViews }) {
   )
 }
 
-function LiveView({ views, recent, timeline, start }: { views: OverviewViews; recent: Unavailable<HoneypotEvent[]>; timeline: Unavailable<TimeBucket[]>; start: string }) {
+function LiveView({ recent, timeline, start }: { recent: Unavailable<HoneypotEvent[]>; timeline: Unavailable<TimeBucket[]>; start: string }) {
   return (
     <VStack gap={4}>
       <Panel title="Activity, last 24h" action={<ActionLink href="/events">Event explorer</ActionLink>}>
-        {available(views.heatmap, (rows) => <SensorHeatmap rows={rows} startIso={start} />)}
+        <Views fallback={<SkeletonBlock height={560} />}>{(views) => available(views.heatmap, (rows) => <SensorHeatmap rows={rows} startIso={start} />)}</Views>
       </Panel>
       <Grid columns={{ minWidth: 320, repeat: 'fit' }} gap={4}>
         <Panel title="Events by protocol">{available(timeline, (buckets) => <ProtocolTimeline buckets={buckets} />)}</Panel>
-        <AttackVectorsPanel views={views} />
+        <AttackVectorsPanel />
       </Grid>
       <Panel title="Attack origins" action={<ActionLink href="/ips">Attack sources</ActionLink>}>
-        {available(views.mapPoints, (points) => <WorldMap points={points} />)}
+        <Views fallback={<SkeletonBlock height={420} />}>{(views) => available(views.mapPoints, (points) => <WorldMap points={points} />)}</Views>
       </Panel>
       <Panel title="Recent events" action={<ActionLink href="/events">All events</ActionLink>}>
         {available(recent, (rows) => <Table data={rows} columns={eventColumns} idKey="id" density="compact" textOverflow="truncate" hasHover />)}
@@ -370,7 +402,6 @@ function EvidenceView({ views }: { views: OverviewViews }) {
 
 function OverviewPage() {
   const overview = usePageQuery(overviewQuery())
-  const views = usePageQuery(overviewViewsQuery())
   const { view = 'live', section } = Route.useSearch()
   // The numbers follow the live stream, at most every refresh interval.
   useLiveRefresh((usePreferences()?.refreshSeconds ?? 10) * 1000)
@@ -392,16 +423,19 @@ function OverviewPage() {
             )}
           </Grid>
         )}
-        {!overview || !views ? (
-          view === 'live' ? <LiveSkeleton /> : <SkeletonPanels count={4} lines={6} />
+        {view === 'live' ? (
+          overview ? <LiveView recent={overview.recentEvents} timeline={overview.timeline} start={dayBefore(overview.generatedAt)} /> : <LiveSkeleton />
         ) : (
-          <>
-            {view === 'live' && <LiveView views={views} recent={overview.recentEvents} timeline={overview.timeline} start={dayBefore(overview.generatedAt)} />}
-            {view === 'health' && <HealthView views={views} />}
-            {view === 'threats' && <ThreatsView views={views} section={section} />}
-            {view === 'behavior' && <BehaviorView views={views} section={section} />}
-            {view === 'evidence' && <EvidenceView views={views} />}
-          </>
+          <Views fallback={<SkeletonPanels count={4} lines={6} />}>
+            {(views) => (
+              <>
+                {view === 'health' && <HealthView views={views} />}
+                {view === 'threats' && <ThreatsView views={views} section={section} />}
+                {view === 'behavior' && <BehaviorView views={views} section={section} />}
+                {view === 'evidence' && <EvidenceView views={views} />}
+              </>
+            )}
+          </Views>
         )}
       </VStack>
     </PageFrame>
