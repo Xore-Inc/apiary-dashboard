@@ -62,6 +62,15 @@ await page.goto(`${base}/`, { waitUntil: 'commit', timeout: 90_000 })
 await page.waitForLoadState('domcontentloaded')
 await requireSession(page, browser)
 await landed('first load overview')
+{
+  // The attack-vectors panel shows one sensor: opening the overview reads that
+  // one, not one per sensor (up to forty, dash#337). A live refresh may read it
+  // again, so allow a few.
+  const calls = await page.evaluate(() => (window as unknown as { __calls: string[] }).__calls)
+  const vectors = calls.filter((name) => name === 'getAttackVectors').length
+  check(vectors >= 1 && vectors <= 3, 'overview: the attack-vectors panel makes one read, not one per sensor (#337)', `${vectors} read(s)`)
+  check(!calls.includes('getFilterValues'), 'overview: no filter-vocabulary read')
+}
 for (const [label, href] of [
   ['events', '/events'],
   ['attackers', '/attackers'],

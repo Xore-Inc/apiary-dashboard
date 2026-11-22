@@ -383,9 +383,15 @@ export interface PageRequest {
   limit?: number
 }
 
-export interface EventsPage extends Paged<HoneypotEvent> {
-  values: { sensors: string[]; countries: string[]; protos: Protocol[]; ports: number[] }
+/** The vocabularies the event filters offer when the counted facets are not served. */
+export interface FilterValues {
+  sensors: string[]
+  countries: string[]
+  protos: Protocol[]
+  ports: number[]
 }
+
+export type EventsPage = Paged<HoneypotEvent>
 
 export interface SourceProfile extends Record<string, unknown> {
   ip: string
@@ -1569,16 +1575,26 @@ export interface AttackVectors {
   protocols: CountRow[]
 }
 
+/** The overview's attack-vectors panel: one sensor's vectors, with the
+ * sensors it can switch to. Read one sensor at a time, so opening the page
+ * costs one aggregation, not one per sensor. */
+export interface SensorVectors {
+  /** Sensors that reported in the last 24 h, newest first. */
+  sensors: string[]
+  /** The sensor `vectors` belong to: the one asked for, else the newest. */
+  sensor: string | null
+  /** Unavailable when the endpoint has no answer. */
+  vectors: Unavailable<AttackVectors>
+}
+
 /** The deep-dive tabs. Every field the dashboard endpoint fills, and the
  * payloads and campaigns legs, is `Unavailable` when its endpoint has no
  * answer. The chart-backed fields are `Unavailable` when their
  * `/api/v1/charts/*` route does not answer (`conformance` is the
- * `anomaly-trend` chart); `vectors` is unavailable when the sensor catalog
- * has no answer, and holds one entry per sensor `/api/v1/attack-vectors`
- * answered for. */
+ * `anomaly-trend` chart). The attack vectors are not here: they have their
+ * own read, `getAttackVectors`. */
 export interface OverviewViews {
   heatmap: Unavailable<HeatmapRow[]>
-  vectors: Unavailable<Record<string, AttackVectors>>
   mapPoints: Unavailable<MapPoint[]>
   feeds: Unavailable<SensorFeed[]>
   protocols: Unavailable<CountRow[]>

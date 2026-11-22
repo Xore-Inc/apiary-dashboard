@@ -10,8 +10,8 @@ Inventory, security, failure, build and live-query evidence are complete: every 
 |---|---|---|
 | Route-tree and direct-handler parity | `scripts/route-matrix.ts`; `src/test/route-matrix.test.ts`; [route matrix](migration/route-matrix.md) | PASS: 63/63 mapped, 0 pending |
 | Source-to-destination traceability | [traceability](migration/traceability.md), including 153 server functions and 25 components | PASS: no unexplained inventory row |
-| Live backend query coverage | `LIVE: Backend` in `src/data/api.ts` (a missing query does not compile); `src/data/api.test.ts` | PASS: 109 queries, all live |
-| Authorization: admin, viewer, anonymous | `src/server/authorize.test.ts`; [authorization matrix](migration/authorization-matrix.md); live: `e2e/live/authorization.ts` | PASS: 188 HTTP routes and 109 queries classified; proven live for anonymous and viewer |
+| Live backend query coverage | `LIVE: Backend` in `src/data/api.ts` (a missing query does not compile); `src/data/api.test.ts` | PASS: 111 queries, all live |
+| Authorization: admin, viewer, anonymous | `src/server/authorize.test.ts`; [authorization matrix](migration/authorization-matrix.md); live: `e2e/live/authorization.ts` | PASS: 188 HTTP routes and 111 queries classified; proven live for anonymous and viewer |
 | Browser acceptance | Live checks (`e2e/live/`, below): navigation, every route shape, charts, maps, graphs, the recording player, responsive shell, viewer read-only screens | Before and after every release |
 | Backend unavailable/overloaded | [failure checks](migration/failure-checks.md); API, admission and proxy tests; `scripts/server-checks.sh` against a closed backend port | PASS |
 | Redis unavailable | Session/fault tests | PASS; real-tier soak drill pending |

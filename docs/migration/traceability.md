@@ -10,7 +10,7 @@ Source of truth: `Xore/APIARY@62ee45d30ff49e58a8dd9db2e75e4306b84b682a`, `arcane
 | Shell behaviors | 27 | [shell.md](shell.md) | Behavior owner and disposition recorded | 27 mapped |
 | Data fields | 1,096 | [field-coverage.md](field-coverage.md) | Generated field coverage test | 0 gaps |
 | Rewrite server queries | 109 | `src/data/queries.contract.ts` | `LIVE` in `src/data/api.ts` implements the whole contract (typechecked) | 109 live |
-| Authorization | 188 HTTP routes, 109 queries | [authorization-matrix.md](authorization-matrix.md) | Generated route tree and query facade are the inputs | Complete |
+| Authorization | 188 HTTP routes, 111 queries | [authorization-matrix.md](authorization-matrix.md) | Generated route tree and query facade are the inputs | Complete |
 
 The route-local canonical server functions are not copied one-for-one. `src/data/queries.ts` is the stable rewrite facade, `src/data/api.ts` owns backend calls, and `src/data/adapters/*` owns wire-to-page translation. The server-function matrix records those owners per source function.
 
