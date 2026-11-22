@@ -23,7 +23,7 @@ concurrency:
   group: bun-update
 
 env:
-  BUN_VERSION: "1.4.2"
+  BUN_VERSION: "1.4.5"
   BRANCH: deps/bun-update
 
 jobs:

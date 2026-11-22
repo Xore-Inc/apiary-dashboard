@@ -3,9 +3,13 @@
 # (README → "Signing in and security"); the server refuses to boot without
 # SERVICE_TOKEN (or SERVICE_TOKEN_FILE). Every module the boot path imports
 # (server.ts -> policy.ts -> ...) must be in the server-file COPY below.
-ARG BUN_VERSION=1.4.2
+ARG BUN_VERSION=1.4.5
+# Multi-arch index digests of oven/bun:${BUN_VERSION} and oven/bun:${BUN_VERSION}-slim,
+# resolved 2026-11-22 (docker buildx imagetools inspect). Re-resolve on every Bun bump.
+ARG BUN_BUILD_DIGEST=sha256:3aa040e5445efa09d75bb428a64ba50db13e2b3ac9b6b0c7f145615f62b2ee18
+ARG BUN_RUNTIME_DIGEST=sha256:b780593f3e10918cbdaec3d5a08d52224b9198069a65eb47812085c2ec007643
 
-FROM oven/bun:${BUN_VERSION} AS build
+FROM oven/bun:${BUN_VERSION}@${BUN_BUILD_DIGEST} AS build
 WORKDIR /app
 # patches/ holds the bun patchedDependencies; install refuses without them.
 COPY package.json bun.lock ./
@@ -14,7 +18,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-FROM oven/bun:${BUN_VERSION}-slim AS runtime
+FROM oven/bun:${BUN_VERSION}-slim@${BUN_RUNTIME_DIGEST} AS runtime
 # The base image lags Debian's security fixes; take them at build time.
 RUN apt-get update && apt-get -y upgrade --no-install-recommends && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
