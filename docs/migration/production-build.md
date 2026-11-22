@@ -1,6 +1,6 @@
 # Production build verification
 
-The release artifact is the Vite production output served by `bun run server.ts`; the container builds the same output with Bun 1.4.2.
+The release artifact is the Vite production output served by `bun run server.ts`; the container builds the same output with Bun 1.4.5.
 
 ## Reproducible check
 
