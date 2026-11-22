@@ -41,7 +41,7 @@ jobs:
         if: steps.key.outputs.present == 'true'
         with:
           fetch-depth: 1
-      - uses: anthropics/claude-code-action@1ba15be4f0b0c9a026c0c7986668f8f2aa998440 # v1.0.74
+      - uses: anthropics/claude-code-action@f431adaf77e0fecf918431e75a2b5b45b85af002 # v1.0.283
         if: steps.key.outputs.present == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
