@@ -1,8 +1,10 @@
 name: Dependabot auto-merge
 
 # Patch and minor updates merge by themselves once every required check is
-# green (auto-merge waits for them). Majors, and minors of 0.x packages
-# (which may break), wait for a person, as in APIARY.
+# green (auto-merge waits for them). Majors, minors of 0.x packages (which may
+# break), and GitHub Actions bumps (which run on main with secrets and write
+# scopes, and no required check exercises their new code) wait for a person,
+# as in APIARY.
 
 on:
   pull_request:
@@ -17,27 +19,49 @@ jobs:
     if: github.actor == 'dependabot[bot]' && github.event.pull_request.user.login == 'dependabot[bot]' && !github.event.pull_request.draft
     runs-on: ubuntu-latest
     steps:
-      - uses: dependabot/fetch-metadata@v3
+      - uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         id: metadata
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Hold 0.x minor bumps for a person
-        id: zero-major
+      - name: Hold GitHub Actions and 0.x bumps for a person
+        id: hold
         env:
+          ECOSYSTEM: ${{ steps.metadata.outputs.package-ecosystem }}
           DEPS: ${{ steps.metadata.outputs.updated-dependencies-json }}
         run: |
-          held="$(jq -r '[.[] | select(.updateType == "version-update:semver-minor" and ((.prevVersion // "") | startswith("0.")))
+          set -euo pipefail
+          reasons=()
+          if [ "$ECOSYSTEM" = "github_actions" ]; then
+            reasons+=("GitHub Actions bump (runs with secrets and write scopes on main; no required check exercises the new action code)")
+          fi
+          zero="$(jq -r '[.[] | select((.updateType == "version-update:semver-minor" or .updateType == "version-update:semver-major")
+                                   and ((.prevVersion // "") | startswith("0.")))
                              | "\(.dependencyName) \(.prevVersion) -> \(.newVersion)"] | join(", ")' <<<"${DEPS:-[]}")"
-          if [ -n "$held" ]; then
+          if [ -n "$zero" ]; then
+            reasons+=("0.x minor bump: $zero")
+          fi
+          if [ "${#reasons[@]}" -gt 0 ]; then
+            held="$(printf '%s; ' "${reasons[@]}")"
+            held="${held%; }"
             echo "hold=true" >>"$GITHUB_OUTPUT"
-            echo "::notice::0.x minor bump, not auto-merging: $held"
+            echo "held=$held" >>"$GITHUB_OUTPUT"
+            echo "::notice::Not auto-merging: $held"
           fi
       - name: Merge when green
         if: >-
-          steps.zero-major.outputs.hold != 'true' &&
+          steps.hold.outputs.hold != 'true' &&
           (steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
            steps.metadata.outputs.update-type == 'version-update:semver-minor')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.html_url }}
         run: gh pr merge --auto --squash "$PR"
+      - name: Leave the update for a person
+        if: steps.hold.outputs.hold == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.html_url }}
+          HELD: ${{ steps.hold.outputs.held }}
+        run: |
+          gh pr comment "$PR" --body \
+            "Not auto-merging: $HELD. Check the changelog and merge by hand once the required checks pass. Auto-merge holds GitHub Actions bumps and 0.x minor and major bumps."
