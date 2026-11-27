@@ -78,6 +78,8 @@ GitHub Actions, on GitHub-hosted runners:
 
 Dependabot proposes GitHub Actions and base-image updates weekly. It cannot read Bun 1.4's `bun.lock` yet, so npm packages come from `bun-update.yml` instead; TanStack packages are pinned to exact versions and move together. A ruleset on `main` requires every check above except the automated review, and blocks force pushes and deletion.
 
+Aikido AutoFix pull request settings live in `.aikido` at the repository root. AutoFix pull requests are proposals and are never merged as-is; dependency autofix stays enabled alongside Dependabot.
+
 To release: `git tag v0.1.0 && git push origin v0.1.0`.
 
 ```bash
