@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 /** In order: the crawl writes the samples the skeleton check reads. */
-const CHECKS = ['authorization', 'viewer-readonly', 'standard', 'webkit-first-load', 'crawl', 'skeletons', 'features', 'a11y', 'responsive', 'perf'] as const
+const CHECKS = ['authorization', 'viewer-readonly', 'standard', 'webkit-first-load', 'crawl', 'skeletons', 'features', 'a11y', 'responsive', 'perf', 'records'] as const
 const only = process.env.ONLY?.split(',').map((s) => s.trim()).filter(Boolean)
 const unknown = only?.filter((name) => !(CHECKS as readonly string[]).includes(name)) ?? []
 if (unknown.length) {

@@ -14,9 +14,11 @@ export const Route = createFileRoute('/_layout/events/$id/raw')({
 })
 
 function TabView() {
+  // The document as stored, not the page's summary of it: every field the
+  // index holds, scrubbed only where the API scrubs (#3213).
   return (
     <Panel title="The complete record">
-      <JsonBlock value={usePageQuery(eventDetailQuery(parent.useParams().id))?.event} />
+      <JsonBlock value={usePageQuery(eventDetailQuery(parent.useParams().id))?.record} maxHeight={960} />
     </Panel>
   )
 }

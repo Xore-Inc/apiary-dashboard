@@ -963,6 +963,9 @@ export interface Technique extends Record<string, unknown> {
 
 export interface EventDetail {
   event: HoneypotEvent
+  /** The document exactly as stored (scrubbed for the decoy sensors), for the
+   * Raw tab and the captured-bytes section. */
+  record: Record<string, unknown>
   session: HoneypotEvent[]
   connection: HoneypotEvent[]
   source: HoneypotEvent[]
@@ -976,6 +979,11 @@ export interface EventDetail {
 export interface SessionDetail {
   id: string
   events: HoneypotEvent[]
+  /** Every record the session has. `events` holds the first 1000 of them. */
+  total: number
+  /** Each of the session's documents as stored (scrubbed for the decoy
+   * sensors), in the order of `events`: the session's Raw tab. */
+  records: Record<string, unknown>[]
   srcIp: string
   country: string
   first: string

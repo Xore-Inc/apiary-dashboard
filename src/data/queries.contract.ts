@@ -171,7 +171,7 @@ export interface Queries {
   provisionCredential: (input: Pick<BaitCredential, 'path' | 'target' | 'username' | 'password' | 'memo' | 'template'>) => Promise<BaitCredential>
   rotateCredential: (id: string, password?: string) => Promise<void>
   linkCredentialToken: (id: string, tokenId?: string) => Promise<void>
-  getPayloads: () => Promise<{ payloads: CapturedPayload[]; sources: CountRow[] }>
+  getPayloads: (text?: string) => Promise<{ payloads: CapturedPayload[]; sources: CountRow[] }>
   getAnalysisResults: (range?: string) => Promise<AnalysisResultsData>
   getAnalyzerCatalog: (hash: string) => Promise<AnalyzerCatalog | null>
   startAnalysisRun: (config: AnalysisRunConfig) => Promise<{ run: WorkbenchRun; reused: boolean } | null>

@@ -11,7 +11,7 @@
  * With `allowCustom`, text that matches no value can be added as-is, for
  * filters that also take free text such as a signature substring.
  */
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { Button } from '@astryxdesign/core/Button'
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList'
@@ -44,6 +44,10 @@ type FilterSelectProps = {
   /** Lets typed text that matches no value be added as a value of its own. */
   allowCustom?: boolean
   status?: { type: 'error' | 'warning' | 'success'; message?: string }
+  /** Search on the server: `options` are the matches for the text last given
+   * to `onSearch`, and the list does not narrow them again in the browser. */
+  onSearch?: (text: string) => void
+  searchHint?: string
 }
 
 // Long lists stay responsive; the search narrows past this.
@@ -58,15 +62,28 @@ function summary(options: FilterOption[], value: string[]): string | undefined {
   return labels.length <= 2 ? labels.join(', ') : `${labels[0]}, +${labels.length - 1}`
 }
 
-function FilterList({ options, value, onChange, close, mode, allowCustom, initialQuery, label }: { options: FilterOption[]; value: string[]; onChange: (value: string[]) => void; close: () => void; mode: 'multiple' | 'single'; allowCustom: boolean; initialQuery: string; label: string }) {
+type FilterListProps = { options: FilterOption[]; value: string[]; onChange: (value: string[]) => void; close: () => void; mode: 'multiple' | 'single'; allowCustom: boolean; initialQuery: string; label: string; onSearch?: (text: string) => void; searchHint?: string }
+
+function FilterList({ options, value, onChange, close, mode, allowCustom, initialQuery, label, onSearch, searchHint }: FilterListProps) {
   const [query, setQuery] = useState(initialQuery)
+  const serverSearch = Boolean(onSearch)
   const needle = query.trim().toLowerCase()
+  // The parent learns the text as the list opens, and forgets it as the list
+  // closes. Refs keep this to mount and unmount; later keystrokes reach the
+  // parent from the input's onChange.
+  const searchRef = useRef(onSearch)
+  searchRef.current = onSearch
+  const openedWith = useRef(initialQuery)
+  useEffect(() => {
+    searchRef.current?.(openedWith.current)
+    return () => searchRef.current?.('')
+  }, [])
   // Selected values first, so what is on stays in view while narrowing.
   const matches = useMemo(() => {
-    const hits = options.filter((o) => !needle || o.value.toLowerCase().includes(needle) || (o.label ?? '').toLowerCase().includes(needle))
+    const hits = serverSearch ? options : options.filter((o) => !needle || o.value.toLowerCase().includes(needle) || (o.label ?? '').toLowerCase().includes(needle))
     return [...hits.filter((o) => value.includes(o.value)), ...hits.filter((o) => !value.includes(o.value))]
-  }, [options, needle, value])
-  const custom = allowCustom && needle && !options.some((o) => o.value.toLowerCase() === needle) && !value.includes(query.trim()) ? query.trim() : undefined
+  }, [options, needle, value, serverSearch])
+  const custom = allowCustom && !serverSearch && needle && !options.some((o) => o.value.toLowerCase() === needle) && !value.includes(query.trim()) ? query.trim() : undefined
   const extra = value.filter((v) => !options.some((o) => o.value === v))
 
   const toggle = (v: string) => {
@@ -86,9 +103,12 @@ function FilterList({ options, value, onChange, close, mode, allowCustom, initia
         size="sm"
         hasAutoFocus
         hasClear
-        placeholder={`Search ${formatNumber(options.length)} values`}
+        placeholder={searchHint ?? `Search ${formatNumber(options.length)} values`}
         value={query}
-        onChange={setQuery}
+        onChange={(text) => {
+          setQuery(text)
+          onSearch?.(text)
+        }}
         onEnter={() => {
           if (custom) toggle(custom)
           else if (matches.length === 1) toggle(matches[0].value)
@@ -96,7 +116,7 @@ function FilterList({ options, value, onChange, close, mode, allowCustom, initia
       />
       <HStack gap={2} vAlign="center">
         <StackItem size="fill">
-          <Text type="supporting">{needle ? `${formatNumber(matches.length)} of ${formatNumber(options.length)} match` : `${formatNumber(options.length)} values`}</Text>
+          <Text type="supporting">{serverSearch ? (needle ? `${formatNumber(matches.length)} found` : 'Type to search the whole inventory') : needle ? `${formatNumber(matches.length)} of ${formatNumber(options.length)} match` : `${formatNumber(options.length)} values`}</Text>
         </StackItem>
         {mode === 'multiple' && needle && matches.length > 0 && <Button label="Select matches" size="sm" variant="ghost" onClick={() => onChange([...new Set([...value, ...matches.map((m) => m.value)])])} />}
         {value.length > 0 && <Button label="Clear" size="sm" variant="ghost" onClick={() => onChange([])} />}
@@ -132,7 +152,7 @@ function FilterList({ options, value, onChange, close, mode, allowCustom, initia
 }
 
 
-export function FilterSelect({ label, options, value, onChange, mode = 'multiple', placeholder, description, isLabelHidden, size = 'md', width, allowCustom = false, status }: FilterSelectProps) {
+export function FilterSelect({ label, options, value, onChange, mode = 'multiple', placeholder, description, isLabelHidden, size = 'md', width, allowCustom = false, status, onSearch, searchHint }: FilterSelectProps) {
   const handle = useRef<ComplexSelectorHandle>(null)
   const triggerLabel = summary(options, value)
   const triggerText = triggerLabel ?? placeholder ?? (mode === 'single' ? 'Pick one' : 'Any')
@@ -171,7 +191,7 @@ export function FilterSelect({ label, options, value, onChange, mode = 'multiple
         {(current, commit, close, state) =>
           // Only while open: the list can be long, and each opening starts a
           // fresh search from whatever key opened it.
-          state.isOpen ? <FilterList options={options} value={current} onChange={commit} close={close} mode={mode} allowCustom={allowCustom} initialQuery={seed.current} label={label} /> : null
+          state.isOpen ? <FilterList options={options} value={current} onChange={commit} close={close} mode={mode} allowCustom={allowCustom} initialQuery={seed.current} label={label} onSearch={onSearch} searchHint={searchHint} /> : null
         }
       </ComplexSelector>
     </div>

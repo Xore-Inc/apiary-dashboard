@@ -7,6 +7,7 @@
  * within all come from the backend's catalogue for the picked sample.
  */
 import { useEffect, useState } from 'react'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Banner } from '@astryxdesign/core/Banner'
 import { Card } from '@astryxdesign/core/Card'
 import { CheckboxList, CheckboxListItem } from '@astryxdesign/core/CheckboxList'
@@ -19,10 +20,11 @@ import { Spinner } from '@astryxdesign/core/Spinner'
 import { HStack, VStack } from '@astryxdesign/core/Stack'
 import { Text } from '@astryxdesign/core/Text'
 import { Token } from '@astryxdesign/core/Token'
-import { getAnalysisResults, getAnalyzerCatalog, getPayloads } from '#/data/queries'
+import { analysisResultsQuery, analyzerCatalogQuery, payloadAnalysisQuery, payloadsQuery } from '#/data/resources'
 import { startAnalysisRunWrite } from '#/data/writes'
 import { useDataMutation } from '#/lib/mutation'
-import type { AnalysisRunConfig, AnalyzerCatalog, AnalyzerId, AnalyzerInfo, AnalyzerOptions, CapturedPayload, WorkbenchRecipe, WorkbenchRun } from '#/data/types'
+import { useDebouncedValue } from '#/lib/useDebouncedValue'
+import type { AnalysisRunConfig, AnalyzerId, AnalyzerInfo, AnalyzerOptions, WorkbenchRecipe, WorkbenchRun } from '#/data/types'
 import { formatNumber } from '#/lib/format'
 import { FilterSelect } from '../FilterSelect'
 import { WizardDialog, statusOf } from '../WizardDialog'
@@ -57,30 +59,29 @@ const size = (bytes: number) => (bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1
 export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued }: { isOpen: boolean; onOpenChange: (open: boolean) => void; initialHash?: string; onQueued?: (queued: { run: WorkbenchRun; reused: boolean }) => void }) {
   // Queuing invalidates the workbench and the payload's analysis reads (data/writes.ts).
   const startRun = useDataMutation(startAnalysisRunWrite())
-  const [catalog, setCatalog] = useState<{ payloads: CapturedPayload[]; recipes: WorkbenchRecipe[] } | null>(null)
   const [config, setConfig] = useState<AnalysisRunConfig>(() => defaults(initialHash ?? ''))
+
+  // The picker searches the whole inventory as the operator types. The text
+  // is debounced, and an empty search is the payload page's own list.
+  const [search, setSearch] = useState('')
+  const text = useDebouncedValue(search, 250)
+  const listing = useQuery({ ...(text ? payloadsQuery(text) : payloadsQuery()), enabled: isOpen, placeholderData: keepPreviousData })
+  const listed = listing.data?.payloads ?? []
+  const listedHit = listed.find((p) => p.hash === config.hash)
+  // A payload the list does not show (a deep link, or one outside the search)
+  // is resolved by its own read, so it always validates.
+  const resolved = useQuery({ ...payloadAnalysisQuery(config.hash), enabled: isOpen && Boolean(config.hash) && listing.isSuccess && !listedHit })
+  const payload = listedHit ?? resolved.data?.payload
+  const recipes = useQuery({ ...analysisResultsQuery(), enabled: isOpen }).data?.recipes ?? []
+
   // Which analyzers apply to the picked sample, and why not: the backend's
   // answer for that sample.
-  const [forSample, setForSample] = useState<AnalyzerCatalog | null>(null)
-
-  // The catalog loads when the dialog first opens, so any page can host it.
+  const sample = useQuery({ ...analyzerCatalogQuery(config.hash), enabled: isOpen && Boolean(config.hash) })
+  const forSample = config.hash ? (sample.data ?? null) : null
+  // Drop what the picked sample cannot take.
   useEffect(() => {
-    if (!isOpen || catalog) return
-    void Promise.all([getPayloads(), getAnalysisResults()]).then(([p, r]) => setCatalog({ payloads: p.payloads, recipes: r.recipes }))
-  }, [isOpen, catalog])
-  useEffect(() => {
-    if (!isOpen || !config.hash) return setForSample(null)
-    let live = true
-    void getAnalyzerCatalog(config.hash).then((c) => {
-      if (!live) return
-      setForSample(c)
-      // Drop what the new sample cannot take.
-      if (c) setConfig((cur) => ({ ...cur, analyzers: cur.analyzers.filter((id) => c.analyzers.find((a) => a.id === id)?.applicable) }))
-    })
-    return () => {
-      live = false
-    }
-  }, [isOpen, config.hash])
+    if (forSample) setConfig((cur) => ({ ...cur, analyzers: cur.analyzers.filter((id) => forSample.analyzers.find((a) => a.id === id)?.applicable) }))
+  }, [forSample])
   const infoOf = (id: AnalyzerId) => forSample?.analyzers.find((a) => a.id === id)
   // Each opening starts from a clean config for the host's sample.
   useEffect(() => {
@@ -95,7 +96,6 @@ export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued 
     if (own) setConfig((c) => ({ ...c, options: { ...c.options, [id]: { ...own, ...patch } } }))
   }
 
-  const payload = catalog?.payloads.find((p) => p.hash === config.hash)
   const gpu = config.analyzers.filter((a) => a === 'ghidra' || a === 'revdeck')
   const optionSummary = (id: AnalyzerId) => {
     const own = optionsOf(id)
@@ -164,18 +164,20 @@ export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued 
           label: 'Sample',
           errors: payload ? {} : { hash: 'Pick a captured payload to analyze.' },
           render: (shown) =>
-            !catalog ? (
+            !listing.data && !payload ? (
               loading
             ) : (
               <FormLayout>
                 <FilterSelect
                   label="Payload"
                   mode="single"
-                  options={catalog.payloads.map((p) => ({ value: p.hash, label: `${p.hash.slice(0, 16)}… · ${p.kind} · ${p.verdict?.family ?? p.verdict?.label ?? 'no verdict'}` }))}
+                  options={[...listed, ...(payload && !listedHit ? [payload] : [])].map((p) => ({ value: p.hash, label: `${p.hash.slice(0, 16)}… · ${p.kind} · ${p.platform}` }))}
                   value={config.hash ? [config.hash] : []}
                   onChange={([hash]) => hash && setConfig((c) => ({ ...c, hash }))}
                   placeholder="Pick a captured payload"
-                  description="Every captured sample; type part of its hash, kind or family."
+                  description="Every captured sample. Type part of its hash, or its kind, platform, MIME type or source."
+                  searchHint="Hash prefix, kind, platform, MIME type, source…"
+                  onSearch={setSearch}
                   status={statusOf(shown, 'hash')}
                 />
                 {payload && (
@@ -204,15 +206,15 @@ export function AnalysisRunDialog({ isOpen, onOpenChange, initialHash, onQueued 
               loading
             ) : (
               <VStack gap={4}>
-                {catalog && catalog.recipes.length > 0 && (
+                {recipes.length > 0 && (
                   <Selector
                     label="Start from a recipe"
                     placeholder="Pick analyzers by hand"
-                    options={catalog.recipes.map((r) => ({ value: r.id, label: `${r.name} (${r.scope}, rev ${r.revision})` }))}
+                    options={recipes.map((r) => ({ value: r.id, label: `${r.name} (${r.scope}, rev ${r.revision})` }))}
                     value={null}
                     hasClear
                     onChange={(id) => {
-                      const recipe = catalog.recipes.find((r) => r.id === id)
+                      const recipe = recipes.find((r) => r.id === id)
                       if (recipe) setConfig((c) => fromRecipe(c, recipe, (a) => Boolean(infoOf(a)?.applicable)))
                     }}
                     description="Sets its analyzers and their options; what this sample cannot take is left out."
