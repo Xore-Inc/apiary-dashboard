@@ -1991,11 +1991,19 @@ const abortGpuJob: Backend['abortGpuJob'] = async (jobId) => {
   return wire.abort_requested
 }
 
-/** GET /api/v1/payloads. `aggs=sources` is not optional: stores.rs #2179
- * appends the per-source census (`source_buckets`) ONLY for that value, so
- * without it the page's `sources` rollup is silently empty — the backend
- * answers 200 with the rows and nothing to count. */
-const getPayloads: Backend['getPayloads'] = async () => capturedPayloads((await get<PayloadPageWire>('getPayloads', '/api/v1/payloads', { offset: 0, size: 100, aggs: 'sources' })) ?? { total: 0, rows: [] })
+/** GET /api/v1/payloads. Without `text` this is the payload page's list:
+ * `aggs=sources` is not optional there, because stores.rs #2179 appends the
+ * per-source census (`source_buckets`) ONLY for that value, so without it the
+ * page's `sources` rollup is silently empty.
+ *
+ * With `text` it is the analysis picker's search over the whole inventory
+ * (`q` is free text on this route, stores.rs payload_search_filter): the
+ * matching rows, no census. */
+const getPayloads: Backend['getPayloads'] = async (text) => {
+  const q = text?.trim()
+  const search = q ? { offset: 0, size: 50, q } : { offset: 0, size: 100, aggs: 'sources' }
+  return capturedPayloads((await get<PayloadPageWire>('getPayloads', '/api/v1/payloads', search)) ?? { total: 0, rows: [] })
+}
 
 /** GET /api/v1/payloads/{hash}. The detail doc is its own envelope — the
  * inventory row and the static-analysis and yara docs beside it — so the
