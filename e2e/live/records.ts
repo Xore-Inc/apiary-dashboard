@@ -15,7 +15,7 @@ import { SKELETON, base, check, done, fail, info, launch, requireSession, settle
 
 const EVENT = 'v8i9IqIBRoScrgjujw8M'
 const PACKET_B64 = 'AgGa81eUggGa81eUCABFYAAs1DEAAPgG2nqTuYWwV2qi69qFJwzL2gDLAAAAAGAC//+2LwAAAgQFtA=='
-const PACKET_HEX = '02 01 9a f3 57 94 82 01 9a f3 57 94 08 00 45 60'
+const PACKET_HEX = '02 01 9a f3 57 94 82 01  9a f3 57 94 08 00 45 60'
 const PAYLOAD = '12013662c71da69de977c04cd7021f13a70cf7bed4ca6c82acbc100464d4b0ef'
 const PAYLOAD_KIND = 'Linux ELF executable'
 
