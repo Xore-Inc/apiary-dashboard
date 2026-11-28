@@ -214,6 +214,7 @@ export function eventDetail(wire: EventPageWire, row: EventRow, reading: EventDe
     source: [],
     hashes: wire.hashes,
     recordingShasum: undefined,
+    record: wire.record,
     reading,
   }
 }
@@ -250,6 +251,8 @@ export function sessionDetail(wire: SessionDetailWire): Omit<SessionDetail, 'rec
   return {
     id: wire.id,
     events: wire.events.map(toHoneypotEvent),
+    total: wire.total,
+    records: wire.events.map((row) => row.record as Record<string, unknown>),
     srcIp: wire.ip,
     country: wire.country,
     first: wire.first,

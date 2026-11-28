@@ -17,6 +17,7 @@ import { fieldBlock, readField } from '#/lib/sensorFields'
 import { startQuery, usePageQuery } from '#/lib/query'
 import { eventDetailQuery, relatedQuery } from '#/data/resources'
 import { Deferred } from '#/components/Deferred'
+import { CapturedBytesPanel } from '#/components/CapturedBytes'
 
 const parent = getRouteApi('/_layout/events/$id')
 
@@ -160,6 +161,7 @@ function EventOverview() {
           ))}
         </Panel>
       )}
+      <CapturedBytesPanel record={loaded.record} />
       <EventsPanel title="Around it in this session" events={session.slice(0, 8)} action={event.sessionId ? <EntityLink kind="session" id={event.sessionId}>Full session</EntityLink> : undefined} empty="This event is the whole session." />
       <Deferred query={related}>{(groups) => <RelatedPanel center={event.summary ?? event.eventName} groups={groups} />}</Deferred>
     </VStack>
